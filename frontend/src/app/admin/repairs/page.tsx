@@ -1,0 +1,416 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
+import { Sidebar } from "@/app/components/Sidebar";
+
+type RepairLog = {
+  id: number; repId: string; owner: string | null; brand: string | null; model: string | null;
+  issue: string | null; solution: string | null; completed: boolean;
+  cost: number | null; payment: number | null; profit: number | null;
+  dateCompleted: string | null; duration: string | null; parts: string | null;
+  shop: string | null; comments: string | null; forgottenParts: string | null;
+};
+
+const empty: Omit<RepairLog, "id"> = {
+  repId: "", owner: null, brand: null, model: null, issue: null, solution: null,
+  completed: false, cost: null, payment: null, profit: null, dateCompleted: null,
+  duration: null, parts: null, shop: null, comments: null, forgottenParts: null,
+};
+
+const fmt = (v: number | null) => v == null ? "—" : `LKR ${v.toLocaleString()}`;
+const dash = (v?: string | null) => v || "—";
+const profitColor = (v: number | null) => v == null ? "#9aa3bd" : v > 0 ? "#059669" : v < 0 ? "#e11d48" : "#9aa3bd";
+
+// Card accent based on profit + completion
+const cardAccent = (r: RepairLog) => {
+  if (!r.completed) return { border: "#d97706", bg: "#fffbf0", chip: "rgba(217,119,6,0.12)", chipText: "#92400e" };
+  if (r.profit == null || r.profit === 0) return { border: "#4f46e5", bg: "#f5f5ff", chip: "rgba(79,70,229,0.1)", chipText: "#3730a3" };
+  if (r.profit > 0) return { border: "#059669", bg: "#f0fdf8", chip: "rgba(5,150,105,0.1)", chipText: "#065f46" };
+  return { border: "#e11d48", bg: "#fff1f3", chip: "rgba(225,29,72,0.1)", chipText: "#9f1239" };
+};
+
+const PER_PAGE = 12;
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: "0.75rem", padding: "0.6rem 0", borderBottom: "1px solid var(--border)" }}>
+      <span style={{ width: 120, flexShrink: 0, fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--dim)", paddingTop: 2 }}>{label}</span>
+      <span style={{ fontSize: "0.875rem", color: "var(--text)", flex: 1, lineHeight: 1.5, wordBreak: "break-word" }}>{value}</span>
+    </div>
+  );
+}
+
+function FField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.4rem", textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+export default function AdminRepairsPage() {
+  const [logs, setLogs]         = useState<RepairLog[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [search, setSearch]     = useState("");
+  const [page, setPage]         = useState(1);
+  const [detail, setDetail]     = useState<RepairLog | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing]   = useState<RepairLog | null>(null);
+  const [form, setForm]         = useState<Omit<RepairLog, "id">>(empty);
+  const [saving, setSaving]     = useState(false);
+
+  useEffect(() => {
+    apiFetch<RepairLog[]>("/api/repair-logs")
+      .then(setLogs).catch((e) => setError(e.message)).finally(() => setLoading(false));
+  }, []);
+
+  const q = search.toLowerCase();
+  const filtered = logs.filter((r) =>
+    !q || [r.repId, r.owner, r.brand, r.model, r.issue].some((v) => v?.toLowerCase().includes(q))
+  );
+  const pages    = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const safePage = Math.min(page, pages);
+  const visible  = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+
+  const openAdd  = () => { setForm(empty); setEditing(null); setShowForm(true); };
+  const openEdit = (r: RepairLog) => { const { id: _, ...rest } = r; setForm(rest); setEditing(r); setDetail(null); setShowForm(true); };
+  const setF     = (k: keyof typeof form, v: string | boolean | number | null) => setForm((p) => ({ ...p, [k]: v }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      if (editing) {
+        const u = await apiFetch<RepairLog>(`/api/repair-logs/${editing.id}`, { method: "PUT", body: JSON.stringify({ ...form, id: editing.id }) });
+        setLogs((p) => p.map((r) => r.id === editing.id ? u : r));
+      } else {
+        const c = await apiFetch<RepairLog>("/api/repair-logs", { method: "POST", body: JSON.stringify(form) });
+        setLogs((p) => [...p, c]);
+      }
+      setShowForm(false);
+    } catch (e) { alert(e instanceof Error ? e.message : "Save failed"); }
+    finally { setSaving(false); }
+  };
+
+  const totalProfit = logs.reduce((s, r) => s + (r.profit ?? 0), 0);
+  const totalSpent  = logs.reduce((s, r) => s + (r.cost   ?? 0), 0);
+
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+      <Sidebar role="admin" userName="Admin" userEmail="admin@mobilux.lk" />
+
+      <main style={{ flex: 1, paddingLeft: 240, minWidth: 0 }}>
+        <div style={{ padding: "2rem 1.75rem" }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
+            <div>
+              <p className="label" style={{ marginBottom: "0.4rem" }}>Admin Dashboard</p>
+              <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>Repair Logs</h1>
+            </div>
+            <button onClick={openAdd} className="btn-primary" style={{ width: "auto", padding: "0.7rem 1.5rem" }}>+ Add Repair</button>
+          </div>
+
+          {error && <div className="banner-error" style={{ marginBottom: "1rem" }}>⚠ {error}</div>}
+
+          {/* Stats */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.875rem", marginBottom: "1.25rem" }}>
+            {[
+              { l: "Total",   v: String(logs.length),                   icon: "🔧", c: "#4f46e5" },
+              { l: "Done",    v: String(logs.filter((r) => r.completed).length), icon: "✅", c: "#059669" },
+              { l: "Spent",   v: `LKR ${totalSpent.toLocaleString()}`,   icon: "💸", c: "#d97706" },
+              { l: "Profit",  v: `LKR ${totalProfit.toLocaleString()}`,  icon: "💰", c: totalProfit >= 0 ? "#059669" : "#e11d48" },
+            ].map((s) => (
+              <div key={s.l} style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderTop: `3px solid ${s.c}`, borderRadius: 14, padding: "1rem 1.25rem" }}>
+                <p style={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--dim)", marginBottom: "0.375rem" }}>{s.icon} {s.l}</p>
+                <p style={{ fontSize: "1.2rem", fontWeight: 700, color: s.c, margin: 0 }}>{s.v}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", alignItems: "center", flexWrap: "wrap" }}>
+            <input className="input-field" style={{ maxWidth: 300 }} placeholder="🔍 Search ID, owner, brand, issue…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            {search && <button onClick={() => setSearch("")} className="btn-ghost">Clear</button>}
+            <span style={{ marginLeft: "auto", fontSize: "0.78rem", color: "var(--muted)" }}>
+              {filtered.length} records · page {safePage}/{pages}
+            </span>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+            {[
+              { c: "#059669", l: "Profit" }, { c: "#e11d48", l: "Loss" },
+              { c: "#4f46e5", l: "Break-even" }, { c: "#d97706", l: "Pending" },
+            ].map((x) => (
+              <div key={x.l} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.72rem", color: "var(--muted)" }}>
+                <div style={{ width: 10, height: 10, borderRadius: 3, background: x.c }} />
+                {x.l}
+              </div>
+            ))}
+          </div>
+
+          {/* Cards grid */}
+          {loading ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>Loading…</p>
+          ) : visible.length === 0 ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>No records found.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.25rem", marginBottom: "1.75rem" }}>
+              {visible.map((r) => {
+                const ac = cardAccent(r);
+                const device = [r.brand, r.model].filter(Boolean).join(" ");
+                return (
+                  <div key={r.id} onClick={() => setDetail(r)}
+                    style={{
+                      background: ac.bg,
+                      border: `1.5px solid ${ac.border}30`,
+                      borderRadius: 20,
+                      padding: "1.75rem",
+                      cursor: "pointer",
+                      transition: "all 0.18s ease",
+                      display: "flex", flexDirection: "column", gap: "1rem",
+                      boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
+                      fontFamily: "inherit",
+                      position: "relative", overflow: "hidden",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-3px)";
+                      e.currentTarget.style.boxShadow = `0 12px 32px ${ac.border}22`;
+                      e.currentTarget.style.borderColor = `${ac.border}80`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "";
+                      e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.05)";
+                      e.currentTarget.style.borderColor = `${ac.border}30`;
+                    }}
+                  >
+                    {/* Decorative top strip */}
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${ac.border}, ${ac.border}60)`, borderRadius: "20px 20px 0 0" }} />
+
+                    {/* Header: ID + Status */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.25rem" }}>
+                      <span style={{
+                        fontFamily: "monospace", fontSize: "0.8rem", fontWeight: 800,
+                        color: ac.border, letterSpacing: "0.05em",
+                        background: `${ac.border}15`, padding: "0.3rem 0.8rem",
+                        borderRadius: 8, border: `1px solid ${ac.border}25`,
+                      }}>{r.repId}</span>
+                      <span style={{
+                        fontSize: "0.72rem", fontWeight: 700, padding: "0.3rem 0.875rem",
+                        borderRadius: 999, background: ac.chip, color: ac.chipText,
+                        fontFamily: "inherit",
+                      }}>
+                        {r.completed ? "✓ Completed" : "⏳ Pending"}
+                      </span>
+                    </div>
+
+                    {/* Owner + Device */}
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: "1.15rem", color: "var(--text)", margin: "0 0 0.3rem", lineHeight: 1.2, fontFamily: "inherit" }}>
+                        {r.owner || "Unknown"}
+                      </p>
+                      {device && (
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "white", background: ac.border, padding: "0.2rem 0.65rem", borderRadius: 6, fontFamily: "inherit" }}>
+                            {r.brand}
+                          </span>
+                          {r.model && <span style={{ fontSize: "0.82rem", color: "var(--muted)", fontFamily: "inherit" }}>{r.model}</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Issue */}
+                    <div style={{ background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "0.875rem 1rem" }}>
+                      <p style={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--dim)", margin: "0 0 0.35rem", fontFamily: "inherit" }}>Issue</p>
+                      <p style={{ fontSize: "0.88rem", color: "var(--text)", margin: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.5, fontFamily: "inherit" }}>
+                        {r.issue || "—"}
+                      </p>
+                    </div>
+
+                    {/* Financials */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.625rem" }}>
+                      {[
+                        { l: "Cost",   v: fmt(r.cost),    c: "var(--text)" },
+                        { l: "Paid",   v: fmt(r.payment), c: "var(--text)" },
+                        { l: "Profit", v: fmt(r.profit),  c: profitColor(r.profit) },
+                      ].map((f) => (
+                        <div key={f.l} style={{ background: "white", borderRadius: 12, padding: "0.75rem 0.875rem", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                          <p style={{ fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--dim)", margin: "0 0 0.35rem", fontFamily: "inherit" }}>{f.l}</p>
+                          <p style={{ fontSize: "0.82rem", fontWeight: 700, color: f.c, margin: 0, fontFamily: "inherit", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.v}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Footer: date + duration + warning */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "0.25rem", borderTop: `1px solid ${ac.border}20` }}>
+                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span style={{ opacity: 0.5 }}>📅</span>
+                        {r.dateCompleted ? new Date(r.dateCompleted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "No date"}
+                        {r.duration && <span style={{ color: "var(--dim)" }}>· {r.duration}</span>}
+                      </span>
+                      {r.forgottenParts ? (
+                        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#be123c", background: "rgba(225,29,72,0.1)", padding: "0.25rem 0.625rem", borderRadius: 999, fontFamily: "inherit" }}>
+                          ⚠ {r.forgottenParts}
+                        </span>
+                      ) : r.parts ? (
+                        <span style={{ fontSize: "0.72rem", color: "var(--dim)", fontFamily: "inherit" }}>🔩 {r.parts}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {pages > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="btn-ghost" style={{ padding: "0.5rem 1rem" }}>← Prev</button>
+              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                <button key={p} onClick={() => setPage(p)} style={{
+                  padding: "0.5rem 0.875rem", borderRadius: 10, border: "1px solid",
+                  borderColor: p === safePage ? "var(--primary)" : "var(--border2)",
+                  background: p === safePage ? "var(--primary)" : "var(--bg2)",
+                  color: p === safePage ? "#fff" : "var(--muted)",
+                  fontWeight: p === safePage ? 700 : 400, cursor: "pointer", fontSize: "0.85rem",
+                }}>{p}</button>
+              ))}
+              <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={safePage === pages} className="btn-ghost" style={{ padding: "0.5rem 1rem" }}>Next →</button>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* ── Detail Modal ──────────────────────────────────── */}
+      {detail && (
+        <div onClick={(e) => e.target === e.currentTarget && setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div style={{ background: "var(--bg2)", border: "1px solid var(--border2)", borderRadius: 18, width: "100%", maxWidth: 580, maxHeight: "88vh", overflowY: "auto", padding: "1.75rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
+              <div>
+                <span style={{ fontFamily: "monospace", fontWeight: 800, fontSize: "1rem", color: cardAccent(detail).border }}>{detail.repId}</span>
+                <p style={{ margin: "0.25rem 0 0", fontSize: "1.2rem", fontWeight: 700, color: "var(--text)" }}>{detail.owner || "Unknown"}</p>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button onClick={() => openEdit(detail)} style={{ fontSize: "0.78rem", padding: "0.4rem 1rem", background: "rgba(79,70,229,0.1)", border: "1px solid rgba(79,70,229,0.25)", color: "var(--primary)", borderRadius: 9, cursor: "pointer", fontWeight: 600 }}>Edit</button>
+                <button onClick={() => setDetail(null)} style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "var(--muted)" }}>✕</button>
+              </div>
+            </div>
+
+            {/* Badges */}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+              <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0.3rem 0.75rem", borderRadius: 999, background: detail.completed ? "rgba(5,150,105,0.12)" : "rgba(217,119,6,0.12)", color: detail.completed ? "#059669" : "#d97706" }}>
+                {detail.completed ? "✅ Completed" : "⏳ Pending"}
+              </span>
+              {detail.brand && <span style={{ fontSize: "0.72rem", padding: "0.3rem 0.75rem", borderRadius: 999, background: "rgba(79,70,229,0.1)", color: "var(--primary)", fontWeight: 600 }}>{detail.brand}</span>}
+              {detail.model && <span style={{ fontSize: "0.72rem", padding: "0.3rem 0.75rem", borderRadius: 999, background: "var(--bg3)", color: "var(--muted)" }}>{detail.model}</span>}
+            </div>
+
+            {/* Financials summary */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
+              {[
+                { l: "Cost",   v: fmt(detail.cost),    c: "var(--text)" },
+                { l: "Payment",v: fmt(detail.payment),  c: "var(--text)" },
+                { l: "Profit", v: fmt(detail.profit),   c: profitColor(detail.profit) },
+              ].map((f) => (
+                <div key={f.l} style={{ background: "var(--bg3)", borderRadius: 12, padding: "0.875rem 1rem", border: "1px solid var(--border)" }}>
+                  <p style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--dim)", margin: "0 0 0.3rem" }}>{f.l}</p>
+                  <p style={{ fontSize: "1.05rem", fontWeight: 700, color: f.c, margin: 0 }}>{f.v}</p>
+                </div>
+              ))}
+            </div>
+
+            <DetailRow label="Issue"     value={dash(detail.issue)} />
+            <DetailRow label="Solution"  value={dash(detail.solution)} />
+            <DetailRow label="Date"      value={detail.dateCompleted ? new Date(detail.dateCompleted).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "—"} />
+            <DetailRow label="Duration"  value={dash(detail.duration)} />
+            <DetailRow label="Parts"     value={dash(detail.parts)} />
+            <DetailRow label="Shop"      value={dash(detail.shop)} />
+            {detail.comments && <DetailRow label="Comments" value={<span style={{ color: "var(--muted)", lineHeight: 1.6, fontSize: "0.82rem" }}>{detail.comments}</span>} />}
+            {detail.forgottenParts && (
+              <DetailRow label="Forgotten" value={<span style={{ color: "#e11d48", fontWeight: 700 }}>⚠ {detail.forgottenParts}</span>} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Add/Edit Form Modal ───────────────────────────── */}
+      {showForm && (
+        <div onClick={(e) => e.target === e.currentTarget && setShowForm(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+          <div style={{ background: "var(--bg2)", border: "1px solid var(--border2)", borderRadius: 18, width: "100%", maxWidth: 720, maxHeight: "90vh", overflowY: "auto", padding: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h2 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>{editing ? `Edit ${editing.repId}` : "New Repair Log"}</h2>
+              <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "var(--muted)" }}>✕</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              {[
+                { l: "Repair ID", k: "repId", ph: "REP-041" },
+                { l: "Owner",     k: "owner", ph: "Customer name" },
+                { l: "Brand",     k: "brand", ph: "Apple, Samsung…" },
+                { l: "Model",     k: "model", ph: "iPhone 13…" },
+                { l: "Duration",  k: "duration", ph: "1 Day, 2 Hours…" },
+                { l: "Parts Used",k: "parts",    ph: "Display, Battery…" },
+                { l: "Parts Shop",k: "shop",     ph: "Trans Asia Cellular…" },
+                { l: "Forgotten", k: "forgottenParts", ph: "Any forgotten parts" },
+              ].map((f) => (
+                <FField key={f.k} label={f.l}>
+                  <input className="input-field" value={(form as Record<string, unknown>)[f.k] as string ?? ""} onChange={(e) => setF(f.k as keyof typeof form, e.target.value || null)} placeholder={f.ph} />
+                </FField>
+              ))}
+              <FField label="Issue">
+                <textarea className="input-field" rows={2} value={form.issue ?? ""} onChange={(e) => setF("issue", e.target.value || null)} placeholder="Describe the issue" style={{ resize: "vertical" }} />
+              </FField>
+              <FField label="Solution">
+                <textarea className="input-field" rows={2} value={form.solution ?? ""} onChange={(e) => setF("solution", e.target.value || null)} placeholder="What was done" style={{ resize: "vertical" }} />
+              </FField>
+              <FField label="Date Completed">
+                <input className="input-field" type="date" value={form.dateCompleted ?? ""} onChange={(e) => setF("dateCompleted", e.target.value || null)} />
+              </FField>
+              <FField label="Completed">
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", paddingTop: "0.875rem" }}>
+                  <input type="checkbox" checked={form.completed} onChange={(e) => setF("completed", e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--primary)" }} />
+                  <span style={{ fontSize: "0.875rem", color: "var(--text)" }}>Mark as completed</span>
+                </label>
+              </FField>
+              {(["cost", "payment", "profit"] as const).map((k) => (
+                <FField key={k} label={`${k.charAt(0).toUpperCase() + k.slice(1)} (LKR)`}>
+                  <input className="input-field" type="number" value={form[k] ?? ""} onChange={(e) => setF(k, e.target.value ? Number(e.target.value) : null)} placeholder="0" />
+                </FField>
+              ))}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <FField label="Comments">
+                  <textarea className="input-field" rows={3} value={form.comments ?? ""} onChange={(e) => setF("comments", e.target.value || null)} placeholder="Notes, observations, follow-ups…" style={{ resize: "vertical" }} />
+                </FField>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem", justifyContent: "flex-end" }}>
+              <button onClick={() => setShowForm(false)} className="btn-ghost">Cancel</button>
+              <button onClick={save} disabled={saving} className="btn-primary" style={{ width: "auto", padding: "0.7rem 2rem" }}>
+                {saving ? "Saving…" : editing ? "Save changes" : "Add repair"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile responsive styles */}
+      <style>{`
+        @media (max-width: 768px) {
+          main { padding-left: 0 !important; }
+          .sidebar { display: none; }
+        }
+        @media (max-width: 480px) {
+          div[style*="minmax(260px"] {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+

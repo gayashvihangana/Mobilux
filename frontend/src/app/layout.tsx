@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Space_Grotesk } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const display = Playfair_Display({
-  variable: "--font-title",
-  subsets: ["latin"],
-});
-
-const sans = Space_Grotesk({
+const inter = Inter({
   variable: "--font-primary",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -25,11 +21,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${sans.variable} ${display.variable} h-full antialiased`}
+      className={`${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body
-        className="min-h-full flex flex-col bg-slate-950 text-slate-100 font-body"
+        className="min-h-full flex flex-col font-body"
+        style={{ background: "var(--bg)", color: "var(--text)" }}
         suppressHydrationWarning
       >
         {children}

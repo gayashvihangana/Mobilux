@@ -24,7 +24,6 @@
   --color-background: var(--bg);
   --color-foreground: var(--text);
   --font-sans: var(--font-primary);
-  --font-display: var(--font-title);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -32,8 +31,12 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-primary), system-ui, sans-serif;
+  font-family: var(--font-primary), 'Inter', system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -42,7 +45,7 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
 @layer utilities {
-  .font-display { font-family: var(--font-title), serif; }
+  .font-display { font-family: var(--font-primary), sans-serif; font-weight: 700; }
 
   /* Cards */
   .card {
