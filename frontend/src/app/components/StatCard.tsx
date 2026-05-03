@@ -2,19 +2,50 @@ type StatCardProps = {
   label: string;
   value: string;
   hint?: string;
-  accentClass?: string;
+  icon?: string;
+  accent?: "primary" | "amber" | "emerald" | "rose" | "cyan";
 };
 
-export function StatCard({ label, value, hint, accentClass }: StatCardProps) {
+const accentMap: Record<string, { color: string; bg: string }> = {
+  primary: { color: "#6366f1", bg: "rgba(99,102,241,0.12)" },
+  amber:   { color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  emerald: { color: "#10b981", bg: "rgba(16,185,129,0.12)" },
+  rose:    { color: "#f43f5e", bg: "rgba(244,63,94,0.12)"  },
+  cyan:    { color: "#06b6d4", bg: "rgba(6,182,212,0.12)"  },
+};
+
+export function StatCard({ label, value, hint, icon = "◈", accent = "primary" }: StatCardProps) {
+  const { color, bg } = accentMap[accent] ?? accentMap.primary;
+
   return (
-    <div
-      className={`rounded-3xl border border-slate-800/70 bg-slate-900/60 p-6 shadow-[0_25px_60px_-45px_rgba(15,23,42,0.9)] ${
-        accentClass ?? ""
-      }`}
-    >
-      <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
-      {hint ? <p className="mt-2 text-sm text-slate-400">{hint}</p> : null}
+    <div className="stat-card">
+      {/* Top accent line */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 2,
+        background: `linear-gradient(90deg, ${color}, transparent)`,
+      }} />
+
+      {/* Icon */}
+      <div style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 40, height: 40,
+        background: bg,
+        borderRadius: 10,
+        fontSize: "1.1rem",
+        marginBottom: "1rem",
+      }}>
+        {icon}
+      </div>
+
+      <p style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--dim)", marginBottom: "0.5rem" }}>
+        {label}
+      </p>
+      <p style={{ fontSize: "1.85rem", fontWeight: 700, color: "var(--text)", lineHeight: 1 }}>
+        {value}
+      </p>
+      {hint && (
+        <p style={{ fontSize: "0.78rem", color: "var(--muted)", marginTop: "0.5rem" }}>{hint}</p>
+      )}
     </div>
   );
 }

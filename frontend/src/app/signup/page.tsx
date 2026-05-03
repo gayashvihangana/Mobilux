@@ -7,30 +7,29 @@ import { apiFetch } from "@/lib/api";
 import type { AuthResponse, Role } from "@/lib/types";
 
 const redirectByRole: Record<Role, string> = {
-  ADMIN: "/admin/dashboard",
+  ADMIN:    "/admin/dashboard",
   CUSTOMER: "/dashboard",
-  STAFF: "/staff/dashboard",
+  STAFF:    "/staff/dashboard",
 };
 
 export default function SignupPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName]         = useState("");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [loading, setLoading]   = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
-      const response = await apiFetch<AuthResponse>("/api/auth/signup", {
+      const res = await apiFetch<AuthResponse>("/api/auth/signup", {
         method: "POST",
         body: JSON.stringify({ name, email, password }),
       });
-      router.push(redirectByRole[response.role]);
+      router.push(redirectByRole[res.role]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
@@ -39,74 +38,107 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6 py-16">
-        <div className="grid w-full max-w-4xl gap-8 md:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-slate-800/70 bg-slate-900/60 p-8">
-            <Link href="/" className="font-display text-2xl text-shadow-glow">
-              Mobilux
-            </Link>
-            <h1 className="mt-6 font-display text-3xl text-white">Create your account</h1>
-            <p className="mt-2 text-sm text-slate-400">
-              Manage your repairs, payments, and discounts from one dashboard.
-            </p>
-            {error ? (
-              <div className="mt-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                {error}
+    <div style={{ minHeight: "100vh", display: "flex", background: "var(--bg)" }}>
+
+      {/* ── RIGHT: Brand panel ─────────────────────────── */}
+      <div style={{
+        flex: "0 0 40%",
+        background: "linear-gradient(145deg, #4f46e5 0%, #7c3aed 60%, #4338ca 100%)",
+        borderRight: "1px solid rgba(255,255,255,0.15)",
+        display: "flex", flexDirection: "column",
+        justifyContent: "center", padding: "4rem 3rem",
+        position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: "-40px", left: "-40px", width: 200, height: 200, background: "rgba(99,102,241,0.18)", borderRadius: "50%", filter: "blur(60px)" }} />
+        <div style={{ position: "absolute", bottom: "60px", right: "-30px", width: 160, height: 160, background: "rgba(139,92,246,0.15)", borderRadius: "50%", filter: "blur(50px)" }} />
+
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <p className="label" style={{ marginBottom: "1.25rem", color: "rgba(255,255,255,0.55)" }}>Why Mobilux</p>
+          {[
+            { icon: "📡", text: "Live repair tracking in real-time" },
+            { icon: "📎", text: "Upload bank transfer receipts easily" },
+            { icon: "🎁", text: "Loyalty discounts after repeat repairs" },
+            { icon: "🛡️", text: "Transparent pricing in LKR" },
+          ].map((f) => (
+            <div key={f.text} style={{
+              display: "flex", alignItems: "flex-start", gap: "0.875rem",
+              marginBottom: "1.25rem",
+            }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: "rgba(255,255,255,0.12)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1rem", flexShrink: 0,
+              }}>{f.icon}</div>
+              <p style={{ fontSize: "0.875rem", color: "rgba(255,255,255,0.65)", lineHeight: 1.5, paddingTop: "0.5rem" }}>{f.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── LEFT: Form ─────────────────────────────────── */}
+      <div style={{
+        flex: 1, display: "flex", alignItems: "center",
+        justifyContent: "center", padding: "3rem 4rem", position: "relative",
+      }}>
+        <div style={{
+          position: "absolute", top: "30%", right: "20%",
+          width: 280, height: 280,
+          background: "var(--pglow)",
+          borderRadius: "50%", filter: "blur(90px)", pointerEvents: "none",
+        }} />
+
+        <div style={{ width: "100%", maxWidth: 400, position: "relative", zIndex: 1 }}>
+          <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", textDecoration: "none", marginBottom: "2.5rem" }}>
+            <div style={{
+              width: 38, height: 38,
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              borderRadius: 10, display: "flex", alignItems: "center",
+              justifyContent: "center", fontWeight: 700, color: "#fff", fontSize: "1rem",
+            }}>M</div>
+            <span style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text)" }}>Mobilux</span>
+          </Link>
+
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text)", marginBottom: "0.5rem", lineHeight: 1.2 }}>
+            Create account
+          </h1>
+          <p style={{ fontSize: "0.9rem", color: "var(--muted)", marginBottom: "2rem" }}>
+            Manage your repairs, payments, and discounts in one place.
+          </p>
+
+          {error && <div className="banner-error" style={{ marginBottom: "1.25rem" }}>{error}</div>}
+
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {[
+              { label: "Full name",    id: "signup-name",     type: "text",     placeholder: "John Silva",         val: name,     set: setName },
+              { label: "Email address",id: "signup-email",    type: "email",    placeholder: "you@example.com",    val: email,    set: setEmail },
+              { label: "Password",     id: "signup-password", type: "password", placeholder: "Min. 8 characters",  val: password, set: setPassword },
+            ].map((f) => (
+              <div key={f.id}>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--muted)", marginBottom: "0.5rem" }}>{f.label}</label>
+                <input
+                  id={f.id}
+                  className="input-field"
+                  type={f.type}
+                  placeholder={f.placeholder}
+                  value={f.val}
+                  onChange={(e) => f.set(e.target.value)}
+                  minLength={f.id === "signup-password" ? 8 : undefined}
+                  required
+                />
               </div>
-            ) : null}
-            <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-              <input
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white"
-                placeholder="Full name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                required
-              />
-              <input
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white"
-                placeholder="Email address"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-              <input
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white"
-                placeholder="Password (min 8 characters)"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                minLength={8}
-                required
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {loading ? "Creating account..." : "Create account"}
-              </button>
-            </form>
-            <p className="mt-6 text-sm text-slate-400">
-              Already have an account?{" "}
-              <Link href="/login" className="text-amber-200 hover:text-amber-100">
-                Sign in
-              </Link>
-            </p>
-          </div>
-          <div className="rounded-3xl border border-slate-800/70 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8">
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Why Mobilux</p>
-            <div className="mt-6 space-y-4 text-sm text-slate-300">
-              <p>Stay updated with live repair tracking.</p>
-              <p>Upload bank transfer receipts with ease.</p>
-              <p>Unlock loyalty discounts after repeat repairs.</p>
-              <p>Manage your profile and repair history anytime.</p>
-            </div>
-            <div className="mt-10 rounded-2xl border border-slate-800/70 bg-slate-900/60 p-4 text-sm text-slate-400">
-              <p>All pricing is displayed in LKR and confirmed by Mobilux staff.</p>
-            </div>
-          </div>
+            ))}
+            <button id="signup-submit" type="submit" disabled={loading} className="btn-primary" style={{ marginTop: "0.5rem" }}>
+              {loading ? "Creating account…" : "Create account →"}
+            </button>
+          </form>
+
+          <p style={{ marginTop: "1.5rem", fontSize: "0.875rem", color: "var(--muted)", textAlign: "center" }}>
+            Already have an account?{" "}
+            <Link href="/login" style={{ color: "var(--primary-h)", textDecoration: "none", fontWeight: 600 }}>
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>
