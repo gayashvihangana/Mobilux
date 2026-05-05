@@ -30,8 +30,6 @@ const cardAccent = (r: RepairLog) => {
   return { border: "#e11d48", bg: "#fff1f3", chip: "rgba(225,29,72,0.1)", chipText: "#9f1239" };
 };
 
-const PER_PAGE = 12;
-
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: "flex", gap: "0.75rem", padding: "0.6rem 0", borderBottom: "1px solid var(--border)" }}>
@@ -55,7 +53,6 @@ export default function AdminRepairsPage() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [search, setSearch]     = useState("");
-  const [page, setPage]         = useState(1);
   const [detail, setDetail]     = useState<RepairLog | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing]   = useState<RepairLog | null>(null);
@@ -117,9 +114,7 @@ export default function AdminRepairsPage() {
     if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
     return String(av).localeCompare(String(bv)) * dir;
   });
-  const pages    = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const safePage = Math.min(page, pages);
-  const visible  = sorted.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  const visible  = sorted;
 
   const toggleSort = (key: typeof sortKey) => {
     if (sortKey === key) {
@@ -176,10 +171,10 @@ export default function AdminRepairsPage() {
 
           {/* Search */}
           <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", alignItems: "center", flexWrap: "wrap" }}>
-            <input className="input-field" style={{ maxWidth: 300 }} placeholder="🔍 Search ID, owner, brand, issue…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            <input className="input-field" style={{ maxWidth: 300 }} placeholder="🔍 Search ID, owner, brand, issue…" value={search} onChange={(e) => { setSearch(e.target.value); }} />
             {search && <button onClick={() => setSearch("")} className="btn-ghost">Clear</button>}
             <span style={{ marginLeft: "auto", fontSize: "0.78rem", color: "var(--muted)" }}>
-              {filtered.length} records · page {safePage}/{pages}
+              {filtered.length} records
             </span>
           </div>
 
@@ -193,17 +188,19 @@ export default function AdminRepairsPage() {
                 <div style={{ width: 10, height: 10, borderRadius: 3, background: x.c }} />
                 {x.l}
               </div>
-            ))}
-          </div>
-
-          {/* Cards grid */}
-          {loading ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>Loading…</p>
-          ) : visible.length === 0 ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>No records found.</p>
-          ) : (
-            <div style={{ marginBottom: "1.75rem" }}>
-              <div style={{
+                {
+                  key: "repId", label: "Repair ID"
+                },
+                  { key: "owner", label: "Owner" },
+                  { key: "phone", label: "Phone" },
+                  { key: "issue", label: "Issue" },
+                  { key: "status", label: "Status" },
+                  { key: "cost", label: "Cost" },
+                  { key: "payment", label: "Received" },
+                  { key: "profit", label: "Profit" },
+                  { key: "comments", label: "Comments" },
+                  { key: "date", label: "Date" },
+                ].map((col, index) => (
                 display: "grid",
                 gridTemplateColumns: colWidths.map((w) => `${w}px`).join(" "),
                 gap: "0.65rem",
@@ -341,22 +338,6 @@ export default function AdminRepairsPage() {
             </div>
           )}
 
-          {/* Pagination */}
-          {pages > 1 && (
-            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="btn-ghost" style={{ padding: "0.5rem 1rem" }}>← Prev</button>
-              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <button key={p} onClick={() => setPage(p)} style={{
-                  padding: "0.5rem 0.875rem", borderRadius: 10, border: "1px solid",
-                  borderColor: p === safePage ? "var(--primary)" : "var(--border2)",
-                  background: p === safePage ? "var(--primary)" : "var(--bg2)",
-                  color: p === safePage ? "#fff" : "var(--muted)",
-                  fontWeight: p === safePage ? 700 : 400, cursor: "pointer", fontSize: "0.85rem",
-                }}>{p}</button>
-              ))}
-              <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={safePage === pages} className="btn-ghost" style={{ padding: "0.5rem 1rem" }}>Next →</button>
-            </div>
-          )}
         </div>
       </main>
 
