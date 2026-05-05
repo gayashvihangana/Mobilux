@@ -61,19 +61,74 @@ export default function AdminRepairsPage() {
   const [editing, setEditing]   = useState<RepairLog | null>(null);
   const [form, setForm]         = useState<Omit<RepairLog, "id">>(empty);
   const [saving, setSaving]     = useState(false);
+  const [sortKey, setSortKey]   = useState<"repId" | "owner" | "phone" | "issue" | "status" | "cost" | "payment" | "profit" | "date" | "comments">("date");
+  const [sortDir, setSortDir]   = useState<"asc" | "desc">("desc");
+  const [colWidths, setColWidths] = useState([120, 160, 190, 240, 120, 130, 130, 130, 160, 220]);
+  const [resizing, setResizing] = useState<{ index: number; startX: number; startWidth: number } | null>(null);
 
   useEffect(() => {
     apiFetch<RepairLog[]>("/api/repair-logs")
       .then(setLogs).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!resizing) return;
+    const onMove = (event: MouseEvent) => {
+      setColWidths((prev) => {
+        const next = [...prev];
+        const delta = event.clientX - resizing.startX;
+        next[resizing.index] = Math.max(110, resizing.startWidth + delta);
+        return next;
+      });
+    };
+    const onUp = () => setResizing(null);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [resizing]);
+
   const q = search.toLowerCase();
   const filtered = logs.filter((r) =>
     !q || [r.repId, r.owner, r.brand, r.model, r.issue].some((v) => v?.toLowerCase().includes(q))
   );
+  const getSortValue = (r: RepairLog) => {
+    switch (sortKey) {
+      case "repId": return r.repId || "";
+      case "owner": return r.owner || "";
+      case "phone": return [r.brand, r.model].filter(Boolean).join(" ");
+      case "issue": return r.issue || "";
+      case "status": return r.completed ? "completed" : "pending";
+      case "cost": return r.cost ?? 0;
+      case "payment": return r.payment ?? 0;
+      case "profit": return r.profit ?? 0;
+      case "comments": return r.comments || "";
+      case "date":
+      default:
+        return r.dateCompleted ? new Date(r.dateCompleted).getTime() : 0;
+    }
+  };
+  const sorted = [...filtered].sort((a, b) => {
+    const av = getSortValue(a);
+    const bv = getSortValue(b);
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  });
   const pages    = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const safePage = Math.min(page, pages);
-  const visible  = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+  const visible  = sorted.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
+
+  const toggleSort = (key: typeof sortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "date" ? "desc" : "asc");
+  };
 
   const openAdd  = () => { setForm(empty); setEditing(null); setShowForm(true); };
   const openEdit = (r: RepairLog) => { const { id: _, ...rest } = r; setForm(rest); setEditing(r); setDetail(null); setShowForm(true); };
@@ -81,17 +136,6 @@ export default function AdminRepairsPage() {
 
   const save = async () => {
     setSaving(true);
-    try {
-      if (editing) {
-        const u = await apiFetch<RepairLog>(`/api/repair-logs/${editing.id}`, { method: "PUT", body: JSON.stringify({ ...form, id: editing.id }) });
-        setLogs((p) => p.map((r) => r.id === editing.id ? u : r));
-      } else {
-        const c = await apiFetch<RepairLog>("/api/repair-logs", { method: "POST", body: JSON.stringify(form) });
-        setLogs((p) => [...p, c]);
-      }
-      setShowForm(false);
-    } catch (e) { alert(e instanceof Error ? e.message : "Save failed"); }
-    finally { setSaving(false); }
   };
 
   const totalProfit = logs.reduce((s, r) => s + (r.profit ?? 0), 0);
@@ -161,8 +205,8 @@ export default function AdminRepairsPage() {
             <div style={{ marginBottom: "1.75rem" }}>
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "130px 1.2fr 1.4fr 1.8fr 120px 1.2fr 160px",
-                gap: "0.7rem",
+                gridTemplateColumns: colWidths.map((w) => `${w}px`).join(" "),
+                gap: "0.65rem",
                 alignItems: "center",
                 padding: "0.65rem 1rem",
                 borderRadius: 14,
@@ -175,13 +219,32 @@ export default function AdminRepairsPage() {
                 fontWeight: 600,
                 marginBottom: "0.6rem",
               }}>
-                <span>Repair ID</span>
-                <span>Owner</span>
-                <span>Phone</span>
-                <span>Issue</span>
-                <span>Status</span>
-                <span>Financials</span>
-                <span>Date</span>
+                {[
+                  { key: "repId", label: "Repair ID" },
+                  { key: "owner", label: "Owner" },
+                  { key: "phone", label: "Phone" },
+                  { key: "issue", label: "Issue" },
+                  { key: "status", label: "Status" },
+                  { key: "financials", label: "Financials" },
+                  { key: "date", label: "Date" },
+                  { key: "comments", label: "Comments" },
+                ].map((col, index) => (
+                  <div
+                    key={col.key}
+                    style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", position: "relative", paddingRight: 10 }}
+                    onClick={() => toggleSort(col.key as typeof sortKey)}
+                  >
+                    <span>{col.label}</span>
+                    {sortKey === col.key && <span style={{ fontSize: "0.65rem" }}>{sortDir === "asc" ? "▲" : "▼"}</span>}
+                    <span
+                      onMouseDown={(event) => {
+                        event.stopPropagation();
+                        setResizing({ index, startX: event.clientX, startWidth: colWidths[index] });
+                      }}
+                      style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: 6, cursor: "col-resize" }}
+                    />
+                  </div>
+                ))}
               </div>
 
               <div style={{ display: "grid", gap: "0.65rem" }}>
@@ -191,15 +254,15 @@ export default function AdminRepairsPage() {
                   return (
                     <div key={r.id} onClick={() => setDetail(r)}
                       style={{
-                        background: ac.bg,
+                        background: "var(--bg2)",
                         border: `1.5px solid ${ac.border}30`,
                         borderRadius: 16,
                         padding: "0.7rem 1rem",
                         cursor: "pointer",
                         transition: "all 0.18s ease",
                         display: "grid",
-                        gridTemplateColumns: "130px 1.2fr 1.4fr 1.8fr 120px 1.2fr 160px",
-                        gap: "0.7rem",
+                        gridTemplateColumns: colWidths.map((w) => `${w}px`).join(" "),
+                        gap: "0.65rem",
                         alignItems: "center",
                         boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
                         fontFamily: "inherit",
@@ -220,7 +283,7 @@ export default function AdminRepairsPage() {
                       <span style={{
                         fontFamily: "monospace", fontSize: "0.78rem", fontWeight: 800,
                         color: ac.border, letterSpacing: "0.04em",
-                        background: `${ac.border}15`, padding: "0.25rem 0.65rem",
+                        background: `${ac.border}15`, padding: "0.25rem 0 0.25rem 0.6rem",
                         borderRadius: 8, border: `1px solid ${ac.border}25`,
                         whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden",
                       }}>{r.repId}</span>
@@ -252,7 +315,19 @@ export default function AdminRepairsPage() {
                       </span>
 
                       <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                        C {fmt(r.cost)} · P {fmt(r.payment)} · <span style={{ color: profitColor(r.profit), fontWeight: 700 }}>Pr {fmt(r.profit)}</span>
+                        {fmt(r.cost)}
+                      </span>
+
+                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                        {fmt(r.payment)}
+                      </span>
+
+                      <span style={{ fontSize: "0.78rem", color: profitColor(r.profit), fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                        {fmt(r.profit)}
+                      </span>
+
+                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                        {r.comments || "—"}
                       </span>
 
                       <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
