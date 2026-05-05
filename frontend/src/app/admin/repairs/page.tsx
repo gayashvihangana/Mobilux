@@ -168,10 +168,11 @@ export default function AdminRepairsPage() {
                       background: ac.bg,
                       border: `1.5px solid ${ac.border}30`,
                       borderRadius: 20,
-                      padding: "1.5rem",
+                      padding: "0.75rem 1rem",
                       cursor: "pointer",
                       transition: "all 0.18s ease",
-                      display: "flex", flexDirection: "column", gap: "1rem",
+                      display: "flex",
+                      alignItems: "center",
                       boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
                       fontFamily: "inherit",
                       position: "relative", overflow: "hidden",
@@ -189,77 +190,42 @@ export default function AdminRepairsPage() {
                       e.currentTarget.style.borderColor = `${ac.border}30`;
                     }}
                   >
-                    {/* Decorative top strip */}
-                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${ac.border}, ${ac.border}60)`, borderRadius: "20px 20px 0 0" }} />
-
-                    {/* Header: ID + Status */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.25rem" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "120px 1.5fr 2.2fr 120px 1.2fr 160px", gap: "0.75rem", alignItems: "center", width: "100%" }}>
                       <span style={{
-                        fontFamily: "monospace", fontSize: "0.8rem", fontWeight: 800,
-                        color: ac.border, letterSpacing: "0.05em",
-                        background: `${ac.border}15`, padding: "0.3rem 0.8rem",
+                        fontFamily: "monospace", fontSize: "0.78rem", fontWeight: 800,
+                        color: ac.border, letterSpacing: "0.04em",
+                        background: `${ac.border}15`, padding: "0.25rem 0.65rem",
                         borderRadius: 8, border: `1px solid ${ac.border}25`,
+                        whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden",
                       }}>{r.repId}</span>
+
+                      <span style={{ fontSize: "0.9rem", color: "var(--text)", fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                        {r.owner || "Unknown"}{device ? ` · ${device}` : ""}
+                      </span>
+
+                      <span style={{ fontSize: "0.82rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                        {r.issue || "—"}
+                        {r.forgottenParts ? " · ⚠" : ""}
+                      </span>
+
                       <span style={{
-                        fontSize: "0.72rem", fontWeight: 700, padding: "0.3rem 0.875rem",
+                        justifySelf: "start",
+                        fontSize: "0.7rem", fontWeight: 700, padding: "0.25rem 0.75rem",
                         borderRadius: 999, background: ac.chip, color: ac.chipText,
                         fontFamily: "inherit",
+                        whiteSpace: "nowrap",
                       }}>
-                        {r.completed ? "✓ Completed" : "⏳ Pending"}
+                        {r.completed ? "Completed" : "Pending"}
                       </span>
-                    </div>
 
-                    {/* Owner + Device */}
-                    <div>
-                      <p style={{ fontWeight: 700, fontSize: "1.15rem", color: "var(--text)", margin: "0 0 0.3rem", lineHeight: 1.2, fontFamily: "inherit" }}>
-                        {r.owner || "Unknown"}
-                      </p>
-                      {device && (
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
-                          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "white", background: ac.border, padding: "0.2rem 0.65rem", borderRadius: 6, fontFamily: "inherit" }}>
-                            {r.brand}
-                          </span>
-                          {r.model && <span style={{ fontSize: "0.82rem", color: "var(--muted)", fontFamily: "inherit" }}>{r.model}</span>}
-                        </div>
-                      )}
-                    </div>
+                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                        C {fmt(r.cost)} · P {fmt(r.payment)} · <span style={{ color: profitColor(r.profit), fontWeight: 700 }}>Pr {fmt(r.profit)}</span>
+                      </span>
 
-                    {/* Issue */}
-                    <div style={{ background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "0.875rem 1rem" }}>
-                      <p style={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--dim)", margin: "0 0 0.35rem", fontFamily: "inherit" }}>Issue</p>
-                      <p style={{ fontSize: "0.88rem", color: "var(--text)", margin: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.5, fontFamily: "inherit" }}>
-                        {r.issue || "—"}
-                      </p>
-                    </div>
-
-                    {/* Financials */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.625rem" }}>
-                      {[
-                        { l: "Cost",   v: fmt(r.cost),    c: "var(--text)" },
-                        { l: "Paid",   v: fmt(r.payment), c: "var(--text)" },
-                        { l: "Profit", v: fmt(r.profit),  c: profitColor(r.profit) },
-                      ].map((f) => (
-                        <div key={f.l} style={{ background: "white", borderRadius: 12, padding: "0.75rem 0.875rem", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-                          <p style={{ fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.09em", color: "var(--dim)", margin: "0 0 0.35rem", fontFamily: "inherit" }}>{f.l}</p>
-                          <p style={{ fontSize: "0.82rem", fontWeight: 700, color: f.c, margin: 0, fontFamily: "inherit", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.v}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Footer: date + duration + warning */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "0.25rem", borderTop: `1px solid ${ac.border}20` }}>
-                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        <span style={{ opacity: 0.5 }}>📅</span>
+                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
                         {r.dateCompleted ? new Date(r.dateCompleted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "No date"}
-                        {r.duration && <span style={{ color: "var(--dim)" }}>· {r.duration}</span>}
+                        {r.duration ? ` · ${r.duration}` : ""}
                       </span>
-                      {r.forgottenParts ? (
-                        <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#be123c", background: "rgba(225,29,72,0.1)", padding: "0.25rem 0.625rem", borderRadius: 999, fontFamily: "inherit" }}>
-                          ⚠ {r.forgottenParts}
-                        </span>
-                      ) : r.parts ? (
-                        <span style={{ fontSize: "0.72rem", color: "var(--dim)", fontFamily: "inherit" }}>🔩 {r.parts}</span>
-                      ) : null}
                     </div>
                   </div>
                 );
