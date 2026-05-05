@@ -161,8 +161,8 @@ export default function AdminRepairsPage() {
             <div style={{ marginBottom: "1.75rem" }}>
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "140px 1.4fr 2fr 130px 1.4fr 170px",
-                gap: "0.75rem",
+                gridTemplateColumns: "130px 1.2fr 1.4fr 1.8fr 120px 1.2fr 160px",
+                gap: "0.7rem",
                 alignItems: "center",
                 padding: "0.65rem 1rem",
                 borderRadius: 14,
@@ -176,7 +176,8 @@ export default function AdminRepairsPage() {
                 marginBottom: "0.6rem",
               }}>
                 <span>Repair ID</span>
-                <span>Owner / Device</span>
+                <span>Owner</span>
+                <span>Phone</span>
                 <span>Issue</span>
                 <span>Status</span>
                 <span>Financials</span>
@@ -197,8 +198,8 @@ export default function AdminRepairsPage() {
                         cursor: "pointer",
                         transition: "all 0.18s ease",
                         display: "grid",
-                        gridTemplateColumns: "140px 1.4fr 2fr 130px 1.4fr 170px",
-                        gap: "0.75rem",
+                        gridTemplateColumns: "130px 1.2fr 1.4fr 1.8fr 120px 1.2fr 160px",
+                        gap: "0.7rem",
                         alignItems: "center",
                         boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
                         fontFamily: "inherit",
@@ -225,7 +226,14 @@ export default function AdminRepairsPage() {
                       }}>{r.repId}</span>
 
                       <span style={{ fontSize: "0.9rem", color: "var(--text)", fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                        {r.owner || "Unknown"}{device ? ` · ${device}` : ""}
+                        {r.owner || "Unknown"}
+                      </span>
+
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
+                        <img src="/phone.svg" alt="Phone" width={18} height={18} style={{ opacity: 0.8 }} />
+                        <span style={{ fontSize: "0.82rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                          {device || "Unknown"}
+                        </span>
                       </span>
 
                       <span style={{ fontSize: "0.82rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
