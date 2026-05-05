@@ -12,6 +12,23 @@ type RepairLog = {
   shop: string | null; comments: string | null; forgottenParts: string | null;
 };
 
+type SortKey = "repId" | "owner" | "phone" | "issue" | "status" | "cost" | "payment" | "profit" | "date" | "comments";
+
+type Column = { key: SortKey; label: string };
+
+const columns: Column[] = [
+  { key: "repId", label: "Repair ID" },
+  { key: "owner", label: "Owner" },
+  { key: "phone", label: "Phone" },
+  { key: "issue", label: "Issue" },
+  { key: "status", label: "Status" },
+  { key: "cost", label: "Cost" },
+  { key: "payment", label: "Received" },
+  { key: "profit", label: "Profit" },
+  { key: "comments", label: "Comments" },
+  { key: "date", label: "Date" },
+];
+
 const empty: Omit<RepairLog, "id"> = {
   repId: "", owner: null, brand: null, model: null, issue: null, solution: null,
   completed: false, cost: null, payment: null, profit: null, dateCompleted: null,
@@ -22,12 +39,11 @@ const fmt = (v: number | null) => v == null ? "—" : `LKR ${v.toLocaleString()}
 const dash = (v?: string | null) => v || "—";
 const profitColor = (v: number | null) => v == null ? "#9aa3bd" : v > 0 ? "#059669" : v < 0 ? "#e11d48" : "#9aa3bd";
 
-// Card accent based on profit + completion
 const cardAccent = (r: RepairLog) => {
-  if (!r.completed) return { border: "#d97706", bg: "#fffbf0", chip: "rgba(217,119,6,0.12)", chipText: "#92400e" };
-  if (r.profit == null || r.profit === 0) return { border: "#4f46e5", bg: "#f5f5ff", chip: "rgba(79,70,229,0.1)", chipText: "#3730a3" };
-  if (r.profit > 0) return { border: "#059669", bg: "#f0fdf8", chip: "rgba(5,150,105,0.1)", chipText: "#065f46" };
-  return { border: "#e11d48", bg: "#fff1f3", chip: "rgba(225,29,72,0.1)", chipText: "#9f1239" };
+  if (!r.completed) return { border: "#d97706", chip: "rgba(217,119,6,0.12)", chipText: "#92400e" };
+  if (r.profit == null || r.profit === 0) return { border: "#4f46e5", chip: "rgba(79,70,229,0.1)", chipText: "#3730a3" };
+  if (r.profit > 0) return { border: "#059669", chip: "rgba(5,150,105,0.1)", chipText: "#065f46" };
+  return { border: "#e11d48", chip: "rgba(225,29,72,0.1)", chipText: "#9f1239" };
 };
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -58,7 +74,7 @@ export default function AdminRepairsPage() {
   const [editing, setEditing]   = useState<RepairLog | null>(null);
   const [form, setForm]         = useState<Omit<RepairLog, "id">>(empty);
   const [saving, setSaving]     = useState(false);
-  const [sortKey, setSortKey]   = useState<"repId" | "owner" | "phone" | "issue" | "status" | "cost" | "payment" | "profit" | "date" | "comments">("date");
+  const [sortKey, setSortKey]   = useState<SortKey>("date");
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("desc");
   const [colWidths, setColWidths] = useState([120, 160, 190, 240, 120, 130, 130, 130, 160, 220]);
   const [resizing, setResizing] = useState<{ index: number; startX: number; startWidth: number } | null>(null);
@@ -91,6 +107,7 @@ export default function AdminRepairsPage() {
   const filtered = logs.filter((r) =>
     !q || [r.repId, r.owner, r.brand, r.model, r.issue].some((v) => v?.toLowerCase().includes(q))
   );
+
   const getSortValue = (r: RepairLog) => {
     switch (sortKey) {
       case "repId": return r.repId || "";
@@ -107,6 +124,7 @@ export default function AdminRepairsPage() {
         return r.dateCompleted ? new Date(r.dateCompleted).getTime() : 0;
     }
   };
+
   const sorted = [...filtered].sort((a, b) => {
     const av = getSortValue(a);
     const bv = getSortValue(b);
@@ -114,9 +132,9 @@ export default function AdminRepairsPage() {
     if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
     return String(av).localeCompare(String(bv)) * dir;
   });
-  const visible  = sorted;
+  const visible = sorted;
 
-  const toggleSort = (key: typeof sortKey) => {
+  const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
       return;
@@ -131,6 +149,20 @@ export default function AdminRepairsPage() {
 
   const save = async () => {
     setSaving(true);
+    try {
+      if (editing) {
+        const u = await apiFetch<RepairLog>(`/api/repair-logs/${editing.id}`, { method: "PUT", body: JSON.stringify({ ...form, id: editing.id }) });
+        setLogs((p) => p.map((r) => r.id === editing.id ? u : r));
+      } else {
+        const c = await apiFetch<RepairLog>("/api/repair-logs", { method: "POST", body: JSON.stringify(form) });
+        setLogs((p) => [...p, c]);
+      }
+      setShowForm(false);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const totalProfit = logs.reduce((s, r) => s + (r.profit ?? 0), 0);
@@ -188,19 +220,17 @@ export default function AdminRepairsPage() {
                 <div style={{ width: 10, height: 10, borderRadius: 3, background: x.c }} />
                 {x.l}
               </div>
-                {
-                  key: "repId", label: "Repair ID"
-                },
-                  { key: "owner", label: "Owner" },
-                  { key: "phone", label: "Phone" },
-                  { key: "issue", label: "Issue" },
-                  { key: "status", label: "Status" },
-                  { key: "cost", label: "Cost" },
-                  { key: "payment", label: "Received" },
-                  { key: "profit", label: "Profit" },
-                  { key: "comments", label: "Comments" },
-                  { key: "date", label: "Date" },
-                ].map((col, index) => (
+            ))}
+          </div>
+
+          {/* Table */}
+          {loading ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>Loading…</p>
+          ) : visible.length === 0 ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>No records found.</p>
+          ) : (
+            <div style={{ marginBottom: "1.75rem" }}>
+              <div style={{
                 display: "grid",
                 gridTemplateColumns: colWidths.map((w) => `${w}px`).join(" "),
                 gap: "0.65rem",
@@ -216,20 +246,11 @@ export default function AdminRepairsPage() {
                 fontWeight: 600,
                 marginBottom: "0.6rem",
               }}>
-                {[
-                  { key: "repId", label: "Repair ID" },
-                  { key: "owner", label: "Owner" },
-                  { key: "phone", label: "Phone" },
-                  { key: "issue", label: "Issue" },
-                  { key: "status", label: "Status" },
-                  { key: "financials", label: "Financials" },
-                  { key: "date", label: "Date" },
-                  { key: "comments", label: "Comments" },
-                ].map((col, index) => (
+                {columns.map((col, index) => (
                   <div
                     key={col.key}
                     style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", position: "relative", paddingRight: 10 }}
-                    onClick={() => toggleSort(col.key as typeof sortKey)}
+                    onClick={() => toggleSort(col.key)}
                   >
                     <span>{col.label}</span>
                     {sortKey === col.key && <span style={{ fontSize: "0.65rem" }}>{sortDir === "asc" ? "▲" : "▼"}</span>}
@@ -337,7 +358,6 @@ export default function AdminRepairsPage() {
               </div>
             </div>
           )}
-
         </div>
       </main>
 
@@ -469,5 +489,3 @@ export default function AdminRepairsPage() {
     </div>
   );
 }
-
-
