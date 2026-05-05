@@ -1,8 +1,4 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:mobilux}
-    username: ${PGUSER:mobilux}
-    password: ${PGPASSWORD:mobilux}
   jpa:
     hibernate:
       ddl-auto: update
