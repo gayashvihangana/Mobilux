@@ -10,23 +10,40 @@ type PageShellProps = {
 
 export function PageShell({ title, subtitle, actions, children }: PageShellProps) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800/70 bg-slate-950/80">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
-          <Link href="/" className="font-display text-2xl">
-            Mobilux
-          </Link>
-          {actions ? <div className="flex items-center gap-3">{actions}</div> : null}
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-6xl px-6 py-10">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-amber-200">{title}</p>
-            {subtitle ? <p className="mt-2 text-slate-400">{subtitle}</p> : null}
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      <header style={{
+        position: "sticky", top: 0, zIndex: 30,
+        height: 60,
+        background: "rgba(255,255,255,0.88)",
+        backdropFilter: "blur(12px)",
+        borderBottom: "1px solid var(--border)",
+        display: "flex", alignItems: "center",
+        padding: "0 2rem",
+        gap: "1rem",
+      }}>
+        <Link href="/" style={{
+          display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none",
+        }}>
+          <div style={{
+            width: 30, height: 30,
+            background: "linear-gradient(135deg, #4f46e5, #8b5cf6)",
+            borderRadius: 8, display: "flex", alignItems: "center",
+            justifyContent: "center", fontWeight: 800, color: "#fff", fontSize: "0.85rem",
+          }}>M</div>
+          <span style={{ fontSize: "1rem", fontWeight: 700, color: "var(--text)" }}>Mobilux</span>
+        </Link>
+        {actions && (
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            {actions}
           </div>
+        )}
+      </header>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "2.5rem 2rem" }}>
+        <div style={{ marginBottom: "2rem" }}>
+          <p className="label" style={{ marginBottom: "0.375rem" }}>{title}</p>
+          {subtitle && <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>{subtitle}</p>}
         </div>
-        <div className="mt-8">{children}</div>
+        {children}
       </main>
     </div>
   );

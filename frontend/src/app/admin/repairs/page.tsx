@@ -171,10 +171,10 @@ export default function AdminRepairsPage() {
   const totalSpent  = logs.reduce((s, r) => s + (r.cost   ?? 0), 0);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
       <Sidebar role="admin" userName="Admin" userEmail="admin@mobilux.lk" />
 
-      <main style={{ flex: 1, paddingLeft: 240, minWidth: 0 }}>
+      <main className="page-with-sidebar">
         <div style={{ padding: "2rem 1.75rem" }}>
 
           {/* Header */}

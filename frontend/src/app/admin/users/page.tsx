@@ -31,9 +31,9 @@ export default function AdminUsersPage() {
   }, []);
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
       <Sidebar role="admin" userName="Admin" userEmail="admin@mobilux.lk" />
-      <main className="page-with-sidebar" style={{ flex: 1 }}>
+      <main className="page-with-sidebar">
         <div className="page-content">
           <div style={{ marginBottom: "2rem" }}>
             <p className="label" style={{ marginBottom: "0.5rem" }}>Admin Dashboard</p>
