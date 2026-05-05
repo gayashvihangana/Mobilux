@@ -134,6 +134,8 @@ export default function AdminRepairsPage() {
   });
   const visible = sorted;
 
+  const isRightAligned = (key: SortKey) => key === "cost" || key === "payment" || key === "profit" || key === "date";
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -187,16 +189,39 @@ export default function AdminRepairsPage() {
           {error && <div className="banner-error" style={{ marginBottom: "1rem" }}>⚠ {error}</div>}
 
           {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.875rem", marginBottom: "1.25rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", marginBottom: "1.25rem" }}>
             {[
-              { l: "Total",   v: String(logs.length),                   icon: "🔧", c: "#4f46e5" },
-              { l: "Done",    v: String(logs.filter((r) => r.completed).length), icon: "✅", c: "#059669" },
-              { l: "Spent",   v: `LKR ${totalSpent.toLocaleString()}`,   icon: "💸", c: "#d97706" },
-              { l: "Profit",  v: `LKR ${totalProfit.toLocaleString()}`,  icon: "💰", c: totalProfit >= 0 ? "#059669" : "#e11d48" },
+              { l: "Total",   v: String(logs.length),                   icon: "🔧", c: "#4f46e5", bg: "rgba(79,70,229,0.08)" },
+              { l: "Done",    v: String(logs.filter((r) => r.completed).length), icon: "✅", c: "#059669", bg: "rgba(5,150,105,0.1)" },
+              { l: "Spent",   v: `LKR ${totalSpent.toLocaleString()}`,   icon: "💸", c: "#d97706", bg: "rgba(217,119,6,0.12)" },
+              { l: "Profit",  v: `LKR ${totalProfit.toLocaleString()}`,  icon: "💰", c: totalProfit >= 0 ? "#059669" : "#e11d48", bg: totalProfit >= 0 ? "rgba(5,150,105,0.1)" : "rgba(225,29,72,0.12)" },
             ].map((s) => (
-              <div key={s.l} style={{ background: "var(--bg2)", border: "1px solid var(--border)", borderTop: `3px solid ${s.c}`, borderRadius: 14, padding: "1rem 1.25rem" }}>
-                <p style={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--dim)", marginBottom: "0.375rem" }}>{s.icon} {s.l}</p>
-                <p style={{ fontSize: "1.2rem", fontWeight: 700, color: s.c, margin: 0 }}>{s.v}</p>
+              <div key={s.l} style={{
+                background: "linear-gradient(135deg, #ffffff 0%, rgba(248,250,252,0.9) 100%)",
+                border: "1px solid var(--border)",
+                borderRadius: 16,
+                padding: "1rem 1.25rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.9rem",
+                boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+              }}>
+                <div style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  background: s.bg,
+                  color: s.c,
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: "1.1rem",
+                }}>
+                  {s.icon}
+                </div>
+                <div>
+                  <p style={{ fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--dim)", margin: "0 0 0.35rem" }}>{s.l}</p>
+                  <p style={{ fontSize: "1.25rem", fontWeight: 700, color: s.c, margin: 0 }}>{s.v}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -249,7 +274,16 @@ export default function AdminRepairsPage() {
                 {columns.map((col, index) => (
                   <div
                     key={col.key}
-                    style={{ display: "flex", alignItems: "center", gap: "0.35rem", cursor: "pointer", position: "relative", paddingRight: 10 }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.35rem",
+                      cursor: "pointer",
+                      position: "relative",
+                      paddingRight: 10,
+                      justifySelf: isRightAligned(col.key) ? "end" : "start",
+                      textAlign: isRightAligned(col.key) ? "right" : "left",
+                    }}
                     onClick={() => toggleSort(col.key)}
                   >
                     <span>{col.label}</span>
@@ -332,15 +366,15 @@ export default function AdminRepairsPage() {
                         {r.completed ? "Completed" : "Pending"}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
                         {fmt(r.cost)}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
                         {fmt(r.payment)}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: profitColor(r.profit), fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                      <span style={{ fontSize: "0.78rem", color: profitColor(r.profit), fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
                         {fmt(r.profit)}
                       </span>
 
@@ -348,7 +382,7 @@ export default function AdminRepairsPage() {
                         {r.comments || "—"}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
                         {r.dateCompleted ? new Date(r.dateCompleted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "No date"}
                         {r.duration ? ` · ${r.duration}` : ""}
                       </span>
