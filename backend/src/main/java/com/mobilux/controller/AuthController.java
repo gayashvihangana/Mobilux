@@ -48,7 +48,8 @@ public class AuthController {
         ResponseCookie cookie = ResponseCookie.from("mobilux_token", token)
             .httpOnly(true)
             .path("/")
-            .sameSite("Lax")
+            .sameSite("None")   // required for cross-site (Vercel → Railway)
+            .secure(true)       // required when SameSite=None
             .maxAge(Duration.ofMinutes(expirationMinutes))
             .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
