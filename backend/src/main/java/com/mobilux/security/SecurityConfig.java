@@ -21,6 +21,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
@@ -47,14 +48,19 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // Strip accidental surrounding quotes (common in Railway variable values)
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
             .map(String::trim)
+            .map(s -> s.replaceAll("^\"|\"$", ""))
             .filter(value -> !value.isEmpty())
             .collect(Collectors.toList());
+        if (origins.isEmpty()) {
+            origins = List.of("*");
+        }
         configuration.setAllowedOriginPatterns(origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
