@@ -158,39 +158,64 @@ export default function AdminRepairsPage() {
           ) : visible.length === 0 ? (
             <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>No records found.</p>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem", marginBottom: "1.75rem", justifyItems: "center" }}>
-              {visible.map((r) => {
-                const ac = cardAccent(r);
-                const device = [r.brand, r.model].filter(Boolean).join(" ");
-                return (
-                  <div key={r.id} onClick={() => setDetail(r)}
-                    style={{
-                      background: ac.bg,
-                      border: `1.5px solid ${ac.border}30`,
-                      borderRadius: 20,
-                      padding: "0.75rem 1rem",
-                      cursor: "pointer",
-                      transition: "all 0.18s ease",
-                      display: "flex",
-                      alignItems: "center",
-                      boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
-                      fontFamily: "inherit",
-                      position: "relative", overflow: "hidden",
-                      width: "100%",
-                      maxWidth: 880,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-3px)";
-                      e.currentTarget.style.boxShadow = `0 12px 32px ${ac.border}22`;
-                      e.currentTarget.style.borderColor = `${ac.border}80`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "";
-                      e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.05)";
-                      e.currentTarget.style.borderColor = `${ac.border}30`;
-                    }}
-                  >
-                    <div style={{ display: "grid", gridTemplateColumns: "120px 1.5fr 2.2fr 120px 1.2fr 160px", gap: "0.75rem", alignItems: "center", width: "100%" }}>
+            <div style={{ marginBottom: "1.75rem" }}>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "140px 1.4fr 2fr 130px 1.4fr 170px",
+                gap: "0.75rem",
+                alignItems: "center",
+                padding: "0.65rem 1rem",
+                borderRadius: 14,
+                background: "linear-gradient(135deg, rgba(79,70,229,0.08), rgba(217,119,6,0.08))",
+                border: "1px solid var(--border)",
+                color: "var(--muted)",
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.14em",
+                fontWeight: 600,
+                marginBottom: "0.6rem",
+              }}>
+                <span>Repair ID</span>
+                <span>Owner / Device</span>
+                <span>Issue</span>
+                <span>Status</span>
+                <span>Financials</span>
+                <span>Date</span>
+              </div>
+
+              <div style={{ display: "grid", gap: "0.65rem" }}>
+                {visible.map((r) => {
+                  const ac = cardAccent(r);
+                  const device = [r.brand, r.model].filter(Boolean).join(" ");
+                  return (
+                    <div key={r.id} onClick={() => setDetail(r)}
+                      style={{
+                        background: ac.bg,
+                        border: `1.5px solid ${ac.border}30`,
+                        borderRadius: 16,
+                        padding: "0.7rem 1rem",
+                        cursor: "pointer",
+                        transition: "all 0.18s ease",
+                        display: "grid",
+                        gridTemplateColumns: "140px 1.4fr 2fr 130px 1.4fr 170px",
+                        gap: "0.75rem",
+                        alignItems: "center",
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
+                        fontFamily: "inherit",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow = `0 10px 24px ${ac.border}22`;
+                        e.currentTarget.style.borderColor = `${ac.border}80`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "";
+                        e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.05)";
+                        e.currentTarget.style.borderColor = `${ac.border}30`;
+                      }}
+                    >
                       <span style={{
                         fontFamily: "monospace", fontSize: "0.78rem", fontWeight: 800,
                         color: ac.border, letterSpacing: "0.04em",
@@ -227,9 +252,9 @@ export default function AdminRepairsPage() {
                         {r.duration ? ` · ${r.duration}` : ""}
                       </span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
 
