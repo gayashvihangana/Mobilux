@@ -158,7 +158,7 @@ export default function AdminRepairsPage() {
           ) : visible.length === 0 ? (
             <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>No records found.</p>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "1.25rem", marginBottom: "1.75rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem", marginBottom: "1.75rem", justifyItems: "center" }}>
               {visible.map((r) => {
                 const ac = cardAccent(r);
                 const device = [r.brand, r.model].filter(Boolean).join(" ");
@@ -168,13 +168,15 @@ export default function AdminRepairsPage() {
                       background: ac.bg,
                       border: `1.5px solid ${ac.border}30`,
                       borderRadius: 20,
-                      padding: "1.75rem",
+                      padding: "1.5rem",
                       cursor: "pointer",
                       transition: "all 0.18s ease",
                       display: "flex", flexDirection: "column", gap: "1rem",
                       boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
                       fontFamily: "inherit",
                       position: "relative", overflow: "hidden",
+                      width: "100%",
+                      maxWidth: 880,
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = "translateY(-3px)";
