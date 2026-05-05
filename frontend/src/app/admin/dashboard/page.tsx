@@ -47,9 +47,10 @@ export default function AdminDashboardPage() {
         ]);
         if (!active) return;
         setSummary(s); setRepairs(r.slice(0, 4)); setPayments(p.slice(0, 3));
-      } catch {
+      } catch (err) {
         if (!active) return;
-        setError("Backend offline");
+        const msg = err instanceof Error ? err.message : "Request failed";
+        setError(msg.includes("403") || msg.includes("401") ? "Not logged in" : msg);
         setSummary(fallbackSummary); setRepairs(fallbackRepairs); setPayments(fallbackPayments);
       }
     })();
