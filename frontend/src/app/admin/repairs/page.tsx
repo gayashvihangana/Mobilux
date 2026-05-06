@@ -150,7 +150,7 @@ export default function AdminRepairsPage() {
   };
 
   const openAdd  = () => { setForm(empty); setEditing(null); setShowForm(true); };
-  const openEdit = (r: RepairLog) => { const { id: _, ...rest } = r; setForm(rest); setEditing(r); setDetail(null); setShowForm(true); };
+  const openEdit = (r: RepairLog) => { const { id, ...rest } = r; void id; setForm(rest); setEditing(r); setDetail(null); setShowForm(true); };
   const setF     = (k: keyof typeof form, v: string | boolean | number | null) => setForm((p) => ({ ...p, [k]: v }));
 
   const confirmDelete = async (r: RepairLog) => {
