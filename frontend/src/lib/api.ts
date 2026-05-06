@@ -16,6 +16,22 @@ async function parseError(response: Response) {
   return `Request failed (${response.status})`;
 }
 
+const AUTH_PATHS = new Set(["/api/auth/login", "/api/auth/signup", "/api/auth/logout", "/api/auth/me"]);
+
+async function handleUnauthorized(path: string) {
+  if (AUTH_PATHS.has(path)) {
+    return;
+  }
+  try {
+    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
+  } catch {
+    // Ignore logout failures and still redirect.
+  }
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers ?? {});
   if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
@@ -27,6 +43,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     headers,
     credentials: "include",
   });
+
+  if (response.status === 401 || response.status === 403) {
+    await handleUnauthorized(path);
+  }
 
   if (!response.ok) {
     throw new Error(await parseError(response));

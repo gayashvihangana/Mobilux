@@ -49,6 +49,9 @@ public class UserService {
         if (request.getRole() != null) {
             user.setRole(request.getRole());
         }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
         return toResponse(userRepository.save(user));
     }
 
@@ -70,6 +73,6 @@ public class UserService {
     }
 
     public UserResponse toResponse(User user) {
-        return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getRole().name());
+        return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getRole().name(), user.getAvatarUrl());
     }
 }

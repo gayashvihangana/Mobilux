@@ -30,18 +30,18 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(Role.CUSTOMER);
         User saved = userRepository.save(user);
-        return new AuthResponse("", saved.getRole().name(), saved.getName(), saved.getEmail());
+        return new AuthResponse("", saved.getRole().name(), saved.getName(), saved.getEmail(), saved.getAvatarUrl());
     }
 
     public AuthResponse login(AuthRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
             .orElseThrow(() -> new BadRequestException("Invalid credentials"));
-        return new AuthResponse("", user.getRole().name(), user.getName(), user.getEmail());
+        return new AuthResponse("", user.getRole().name(), user.getName(), user.getEmail(), user.getAvatarUrl());
     }
 
     public AuthResponse getAuthResponseByEmail(String email) {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new BadRequestException("Invalid credentials"));
-        return new AuthResponse("", user.getRole().name(), user.getName(), user.getEmail());
+        return new AuthResponse("", user.getRole().name(), user.getName(), user.getEmail(), user.getAvatarUrl());
     }
 }

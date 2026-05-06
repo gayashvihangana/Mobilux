@@ -7,6 +7,7 @@ export interface AuthResponse {
   role: Role;
   name: string;
   email: string;
+  avatarUrl?: string | null;
 }
 
 export interface UserSummary {
@@ -21,6 +22,7 @@ export interface UserResponse {
   name: string;
   email: string;
   role: Role;
+  avatarUrl?: string | null;
 }
 
 export interface RepairResponse {

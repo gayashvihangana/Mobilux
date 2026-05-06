@@ -5,6 +5,7 @@ import com.mobilux.model.Role;
 public class UserUpdateRequest {
     private String name;
     private Role role;
+    private String avatarUrl;
 
     public String getName() {
         return name;
@@ -20,5 +21,13 @@ public class UserUpdateRequest {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 }

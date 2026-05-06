@@ -5,12 +5,14 @@ public class UserResponse {
     private String name;
     private String email;
     private String role;
+    private String avatarUrl;
 
-    public UserResponse(Long id, String name, String email, String role) {
+    public UserResponse(Long id, String name, String email, String role, String avatarUrl) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.role = role;
+        this.avatarUrl = avatarUrl;
     }
 
     public Long getId() {
@@ -27,5 +29,9 @@ public class UserResponse {
 
     public String getRole() {
         return role;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
     }
 }

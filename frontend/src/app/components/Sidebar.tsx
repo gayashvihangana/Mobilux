@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { apiFetch, API_BASE } from "@/lib/api";
 
 type NavItem = { label: string; icon: string; href: string; badge?: number };
 
@@ -35,16 +36,31 @@ type SidebarProps = {
   role?: "admin" | "staff" | "customer";
   userName?: string;
   userEmail?: string;
+  avatarUrl?: string | null;
 };
 
-export function Sidebar({ role = "admin", userName, userEmail }: SidebarProps) {
+export function Sidebar({ role = "admin", userName, userEmail, avatarUrl }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const nav = role === "admin" ? adminNav : role === "staff" ? staffNav : customerNav;
   const { label: roleLabel, color: roleColor, bg: roleBg } = roleConfig[role];
 
   const initials = userName
     ? userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : "U";
+  const avatarSrc = avatarUrl
+    ? avatarUrl.startsWith("/")
+      ? `${API_BASE}${avatarUrl}`
+      : avatarUrl
+    : null;
+
+  const handleLogout = async () => {
+    try {
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.push("/login");
+    }
+  };
 
   return (
     <aside className="sidebar">
@@ -119,22 +135,27 @@ export function Sidebar({ role = "admin", userName, userEmail }: SidebarProps) {
       <div>
         <p className="sidebar-section-label">General</p>
         <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <Link href="/login" className="sidebar-link" style={{ fontSize: "0.82rem" }}>
-            <span className="sidebar-icon">⚙</span>
-            <span>Settings</span>
+          <Link href="/profile" className="sidebar-link" style={{ fontSize: "0.82rem" }}>
+            <span className="sidebar-icon">👤</span>
+            <span>Profile</span>
           </Link>
           <Link href="/login" className="sidebar-link" style={{ fontSize: "0.82rem" }}>
             <span className="sidebar-icon">❓</span>
             <span>Help</span>
           </Link>
-          <Link href="/login" className="sidebar-link" style={{ fontSize: "0.82rem" }}>
+          <button
+            onClick={handleLogout}
+            className="sidebar-link"
+            style={{ fontSize: "0.82rem", textAlign: "left", background: "none", border: "none", width: "100%" }}
+          >
             <span className="sidebar-icon">→</span>
             <span>Logout</span>
-          </Link>
+          </button>
         </div>
 
         {/* User card */}
-        <div style={{
+        <Link href="/profile" style={{ textDecoration: "none" }}>
+          <div style={{
           display: "flex", alignItems: "center", gap: "0.625rem",
           padding: "0.75rem",
           background: "var(--bg3)",
@@ -147,7 +168,17 @@ export function Sidebar({ role = "admin", userName, userEmail }: SidebarProps) {
           onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--border2)")}
           onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
         >
-          <div className="avatar" style={{ width: 32, height: 32, fontSize: "0.75rem" }}>{initials}</div>
+          {avatarSrc ? (
+            <img
+              src={avatarSrc}
+              alt={userName ?? "User"}
+              width={32}
+              height={32}
+              style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }}
+            />
+          ) : (
+            <div className="avatar" style={{ width: 32, height: 32, fontSize: "0.75rem" }}>{initials}</div>
+          )}
           <div style={{ minWidth: 0, flex: 1 }}>
             <p style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {userName ?? "User"}
@@ -157,7 +188,8 @@ export function Sidebar({ role = "admin", userName, userEmail }: SidebarProps) {
             </p>
           </div>
           <span style={{ fontSize: "0.7rem", color: "var(--dim)", flexShrink: 0 }}>⋮</span>
-        </div>
+          </div>
+        </Link>
       </div>
     </aside>
   );

@@ -33,6 +33,9 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @Column(length = 500)
+    private String avatarUrl;
+
     @Column(nullable = false)
     private Instant createdAt;
 
@@ -89,6 +92,14 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 
     public Instant getCreatedAt() {

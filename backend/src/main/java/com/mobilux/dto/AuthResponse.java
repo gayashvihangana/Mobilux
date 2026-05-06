@@ -5,12 +5,14 @@ public class AuthResponse {
     private String role;
     private String name;
     private String email;
+    private String avatarUrl;
 
-    public AuthResponse(String token, String role, String name, String email) {
+    public AuthResponse(String token, String role, String name, String email, String avatarUrl) {
         this.token = token;
         this.role = role;
         this.name = name;
         this.email = email;
+        this.avatarUrl = avatarUrl;
     }
 
     public String getToken() {
@@ -27,5 +29,9 @@ public class AuthResponse {
 
     public String getEmail() {
         return email;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
     }
 }
