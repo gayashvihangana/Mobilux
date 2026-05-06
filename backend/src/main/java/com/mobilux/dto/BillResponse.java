@@ -19,6 +19,8 @@ public class BillResponse {
     private String notes;
     private BigDecimal subTotal;
     private BigDecimal total;
+    private BigDecimal amountPaid;
+    private BigDecimal balance;
     private List<BillItemResponse> items;
     private Instant createdAt;
 
@@ -36,6 +38,8 @@ public class BillResponse {
                         String notes,
                         BigDecimal subTotal,
                         BigDecimal total,
+                        BigDecimal amountPaid,
+                        BigDecimal balance,
                         List<BillItemResponse> items,
                         Instant createdAt) {
         this.id = id;
@@ -52,6 +56,8 @@ public class BillResponse {
         this.notes = notes;
         this.subTotal = subTotal;
         this.total = total;
+        this.amountPaid = amountPaid;
+        this.balance = balance;
         this.items = items;
         this.createdAt = createdAt;
     }
@@ -110,6 +116,14 @@ public class BillResponse {
 
     public BigDecimal getTotal() {
         return total;
+    }
+
+    public BigDecimal getAmountPaid() {
+        return amountPaid;
+    }
+
+    public BigDecimal getBalance() {
+        return balance;
     }
 
     public List<BillItemResponse> getItems() {

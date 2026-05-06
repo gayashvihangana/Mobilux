@@ -64,6 +64,9 @@ public class Bill {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
 
+    @Column(precision = 10, scale = 2)
+    private BigDecimal amountPaid;
+
     @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<BillItem> items = new ArrayList<>();
 
@@ -195,6 +198,14 @@ public class Bill {
 
     public void setTotal(BigDecimal total) {
         this.total = total;
+    }
+
+    public BigDecimal getAmountPaid() {
+        return amountPaid;
+    }
+
+    public void setAmountPaid(BigDecimal amountPaid) {
+        this.amountPaid = amountPaid;
     }
 
     public List<BillItem> getItems() {

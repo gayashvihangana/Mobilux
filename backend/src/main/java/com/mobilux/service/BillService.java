@@ -62,6 +62,7 @@ public class BillService {
         bill.setDiscount(request.getDiscount());
         bill.setLoyaltyPoints(request.getLoyaltyPoints());
         bill.setNotes(request.getNotes());
+        bill.setAmountPaid(request.getAmountPaid());
 
         List<BillItem> items = toBillItems(bill, request.getItems());
         bill.getItems().clear();
@@ -79,8 +80,18 @@ public class BillService {
             total = BigDecimal.ZERO;
         }
 
+        BigDecimal amountPaid = request.getAmountPaid() != null ? request.getAmountPaid() : BigDecimal.ZERO;
+        if (amountPaid.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Amount paid cannot be negative");
+        }
+        BigDecimal balance = total.subtract(amountPaid);
+        if (balance.compareTo(BigDecimal.ZERO) < 0) {
+            balance = BigDecimal.ZERO;
+        }
+
         bill.setSubTotal(subTotal);
         bill.setTotal(total);
+        bill.setAmountPaid(amountPaid);
 
         return toResponse(billRepository.save(bill));
     }
@@ -108,6 +119,11 @@ public class BillService {
     public byte[] generatePdf(Long id) {
         Bill bill = billRepository.findById(id)
             .orElseThrow(() -> new NotFoundException("Bill not found"));
+        BigDecimal paid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
+        BigDecimal balance = bill.getTotal().subtract(paid);
+        if (balance.compareTo(BigDecimal.ZERO) < 0) {
+            balance = BigDecimal.ZERO;
+        }
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4);
         try {
@@ -151,6 +167,8 @@ public class BillService {
             document.add(new Paragraph("Subtotal: " + formatMoney(bill.getSubTotal()), body));
             document.add(new Paragraph("Discount: " + formatMoney(bill.getDiscount()), body));
             document.add(new Paragraph("Total: " + formatMoney(bill.getTotal()), heading));
+            document.add(new Paragraph("Paid: " + formatMoney(paid), body));
+            document.add(new Paragraph("Balance: " + formatMoney(balance), body));
             document.add(new Paragraph("Loyalty points: " + safeInt(bill.getLoyaltyPoints()), body));
 
             if (bill.getSpareParts() != null && !bill.getSpareParts().isBlank()) {
@@ -171,6 +189,11 @@ public class BillService {
     public String generateHtml(Long id) {
         Bill bill = billRepository.findById(id)
             .orElseThrow(() -> new NotFoundException("Bill not found"));
+        BigDecimal paid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
+        BigDecimal balance = bill.getTotal().subtract(paid);
+        if (balance.compareTo(BigDecimal.ZERO) < 0) {
+            balance = BigDecimal.ZERO;
+        }
 
         StringBuilder html = new StringBuilder();
         html.append("<!doctype html><html><head><meta charset=\"utf-8\" />");
@@ -209,6 +232,8 @@ public class BillService {
         html.append("Subtotal: ").append(formatMoney(bill.getSubTotal())).append("<br/>");
         html.append("Discount: ").append(formatMoney(bill.getDiscount())).append("<br/>");
         html.append("<span class=\"total\">Total: ").append(formatMoney(bill.getTotal())).append("</span><br/>");
+        html.append("Paid: ").append(formatMoney(paid)).append("<br/>");
+        html.append("Balance: ").append(formatMoney(balance)).append("<br/>");
         html.append("Loyalty points: ").append(safeInt(bill.getLoyaltyPoints())).append("</div>");
 
         if (bill.getSpareParts() != null && !bill.getSpareParts().isBlank()) {
@@ -268,6 +293,11 @@ public class BillService {
         for (BillItem item : bill.getItems()) {
             items.add(new BillItemResponse(item.getDescription(), item.getQuantity(), item.getUnitPrice(), item.getLineTotal()));
         }
+        BigDecimal amountPaid = bill.getAmountPaid() != null ? bill.getAmountPaid() : BigDecimal.ZERO;
+        BigDecimal balance = bill.getTotal().subtract(amountPaid);
+        if (balance.compareTo(BigDecimal.ZERO) < 0) {
+            balance = BigDecimal.ZERO;
+        }
         return new BillResponse(
             bill.getId(),
             bill.getBillNumber(),
@@ -283,6 +313,8 @@ public class BillService {
             bill.getNotes(),
             bill.getSubTotal(),
             bill.getTotal(),
+            amountPaid,
+            balance,
             items,
             bill.getCreatedAt()
         );

@@ -95,6 +95,8 @@ export interface BillResponse {
   repairmanName: string;
   spareParts?: string | null;
   discount?: number | null;
+  amountPaid?: number | null;
+  balance?: number | null;
   loyaltyPoints?: number | null;
   notes?: string | null;
   subTotal: number;

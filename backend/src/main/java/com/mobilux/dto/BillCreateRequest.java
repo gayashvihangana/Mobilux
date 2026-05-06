@@ -15,6 +15,8 @@ public class BillCreateRequest {
 
     private BigDecimal discount;
 
+    private BigDecimal amountPaid;
+
     private Integer loyaltyPoints;
 
     private String notes;
@@ -52,6 +54,14 @@ public class BillCreateRequest {
 
     public void setDiscount(BigDecimal discount) {
         this.discount = discount;
+    }
+
+    public BigDecimal getAmountPaid() {
+        return amountPaid;
+    }
+
+    public void setAmountPaid(BigDecimal amountPaid) {
+        this.amountPaid = amountPaid;
     }
 
     public Integer getLoyaltyPoints() {

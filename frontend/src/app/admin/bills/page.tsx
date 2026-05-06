@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, API_BASE } from "@/lib/api";
 import { formatLkr } from "@/lib/format";
-import type { BillItemInput, BillResponse, RepairResponse } from "@/lib/types";
+import type { AuthResponse, BillItemInput, BillResponse, RepairResponse } from "@/lib/types";
 import { Sidebar } from "@/app/components/Sidebar";
 
 const emptyItem: BillItemInput = { description: "", quantity: 1, unitPrice: 0 };
@@ -15,12 +15,15 @@ export default function AdminBillsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [repairSearch, setRepairSearch] = useState("");
+  const [authUser, setAuthUser] = useState<AuthResponse | null>(null);
 
   const [form, setForm] = useState({
     repairId: "",
     repairmanName: "",
     spareParts: "",
     discount: "0",
+    amountPaid: "0",
     loyaltyPoints: "0",
     notes: "",
     items: [{ ...emptyItem }],
@@ -51,6 +54,23 @@ export default function AdminBillsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const me = await apiFetch<AuthResponse>("/api/auth/me");
+        if (!active) return;
+        setAuthUser(me);
+        setForm((prev) => (prev.repairmanName ? prev : { ...prev, repairmanName: me.name }));
+      } catch {
+        if (active) setAuthUser(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const selectedRepair = useMemo(() => {
     const id = Number(form.repairId || 0);
     return repairs.find((r) => r.id === id) ?? null;
@@ -60,6 +80,30 @@ export default function AdminBillsPage() {
     if (!selectedRepair) return null;
     return bills.find((b) => b.repairId === selectedRepair.id) ?? null;
   }, [bills, selectedRepair]);
+
+  const filteredRepairs = useMemo(() => {
+    const term = repairSearch.trim();
+    if (!term) return repairs;
+    return repairs.filter((repair) => String(repair.id).includes(term));
+  }, [repairs, repairSearch]);
+
+  useEffect(() => {
+    if (!selectedRepair) return;
+    setForm((prev) => {
+      const nextRepairman = prev.repairmanName || selectedRepair.assignedStaff?.name || prev.repairmanName;
+      const hasCustomItems = prev.items.some((item) => item.description.trim());
+      if (hasCustomItems) return prev;
+      const baseDescription = selectedRepair.issueDescription
+        ? `Repair - ${selectedRepair.issueDescription}`
+        : `Repair - ${selectedRepair.deviceModel}`;
+      const price = Number(selectedRepair.cost ?? 0);
+      return {
+        ...prev,
+        repairmanName: nextRepairman ?? prev.repairmanName,
+        items: [{ description: baseDescription, quantity: 1, unitPrice: price }],
+      };
+    });
+  }, [selectedRepair]);
 
   const setItem = (index: number, patch: Partial<BillItemInput>) => {
     setForm((prev) => {
@@ -80,6 +124,7 @@ export default function AdminBillsPage() {
       repairmanName: existingBill.repairmanName ?? "",
       spareParts: existingBill.spareParts ?? "",
       discount: String(existingBill.discount ?? 0),
+      amountPaid: String(existingBill.amountPaid ?? 0),
       loyaltyPoints: String(existingBill.loyaltyPoints ?? 0),
       notes: existingBill.notes ?? "",
       items: existingBill.items.map((item) => ({
@@ -121,6 +166,7 @@ export default function AdminBillsPage() {
         repairmanName: form.repairmanName || null,
         spareParts: form.spareParts || null,
         discount: Number(form.discount || 0),
+        amountPaid: Number(form.amountPaid || 0),
         loyaltyPoints: Number(form.loyaltyPoints || 0),
         notes: form.notes || null,
         items,
@@ -138,6 +184,19 @@ export default function AdminBillsPage() {
       setSaving(false);
     }
   };
+
+  const totals = useMemo(() => {
+    const subTotal = form.items.reduce((sum, item) => {
+      const qty = Number(item.quantity || 0);
+      const price = Number(item.unitPrice || 0);
+      return sum + qty * price;
+    }, 0);
+    const discount = Number(form.discount || 0);
+    const total = Math.max(subTotal - discount, 0);
+    const paid = Number(form.amountPaid || 0);
+    const balance = Math.max(total - paid, 0);
+    return { subTotal, total, paid, balance };
+  }, [form.items, form.discount, form.amountPaid]);
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
@@ -167,18 +226,34 @@ export default function AdminBillsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem" }}>
                 <div>
                   <label className="label" style={{ display: "block", marginBottom: "0.5rem" }}>Repair</label>
+                  <input
+                    className="input-field"
+                    placeholder="Search by repair ID"
+                    value={repairSearch}
+                    onChange={(e) => setRepairSearch(e.target.value)}
+                    style={{ marginBottom: "0.5rem" }}
+                  />
                   <select
                     className="input-field"
                     value={form.repairId}
                     onChange={(e) => setForm((prev) => ({ ...prev, repairId: e.target.value }))}
                   >
                     <option value="">Select repair</option>
-                    {repairs.map((repair) => (
+                    {filteredRepairs.map((repair) => (
                       <option key={repair.id} value={repair.id}>
                         #{repair.id} · {repair.deviceModel} · {repair.customer.name}
                       </option>
                     ))}
                   </select>
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <a
+                      href="/admin/repairs"
+                      className="btn-ghost"
+                      style={{ width: "auto", display: "inline-flex" }}
+                    >
+                      + New repair
+                    </a>
+                  </div>
                 </div>
                 <div>
                   <label className="label" style={{ display: "block", marginBottom: "0.5rem" }}>Repairman</label>
@@ -186,7 +261,7 @@ export default function AdminBillsPage() {
                     className="input-field"
                     value={form.repairmanName}
                     onChange={(e) => setForm((prev) => ({ ...prev, repairmanName: e.target.value }))}
-                    placeholder={selectedRepair?.assignedStaff?.name ?? "Repairman name"}
+                    placeholder={authUser?.name ?? selectedRepair?.assignedStaff?.name ?? "Repairman name"}
                   />
                 </div>
               </div>
@@ -245,7 +320,7 @@ export default function AdminBillsPage() {
                 </button>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "1rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "1rem" }}>
                 <div>
                   <label className="label" style={{ display: "block", marginBottom: "0.5rem" }}>Discount (LKR)</label>
                   <input
@@ -255,6 +330,17 @@ export default function AdminBillsPage() {
                     step="0.01"
                     value={form.discount}
                     onChange={(e) => setForm((prev) => ({ ...prev, discount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label" style={{ display: "block", marginBottom: "0.5rem" }}>Paid amount (LKR)</label>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.amountPaid}
+                    onChange={(e) => setForm((prev) => ({ ...prev, amountPaid: e.target.value }))}
                   />
                 </div>
                 <div>
@@ -275,6 +361,27 @@ export default function AdminBillsPage() {
                     onChange={(e) => setForm((prev) => ({ ...prev, spareParts: e.target.value }))}
                     placeholder="Screen, battery, connector"
                   />
+                </div>
+              </div>
+
+              <div className="card" style={{ padding: "1rem", background: "var(--bg3)" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "1.5rem" }}>
+                  <div>
+                    <p className="label">Subtotal</p>
+                    <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text)" }}>{formatLkr(totals.subTotal)}</p>
+                  </div>
+                  <div>
+                    <p className="label">Total</p>
+                    <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text)" }}>{formatLkr(totals.total)}</p>
+                  </div>
+                  <div>
+                    <p className="label">Paid</p>
+                    <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text)" }}>{formatLkr(totals.paid)}</p>
+                  </div>
+                  <div>
+                    <p className="label">Balance</p>
+                    <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text)" }}>{formatLkr(totals.balance)}</p>
+                  </div>
                 </div>
               </div>
 
@@ -321,6 +428,9 @@ export default function AdminBillsPage() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                       <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--primary)" }}>{formatLkr(bill.total)}</span>
+                      <span style={{ fontSize: "0.8rem", color: "var(--muted)" }}>
+                        Balance {formatLkr(bill.balance ?? 0)}
+                      </span>
                       <a
                         href={`${API_BASE}/api/bills/${bill.id}/pdf`}
                         target="_blank"
