@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import type { AuthResponse, Role } from "@/lib/types";
 
@@ -19,6 +19,23 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError]       = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const me = await apiFetch<AuthResponse>("/api/auth/me");
+        if (active) {
+          router.replace(redirectByRole[me.role]);
+        }
+      } catch {
+        // Not logged in
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

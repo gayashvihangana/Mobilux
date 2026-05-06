@@ -1,6 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
+import type { AuthResponse, Role } from "@/lib/types";
+
+const redirectByRole: Record<Role, string> = {
+  ADMIN: "/admin/dashboard",
+  CUSTOMER: "/dashboard",
+  STAFF: "/staff/dashboard",
+};
 
 const services = [
   { title: "Screen Replacement", description: "Precision glass and OLED replacements with same-day turnaround.", price: "From LKR 9,500", icon: "📱" },
@@ -28,6 +37,44 @@ const testimonials = [
 ];
 
 export default function Home() {
+  const [auth, setAuth] = useState<AuthResponse | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const me = await apiFetch<AuthResponse>("/api/auth/me");
+        if (active) {
+          setAuth(me);
+        }
+      } catch {
+        if (active) {
+          setAuth(null);
+        }
+      } finally {
+        if (active) {
+          setAuthChecked(true);
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const initials = auth?.name
+    ? auth.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : "U";
+
+  const handleLogout = async () => {
+    try {
+      await apiFetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      setAuth(null);
+    }
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
 
@@ -63,8 +110,36 @@ export default function Home() {
           </nav>
 
           <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
-            <Link href="/login" className="btn-ghost" style={{ width: "auto" }}>Login</Link>
-            <Link href="/signup" className="btn-amber" style={{ width: "auto", padding: "0.6rem 1.25rem" }}>Get started</Link>
+            {authChecked && auth ? (
+              <>
+                <Link
+                  href={redirectByRole[auth.role]}
+                  className="btn-ghost"
+                  style={{ width: "auto" }}
+                >
+                  Dashboard
+                </Link>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={handleLogout}
+                  style={{ width: "auto" }}
+                >
+                  Logout
+                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingLeft: "0.5rem" }}>
+                  <div className="avatar" style={{ width: 28, height: 28, fontSize: "0.7rem" }}>{initials}</div>
+                  <span style={{ fontSize: "0.85rem", color: "var(--text)", fontWeight: 600 }}>
+                    {auth.name}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="btn-ghost" style={{ width: "auto" }}>Login</Link>
+                <Link href="/signup" className="btn-amber" style={{ width: "auto", padding: "0.6rem 1.25rem" }}>Get started</Link>
+              </>
+            )}
           </div>
         </div>
       </header>
