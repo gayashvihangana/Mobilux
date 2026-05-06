@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch, API_BASE } from "@/lib/api";
 import { formatLkr } from "@/lib/format";
 import type { AuthResponse, BillItemInput, BillResponse, RepairResponse } from "@/lib/types";
@@ -9,6 +10,7 @@ import { Sidebar } from "@/app/components/Sidebar";
 const emptyItem: BillItemInput = { description: "", quantity: 1, unitPrice: 0 };
 
 export default function AdminBillsPage() {
+  const searchParams = useSearchParams();
   const [repairs, setRepairs] = useState<RepairResponse[]>([]);
   const [bills, setBills] = useState<BillResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +57,12 @@ export default function AdminBillsPage() {
   }, []);
 
   useEffect(() => {
+    const repairIdParam = searchParams.get("repairId");
+    if (!repairIdParam) return;
+    setRepairSearch(repairIdParam);
+  }, [searchParams]);
+
+  useEffect(() => {
     let active = true;
     (async () => {
       try {
@@ -86,6 +94,15 @@ export default function AdminBillsPage() {
     if (!term) return repairs;
     return repairs.filter((repair) => String(repair.id).includes(term));
   }, [repairs, repairSearch]);
+
+  useEffect(() => {
+    const term = repairSearch.trim();
+    if (!term) return;
+    const match = repairs.find((repair) => String(repair.id) === term);
+    if (match) {
+      setForm((prev) => ({ ...prev, repairId: String(match.id) }));
+    }
+  }, [repairSearch, repairs]);
 
   useEffect(() => {
     if (!selectedRepair) return;
@@ -233,10 +250,22 @@ export default function AdminBillsPage() {
                     onChange={(e) => setRepairSearch(e.target.value)}
                     style={{ marginBottom: "0.5rem" }}
                   />
+                  {repairSearch && filteredRepairs.length === 0 && (
+                    <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginBottom: "0.5rem" }}>
+                      No repairs match that ID.
+                    </div>
+                  )}
                   <select
                     className="input-field"
                     value={form.repairId}
                     onChange={(e) => setForm((prev) => ({ ...prev, repairId: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      const match = repairs.find((repair) => String(repair.id) === repairSearch.trim());
+                      if (match) {
+                        setForm((prev) => ({ ...prev, repairId: String(match.id) }));
+                      }
+                    }}
                   >
                     <option value="">Select repair</option>
                     {filteredRepairs.map((repair) => (

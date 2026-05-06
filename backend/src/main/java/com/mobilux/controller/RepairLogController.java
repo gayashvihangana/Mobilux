@@ -40,5 +40,13 @@ public class RepairLogController {
         body.setUpdatedAt(LocalDateTime.now());
         return ResponseEntity.ok(repo.save(body));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        RepairLog existing = repo.findById(id)
+            .orElseThrow(() -> new NotFoundException("Repair log not found"));
+        repo.delete(existing);
+        return ResponseEntity.noContent().build();
+    }
 }
 

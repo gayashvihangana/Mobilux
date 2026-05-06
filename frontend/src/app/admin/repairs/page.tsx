@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Sidebar } from "@/app/components/Sidebar";
 
@@ -12,7 +13,7 @@ type RepairLog = {
   shop: string | null; comments: string | null; forgottenParts: string | null;
 };
 
-type SortKey = "repId" | "owner" | "phone" | "issue" | "status" | "cost" | "payment" | "profit" | "date" | "comments";
+type SortKey = "repId" | "owner" | "phone" | "issue" | "status" | "cost" | "payment" | "profit" | "date" | "comments" | "bill";
 
 type Column = { key: SortKey; label: string };
 
@@ -27,6 +28,7 @@ const columns: Column[] = [
   { key: "profit", label: "Profit" },
   { key: "comments", label: "Comments" },
   { key: "date", label: "Date" },
+  { key: "bill", label: "Bill" },
 ];
 
 const empty: Omit<RepairLog, "id"> = {
@@ -76,8 +78,9 @@ export default function AdminRepairsPage() {
   const [saving, setSaving]     = useState(false);
   const [sortKey, setSortKey]   = useState<SortKey>("date");
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("desc");
-  const [colWidths, setColWidths] = useState([120, 160, 190, 240, 120, 130, 130, 130, 160, 220]);
+  const [colWidths, setColWidths] = useState([120, 160, 190, 240, 120, 130, 130, 130, 160, 220, 110]);
   const [resizing, setResizing] = useState<{ index: number; startX: number; startWidth: number } | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     apiFetch<RepairLog[]>("/api/repair-logs")
@@ -119,6 +122,7 @@ export default function AdminRepairsPage() {
       case "payment": return r.payment ?? 0;
       case "profit": return r.profit ?? 0;
       case "comments": return r.comments || "";
+      case "bill": return "";
       case "date":
       default:
         return r.dateCompleted ? new Date(r.dateCompleted).getTime() : 0;
@@ -148,6 +152,29 @@ export default function AdminRepairsPage() {
   const openAdd  = () => { setForm(empty); setEditing(null); setShowForm(true); };
   const openEdit = (r: RepairLog) => { const { id: _, ...rest } = r; setForm(rest); setEditing(r); setDetail(null); setShowForm(true); };
   const setF     = (k: keyof typeof form, v: string | boolean | number | null) => setForm((p) => ({ ...p, [k]: v }));
+
+  const confirmDelete = async (r: RepairLog) => {
+    const ok = window.confirm(`Delete repair log ${r.repId}? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await apiFetch(`/api/repair-logs/${r.id}`, { method: "DELETE" });
+      setLogs((prev) => prev.filter((log) => log.id !== r.id));
+      setDetail(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Delete failed");
+    }
+  };
+
+  const triggerImport = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    alert(`Selected ${file.name}. Import parsing is not wired yet.`);
+    event.target.value = "";
+  };
 
   const save = async () => {
     setSaving(true);
@@ -183,7 +210,17 @@ export default function AdminRepairsPage() {
               <p className="label" style={{ marginBottom: "0.4rem" }}>Admin Dashboard</p>
               <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--text)", margin: 0 }}>Repair Logs</h1>
             </div>
-            <button onClick={openAdd} className="btn-primary" style={{ width: "auto", padding: "0.7rem 1.5rem" }}>+ Add Repair</button>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleImport}
+                style={{ display: "none" }}
+              />
+              <button onClick={triggerImport} className="btn-ghost" style={{ width: "auto" }}>Import Data</button>
+              <button onClick={openAdd} className="btn-primary" style={{ width: "auto", padding: "0.7rem 1.5rem" }}>+ Add Repair</button>
+            </div>
           </div>
 
           {error && <div className="banner-error" style={{ marginBottom: "1rem" }}>⚠ {error}</div>}
@@ -406,6 +443,7 @@ export default function AdminRepairsPage() {
               </div>
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 <button onClick={() => openEdit(detail)} style={{ fontSize: "0.78rem", padding: "0.4rem 1rem", background: "rgba(79,70,229,0.1)", border: "1px solid rgba(79,70,229,0.25)", color: "var(--primary)", borderRadius: 9, cursor: "pointer", fontWeight: 600 }}>Edit</button>
+                <button onClick={() => confirmDelete(detail)} style={{ fontSize: "0.78rem", padding: "0.4rem 1rem", background: "rgba(225,29,72,0.1)", border: "1px solid rgba(225,29,72,0.25)", color: "#be123c", borderRadius: 9, cursor: "pointer", fontWeight: 600 }}>Delete</button>
                 <button onClick={() => setDetail(null)} style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "var(--muted)" }}>✕</button>
               </div>
             </div>
