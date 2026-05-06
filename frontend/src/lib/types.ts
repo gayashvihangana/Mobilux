@@ -70,3 +70,35 @@ export interface PaymentResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface BillItemInput {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface BillItemResponse {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface BillResponse {
+  id: number;
+  billNumber: string;
+  repairId: number;
+  customerName: string;
+  customerEmail: string;
+  deviceModel: string;
+  issueDescription: string;
+  repairmanName: string;
+  spareParts?: string | null;
+  discount?: number | null;
+  loyaltyPoints?: number | null;
+  notes?: string | null;
+  subTotal: number;
+  total: number;
+  items: BillItemResponse[];
+  createdAt: string;
+}

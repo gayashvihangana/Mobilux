@@ -8,6 +8,7 @@ type NavItem = { label: string; icon: string; href: string; badge?: number };
 const adminNav: NavItem[] = [
   { label: "Overview",  icon: "⊞", href: "/admin/dashboard" },
   { label: "Repairs",   icon: "🔧", href: "/admin/repairs",  badge: 3 },
+  { label: "Bills",     icon: "🧾", href: "/admin/bills" },
   { label: "Payments",  icon: "💳", href: "/admin/payments" },
   { label: "Products",  icon: "📦", href: "/admin/products" },
   { label: "Users",     icon: "👥", href: "/admin/users" },
