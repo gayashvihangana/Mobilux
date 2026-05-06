@@ -1,11 +1,21 @@
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        name: MOBILUX_SESSION
+        http-only: true
 
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/mobilux
     username: mobilux
     password: mobilux
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    timeout: 120m
   jpa:
     hibernate:
       ddl-auto: update
