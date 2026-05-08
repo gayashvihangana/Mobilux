@@ -169,11 +169,141 @@ export default function AdminRepairsPage() {
     importInputRef.current?.click();
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const parseMoney = (value?: string | null) => {
+    if (!value) return null;
+    const cleaned = value.replace(/[^0-9.-]/g, "").trim();
+    if (!cleaned) return null;
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const parseBoolean = (value?: string | null) => {
+    if (!value) return false;
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "yes" || normalized === "1";
+  };
+
+  const parseCsvRows = (text: string) => {
+    const rows: string[][] = [];
+    let current: string[] = [];
+    let cell = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i += 1) {
+      const char = text[i];
+      const next = text[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && next === '"') {
+          cell += '"';
+          i += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (char === "," && !inQuotes) {
+        current.push(cell);
+        cell = "";
+        continue;
+      }
+
+      if (char === "\n" && !inQuotes) {
+        current.push(cell);
+        rows.push(current.map((value) => value.trim()));
+        current = [];
+        cell = "";
+        continue;
+      }
+
+      if (char === "\r") {
+        continue;
+      }
+
+      cell += char;
+    }
+
+    if (cell.length > 0 || current.length > 0) {
+      current.push(cell);
+      rows.push(current.map((value) => value.trim()));
+    }
+
+    return rows;
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    alert(`Selected ${file.name}. Import parsing is not wired yet.`);
-    event.target.value = "";
+    try {
+      setLoading(true);
+      const text = await file.text();
+      const rows = parseCsvRows(text);
+      if (rows.length < 2) {
+        throw new Error("CSV has no data rows.");
+      }
+
+      const headers = rows[0].map((h) => h.toLowerCase());
+      const getIndex = (name: string) => headers.findIndex((h) => h === name);
+
+      const indexMap = {
+        repId: getIndex("repid"),
+        owner: getIndex("owner"),
+        brand: getIndex("brand"),
+        model: getIndex("model"),
+        issue: getIndex("issue"),
+        solution: getIndex("solution"),
+        completed: getIndex("completed"),
+        cost: getIndex("cost"),
+        payment: getIndex("payment"),
+        profit: getIndex("profit"),
+        dateCompleted: getIndex("datecompleted"),
+        duration: getIndex("duration"),
+        parts: getIndex("parts"),
+        shop: getIndex("shop"),
+        comments: getIndex("comments"),
+        forgottenParts: getIndex("forgottenparts"),
+      };
+
+      const created: RepairLog[] = [];
+      for (let i = 1; i < rows.length; i += 1) {
+        const row = rows[i];
+        if (row.length === 0 || row.every((cell) => !cell)) continue;
+        const payload = {
+          repId: row[indexMap.repId] || `REP-${i.toString().padStart(3, "0")}`,
+          owner: row[indexMap.owner] || null,
+          brand: row[indexMap.brand] || null,
+          model: row[indexMap.model] || null,
+          issue: row[indexMap.issue] || null,
+          solution: row[indexMap.solution] || null,
+          completed: parseBoolean(row[indexMap.completed]),
+          cost: parseMoney(row[indexMap.cost]),
+          payment: parseMoney(row[indexMap.payment]),
+          profit: parseMoney(row[indexMap.profit]),
+          dateCompleted: row[indexMap.dateCompleted] || null,
+          duration: row[indexMap.duration] || null,
+          parts: row[indexMap.parts] || null,
+          shop: row[indexMap.shop] || null,
+          comments: row[indexMap.comments] || null,
+          forgottenParts: row[indexMap.forgottenParts] || null,
+        } as Omit<RepairLog, "id">;
+
+        const createdLog = await apiFetch<RepairLog>("/api/repair-logs", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        created.push(createdLog);
+      }
+
+      setLogs((prev) => [...prev, ...created]);
+      setError(null);
+      alert(`Imported ${created.length} repair logs.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setLoading(false);
+      event.target.value = "";
+    }
   };
 
   const save = async () => {
