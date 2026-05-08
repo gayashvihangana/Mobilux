@@ -13,7 +13,7 @@ type RepairLog = {
   shop: string | null; comments: string | null; forgottenParts: string | null;
 };
 
-type SortKey = "repId" | "owner" | "phone" | "issue" | "status" | "cost" | "payment" | "profit" | "date" | "comments" | "bill";
+type SortKey = "repId" | "owner" | "phone" | "issue" | "status" | "cost" | "payment" | "profit" | "date" | "bill";
 
 type Column = { key: SortKey; label: string };
 
@@ -26,7 +26,6 @@ const columns: Column[] = [
   { key: "cost", label: "Cost" },
   { key: "payment", label: "Received" },
   { key: "profit", label: "Profit" },
-  { key: "comments", label: "Comments" },
   { key: "date", label: "Date" },
   { key: "bill", label: "Bill" },
 ];
@@ -78,7 +77,7 @@ export default function AdminRepairsPage() {
   const [saving, setSaving]     = useState(false);
   const [sortKey, setSortKey]   = useState<SortKey>("date");
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("desc");
-  const [colWidths, setColWidths] = useState([120, 160, 190, 240, 120, 130, 130, 130, 160, 220, 110]);
+  const [colWidths, setColWidths] = useState([120, 160, 190, 240, 120, 130, 130, 130, 200, 110]);
   const [resizing, setResizing] = useState<{ index: number; startX: number; startWidth: number } | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -121,7 +120,6 @@ export default function AdminRepairsPage() {
       case "cost": return r.cost ?? 0;
       case "payment": return r.payment ?? 0;
       case "profit": return r.profit ?? 0;
-      case "comments": return r.comments || "";
       case "bill": return "";
       case "date":
       default:
@@ -421,8 +419,8 @@ export default function AdminRepairsPage() {
           ) : visible.length === 0 ? (
             <p style={{ color: "var(--muted)", textAlign: "center", padding: "3rem", fontFamily: "inherit" }}>No records found.</p>
           ) : (
-            <div style={{ marginBottom: "1.75rem" }}>
-              <div style={{
+            <div className="repair-table" style={{ marginBottom: "1.75rem" }}>
+              <div className="repair-grid" style={{
                 display: "grid",
                 gridTemplateColumns: colWidths.map((w) => `${w}px`).join(" "),
                 gap: "0.65rem",
@@ -441,6 +439,7 @@ export default function AdminRepairsPage() {
                 {columns.map((col, index) => (
                   <div
                     key={col.key}
+                    className="repair-header-cell"
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -470,8 +469,10 @@ export default function AdminRepairsPage() {
                 {visible.map((r) => {
                   const ac = cardAccent(r);
                   const device = [r.brand, r.model].filter(Boolean).join(" ");
+                  const billTarget = r.repId && /^\d+$/.test(r.repId) ? r.repId : String(r.id);
                   return (
                     <div key={r.id} onClick={() => setDetail(r)}
+                      className="repair-grid repair-row"
                       style={{
                         background: "var(--bg2)",
                         border: `1.5px solid ${ac.border}30`,
@@ -486,7 +487,6 @@ export default function AdminRepairsPage() {
                         boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
                         fontFamily: "inherit",
                         position: "relative",
-                        overflow: "hidden",
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = "translateY(-2px)";
@@ -499,7 +499,7 @@ export default function AdminRepairsPage() {
                         e.currentTarget.style.borderColor = `${ac.border}30`;
                       }}
                     >
-                      <span style={{
+                      <span className="repair-cell" style={{
                         fontFamily: "monospace", fontSize: "0.78rem", fontWeight: 800,
                         color: ac.border, letterSpacing: "0.04em",
                         background: `${ac.border}15`, padding: "0.25rem 0 0.25rem 0.6rem",
@@ -507,23 +507,23 @@ export default function AdminRepairsPage() {
                         whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden",
                       }}>{r.repId}</span>
 
-                      <span style={{ fontSize: "0.9rem", color: "var(--text)", fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                      <span className="repair-cell" style={{ fontSize: "0.9rem", color: "var(--text)", fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
                         {r.owner || "Unknown"}
                       </span>
 
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
+                      <span className="repair-cell" style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
                         <img src="/phone.svg" alt="Phone" width={18} height={18} style={{ opacity: 0.8 }} />
                         <span style={{ fontSize: "0.82rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
                           {device || "Unknown"}
                         </span>
                       </span>
 
-                      <span style={{ fontSize: "0.82rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                      <span className="repair-cell" style={{ fontSize: "0.82rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
                         {r.issue || "—"}
                         {r.forgottenParts ? " · ⚠" : ""}
                       </span>
 
-                      <span style={{
+                      <span className="repair-cell" style={{
                         justifySelf: "start",
                         fontSize: "0.7rem", fontWeight: 700, padding: "0.25rem 0.75rem",
                         borderRadius: 999, background: ac.chip, color: ac.chipText,
@@ -533,25 +533,34 @@ export default function AdminRepairsPage() {
                         {r.completed ? "Completed" : "Pending"}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
+                      <span className="repair-cell" style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
                         {fmt(r.cost)}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
+                      <span className="repair-cell" style={{ fontSize: "0.78rem", color: "var(--text)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
                         {fmt(r.payment)}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: profitColor(r.profit), fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
+                      <span className="repair-cell" style={{ fontSize: "0.78rem", color: profitColor(r.profit), fontWeight: 700, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
                         {fmt(r.profit)}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
-                        {r.comments || "—"}
+                      <span className="repair-cell repair-date" style={{ fontSize: "0.78rem", color: "var(--muted)", textAlign: "right", justifySelf: "end" }}>
+                        <span style={{ display: "block" }}>
+                          {r.dateCompleted ? new Date(r.dateCompleted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "No date"}
+                        </span>
+                        {r.duration && <span style={{ display: "block", color: "var(--dim)" }}>{r.duration}</span>}
                       </span>
 
-                      <span style={{ fontSize: "0.78rem", color: "var(--muted)", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textAlign: "right", justifySelf: "end" }}>
-                        {r.dateCompleted ? new Date(r.dateCompleted).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "No date"}
-                        {r.duration ? ` · ${r.duration}` : ""}
+                      <span className="repair-cell" style={{ justifySelf: "end" }}>
+                        <Link
+                          href={`/admin/bills?repairId=${encodeURIComponent(billTarget)}`}
+                          className="btn-ghost"
+                          onClick={(event) => event.stopPropagation()}
+                          style={{ width: "auto", padding: "0.4rem 0.75rem", fontSize: "0.75rem" }}
+                        >
+                          Bill
+                        </Link>
                       </span>
                     </div>
                   );
@@ -678,9 +687,25 @@ export default function AdminRepairsPage() {
 
       {/* Mobile responsive styles */}
       <style>{`
+        .repair-table { overflow-x: auto; }
+        .repair-grid { width: 100%; }
+        .repair-row .repair-cell { white-space: nowrap; }
+        .repair-date { white-space: normal; }
         @media (max-width: 768px) {
           main { padding-left: 0 !important; }
           .sidebar { display: none; }
+          .repair-row .repair-cell {
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+          .repair-date {
+            text-align: left;
+            display: block;
+            -webkit-line-clamp: unset;
+          }
         }
         @media (max-width: 480px) {
           div[style*="minmax(260px"] {
