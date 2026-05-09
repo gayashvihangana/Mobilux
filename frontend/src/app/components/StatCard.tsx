@@ -8,12 +8,12 @@ type StatCardProps = {
 };
 
 const accentMap: Record<string, { color: string; bg: string; glow: string }> = {
-  primary: { color: "#4f46e5", bg: "rgba(79,70,229,0.08)",  glow: "rgba(79,70,229,0.2)" },
-  amber:   { color: "#f59e0b", bg: "rgba(245,158,11,0.08)", glow: "rgba(245,158,11,0.2)" },
-  emerald: { color: "#10b981", bg: "rgba(16,185,129,0.08)", glow: "rgba(16,185,129,0.2)" },
-  rose:    { color: "#f43f5e", bg: "rgba(244,63,94,0.08)",  glow: "rgba(244,63,94,0.2)" },
-  cyan:    { color: "#06b6d4", bg: "rgba(6,182,212,0.08)",  glow: "rgba(6,182,212,0.2)" },
-  violet:  { color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", glow: "rgba(139,92,246,0.2)" },
+  primary: { color: "#0f766e", bg: "rgba(15,118,110,0.08)",  glow: "rgba(15,118,110,0.2)" },
+  amber:   { color: "#d97706", bg: "rgba(217,119,6,0.08)",  glow: "rgba(217,119,6,0.2)" },
+  emerald: { color: "#059669", bg: "rgba(5,150,105,0.08)",  glow: "rgba(5,150,105,0.2)" },
+  rose:    { color: "#e11d48", bg: "rgba(225,29,72,0.08)",  glow: "rgba(225,29,72,0.2)" },
+  cyan:    { color: "#0891b2", bg: "rgba(8,145,178,0.08)",  glow: "rgba(8,145,178,0.2)" },
+  violet:  { color: "#1d4ed8", bg: "rgba(29,78,216,0.08)",  glow: "rgba(29,78,216,0.2)" },
 };
 
 export function StatCard({ label, value, hint, hintPositive, icon = "◈", accent = "primary" }: StatCardProps) {

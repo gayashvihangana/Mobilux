@@ -88,10 +88,10 @@ export default function Home() {
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 1.5rem", display: "flex", alignItems: "center", height: 64, gap: "2rem" }}>
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: "0.625rem", textDecoration: "none", flexShrink: 0 }}>
             <div style={{
-              width: 34, height: 34, background: "linear-gradient(135deg,#4f46e5,#8b5cf6)",
+              width: 34, height: 34, background: "linear-gradient(135deg, var(--primary), var(--primary-l))",
               borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center",
               fontWeight: 800, color: "#fff", fontSize: "0.9rem",
-              boxShadow: "0 2px 8px rgba(79,70,229,0.35)",
+              boxShadow: "0 2px 8px rgba(15,118,110,0.32)",
             }}>M</div>
             <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>Mobilux</span>
           </Link>
@@ -215,7 +215,7 @@ export default function Home() {
                 <div key={step} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                   <div style={{
                     width: 20, height: 20, borderRadius: "50%",
-                    background: i < 4 ? "linear-gradient(135deg,#4f46e5,#8b5cf6)" : "var(--bg3)",
+                    background: i < 4 ? "linear-gradient(135deg, var(--primary), var(--primary-l))" : "var(--bg3)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "0.6rem", color: "#fff", fontWeight: 700, flexShrink: 0,
                   }}>{i < 4 ? "✓" : ""}</div>
@@ -226,9 +226,9 @@ export default function Home() {
           </div>
 
           <div style={{
-            background: "linear-gradient(135deg,#4f46e5,#6366f1)",
+            background: "linear-gradient(135deg, var(--primary), var(--primary-h))",
             borderRadius: "var(--r-2xl)", padding: "1.5rem",
-            boxShadow: "0 8px 32px rgba(79,70,229,0.3)",
+            boxShadow: "0 8px 32px rgba(15,118,110,0.3)",
           }}>
             <p style={{ fontSize: "0.78rem", color: "rgba(255,255,255,0.65)", fontWeight: 500, marginBottom: "0.5rem" }}>Next payment</p>
             <p style={{ fontSize: "1.75rem", fontWeight: 700, color: "#fff", letterSpacing: "-0.03em", marginBottom: "0.25rem" }}>LKR 22,000</p>
@@ -263,7 +263,7 @@ export default function Home() {
               boxShadow: "var(--shadow-sm)", transition: "all 0.2s",
               cursor: "pointer",
             }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(79,70,229,0.25)"; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-md)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(15,118,110,0.25)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = "var(--shadow-sm)"; (e.currentTarget as HTMLElement).style.borderColor = "var(--border)"; }}
             >
               <div style={{ fontSize: "1.75rem", marginBottom: "1rem" }}>{s.icon}</div>
@@ -320,7 +320,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div style={{ background: "linear-gradient(135deg,rgba(79,70,229,0.05),rgba(139,92,246,0.08))", border: "1px solid rgba(79,70,229,0.15)", borderRadius: "var(--r-xl)", padding: "1.5rem" }}>
+            <div style={{ background: "linear-gradient(135deg,rgba(15,118,110,0.05),rgba(29,78,216,0.08))", border: "1px solid rgba(15,118,110,0.18)", borderRadius: "var(--r-xl)", padding: "1.5rem" }}>
               <p className="label" style={{ marginBottom: "0.875rem" }}>Why Mobilux</p>
               <ul style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
                 {["Dedicated admin, staff, and customer portals","Manual verification for secure bank transfers","Repair history and discounts in one place","Fast communication and transparent pricing"].map(item => (

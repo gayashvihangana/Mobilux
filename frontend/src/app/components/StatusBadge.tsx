@@ -1,10 +1,10 @@
 import type { RepairStatus } from "@/lib/types";
 
 const statusMap: Record<RepairStatus, { bg: string; color: string; dot: string; label: string }> = {
-  PENDING:          { bg: "rgba(245,158,11,0.1)",  color: "#d97706", dot: "#f59e0b", label: "Pending" },
-  IN_PROGRESS:      { bg: "rgba(6,182,212,0.1)",   color: "#0891b2", dot: "#06b6d4", label: "In Progress" },
-  COMPLETED:        { bg: "rgba(16,185,129,0.1)",  color: "#059669", dot: "#10b981", label: "Completed" },
-  READY_FOR_PICKUP: { bg: "rgba(249,115,22,0.1)",  color: "#ea580c", dot: "#f97316", label: "Ready for Pickup" },
+  PENDING:          { bg: "rgba(217,119,6,0.1)",  color: "#b45309", dot: "#d97706", label: "Pending" },
+  IN_PROGRESS:      { bg: "rgba(8,145,178,0.1)",  color: "#0e7490", dot: "#0891b2", label: "In Progress" },
+  COMPLETED:        { bg: "rgba(5,150,105,0.1)",  color: "#047857", dot: "#059669", label: "Completed" },
+  READY_FOR_PICKUP: { bg: "rgba(234,88,12,0.1)",  color: "#c2410c", dot: "#ea580c", label: "Ready for Pickup" },
 };
 
 export function StatusBadge({ status }: { status: RepairStatus }) {

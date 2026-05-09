@@ -23,6 +23,13 @@ public class RepairLogController {
         return ResponseEntity.ok(repo.findAllByOrderByIdAsc());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<RepairLog> getOne(@PathVariable Long id) {
+        RepairLog existing = repo.findById(id)
+            .orElseThrow(() -> new NotFoundException("Repair log not found"));
+        return ResponseEntity.ok(existing);
+    }
+
     @PostMapping
     public ResponseEntity<RepairLog> create(@RequestBody RepairLog body) {
         body.setId(null);

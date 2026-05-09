@@ -26,7 +26,7 @@ export function PageShell({ title, subtitle, actions, children }: PageShellProps
         }}>
           <div style={{
             width: 30, height: 30,
-            background: "linear-gradient(135deg, #4f46e5, #8b5cf6)",
+            background: "linear-gradient(135deg, #0f766e, #14b8a6)",
             borderRadius: 8, display: "flex", alignItems: "center",
             justifyContent: "center", fontWeight: 800, color: "#fff", fontSize: "0.85rem",
           }}>M</div>

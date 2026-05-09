@@ -1,8 +1,12 @@
 package com.mobilux.entity;
 
+import com.mobilux.model.InvoiceStatus;
+import com.mobilux.model.PaymentMethod;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -27,14 +31,18 @@ public class Bill {
     @Column(nullable = false, unique = true, length = 32)
     private String billNumber;
 
-    @ManyToOne(optional = false)
+    @ManyToOne
     @JoinColumn(name = "repair_id")
     private Repair repair;
+
+    @ManyToOne
+    @JoinColumn(name = "repair_log_id")
+    private RepairLog repairLog;
 
     @Column(nullable = false)
     private String customerName;
 
-    @Column(nullable = false)
+    @Column
     private String customerEmail;
 
     @Column(nullable = false)
@@ -61,11 +69,24 @@ public class Bill {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subTotal;
 
+    @Column(precision = 5, scale = 2)
+    private BigDecimal taxRate;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal taxAmount;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal amountPaid;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private InvoiceStatus invoiceStatus = InvoiceStatus.DRAFT;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
 
     @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<BillItem> items = new ArrayList<>();
@@ -110,6 +131,14 @@ public class Bill {
 
     public void setRepair(Repair repair) {
         this.repair = repair;
+    }
+
+    public RepairLog getRepairLog() {
+        return repairLog;
+    }
+
+    public void setRepairLog(RepairLog repairLog) {
+        this.repairLog = repairLog;
     }
 
     public String getCustomerName() {
@@ -192,6 +221,22 @@ public class Bill {
         this.subTotal = subTotal;
     }
 
+    public BigDecimal getTaxRate() {
+        return taxRate;
+    }
+
+    public void setTaxRate(BigDecimal taxRate) {
+        this.taxRate = taxRate;
+    }
+
+    public BigDecimal getTaxAmount() {
+        return taxAmount;
+    }
+
+    public void setTaxAmount(BigDecimal taxAmount) {
+        this.taxAmount = taxAmount;
+    }
+
     public BigDecimal getTotal() {
         return total;
     }
@@ -206,6 +251,22 @@ public class Bill {
 
     public void setAmountPaid(BigDecimal amountPaid) {
         this.amountPaid = amountPaid;
+    }
+
+    public InvoiceStatus getInvoiceStatus() {
+        return invoiceStatus;
+    }
+
+    public void setInvoiceStatus(InvoiceStatus invoiceStatus) {
+        this.invoiceStatus = invoiceStatus;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 
     public List<BillItem> getItems() {

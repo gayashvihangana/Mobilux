@@ -13,9 +13,9 @@ const redirectByRole: Record<Role, string> = {
 };
 
 const demoAccounts = [
-  { role: "Admin",    email: "admin@mobilux.lk",    pass: "Admin@123", color: "#818cf8", bg: "rgba(99,102,241,0.1)", border: "rgba(99,102,241,0.2)" },
-  { role: "Staff",    email: "staff@mobilux.lk",    pass: "password",  color: "#67e8f9", bg: "rgba(6,182,212,0.1)",  border: "rgba(6,182,212,0.2)" },
-  { role: "Customer", email: "customer@mobilux.lk", pass: "password",  color: "#6ee7b7", bg: "rgba(16,185,129,0.1)", border: "rgba(16,185,129,0.2)" },
+  { role: "Admin",    email: "admin@mobilux.lk",    pass: "Admin@123", color: "#0f766e", bg: "rgba(15,118,110,0.12)", border: "rgba(15,118,110,0.25)" },
+  { role: "Staff",    email: "staff@mobilux.lk",    pass: "password",  color: "#0891b2", bg: "rgba(8,145,178,0.12)",  border: "rgba(8,145,178,0.25)" },
+  { role: "Customer", email: "customer@mobilux.lk", pass: "password",  color: "#059669", bg: "rgba(5,150,105,0.12)", border: "rgba(5,150,105,0.25)" },
 ];
 
 export default function LoginPage() {
@@ -68,13 +68,13 @@ export default function LoginPage() {
         <div style={{
           position: "absolute", top: "20%", left: "10%",
           width: 350, height: 350,
-          background: "radial-gradient(ellipse, rgba(79,70,229,0.08) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, rgba(15,118,110,0.08) 0%, transparent 70%)",
           pointerEvents: "none",
         }} />
         <div style={{
           position: "absolute", bottom: "20%", right: "5%",
           width: 250, height: 250,
-          background: "radial-gradient(ellipse, rgba(139,92,246,0.06) 0%, transparent 70%)",
+          background: "radial-gradient(ellipse, rgba(29,78,216,0.06) 0%, transparent 70%)",
           pointerEvents: "none",
         }} />
 
@@ -83,10 +83,10 @@ export default function LoginPage() {
           <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "0.625rem", textDecoration: "none", marginBottom: "2.5rem" }}>
             <div style={{
               width: 36, height: 36,
-              background: "linear-gradient(135deg,#4f46e5,#8b5cf6)",
+              background: "linear-gradient(135deg, var(--primary), var(--primary-l))",
               borderRadius: 10, display: "flex", alignItems: "center",
               justifyContent: "center", fontWeight: 800, color: "#fff", fontSize: "0.9rem",
-              boxShadow: "0 2px 8px rgba(79,70,229,0.35)",
+              boxShadow: "0 2px 8px rgba(15,118,110,0.32)",
             }}>M</div>
             <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text)" }}>Mobilux</span>
           </Link>
@@ -147,16 +147,16 @@ export default function LoginPage() {
       {/* ── RIGHT: Brand panel ──────────────────────────────── */}
       <div style={{
         flex: "0 0 48%",
-        background: "linear-gradient(145deg, #09090f 0%, #0f0e2a 50%, #0a0a1a 100%)",
+        background: "linear-gradient(145deg, #0b1220 0%, #0f172a 55%, #0b1220 100%)",
         borderLeft: "1px solid rgba(255,255,255,0.06)",
         display: "flex", flexDirection: "column",
         justifyContent: "center", padding: "4rem 3rem",
         position: "relative", overflow: "hidden",
       }}>
         {/* Decorative glows */}
-        <div style={{ position: "absolute", top: "-80px", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse, rgba(79,70,229,0.25) 0%, transparent 65%)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: "-60px", right: "-40px", width: 300, height: 300, background: "radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 65%)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: "30%", left: "-60px", width: 200, height: 200, background: "radial-gradient(ellipse, rgba(6,182,212,0.1) 0%, transparent 65%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: "-80px", left: "50%", transform: "translateX(-50%)", width: 400, height: 400, background: "radial-gradient(ellipse, rgba(15,118,110,0.25) 0%, transparent 65%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-60px", right: "-40px", width: 300, height: 300, background: "radial-gradient(ellipse, rgba(29,78,216,0.18) 0%, transparent 65%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "30%", left: "-60px", width: 200, height: 200, background: "radial-gradient(ellipse, rgba(8,145,178,0.1) 0%, transparent 65%)", pointerEvents: "none" }} />
 
         <div style={{ position: "relative", zIndex: 1 }} className="animate-fade-in">
           {/* Brand */}
@@ -165,7 +165,7 @@ export default function LoginPage() {
               display: "inline-flex", alignItems: "center", gap: "0.625rem",
               marginBottom: "1.5rem",
             }}>
-              <div style={{ width: 38, height: 38, background: "linear-gradient(135deg,#4f46e5,#8b5cf6)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "#fff", fontSize: "0.95rem", boxShadow: "0 0 20px rgba(99,102,241,0.4)" }}>M</div>
+              <div style={{ width: 38, height: 38, background: "linear-gradient(135deg, var(--primary), var(--primary-l))", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: "#fff", fontSize: "0.95rem", boxShadow: "0 0 20px rgba(15,118,110,0.4)" }}>M</div>
               <span style={{ fontSize: "1.15rem", fontWeight: 700, color: "#fff", letterSpacing: "-0.02em" }}>Mobilux</span>
             </div>
             <h2 style={{ fontSize: "1.6rem", fontWeight: 700, color: "#fff", lineHeight: 1.3, letterSpacing: "-0.03em", marginBottom: "0.75rem" }}>

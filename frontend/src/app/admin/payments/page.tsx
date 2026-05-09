@@ -58,7 +58,7 @@ export default function AdminPaymentsPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                         <div style={{
                           width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                          background: "rgba(79,70,229,0.1)",
+                          background: "rgba(15,118,110,0.12)",
                           display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem",
                         }}>💳</div>
                         <div>

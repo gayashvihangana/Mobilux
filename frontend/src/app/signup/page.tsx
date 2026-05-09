@@ -60,14 +60,14 @@ export default function SignupPage() {
       {/* ── RIGHT: Brand panel ─────────────────────────── */}
       <div style={{
         flex: "0 0 40%",
-        background: "linear-gradient(145deg, #4f46e5 0%, #7c3aed 60%, #4338ca 100%)",
+        background: "linear-gradient(145deg, #0b1220 0%, #0f172a 55%, #0b1220 100%)",
         borderRight: "1px solid rgba(255,255,255,0.15)",
         display: "flex", flexDirection: "column",
         justifyContent: "center", padding: "4rem 3rem",
         position: "relative", overflow: "hidden",
       }}>
-        <div style={{ position: "absolute", top: "-40px", left: "-40px", width: 200, height: 200, background: "rgba(99,102,241,0.18)", borderRadius: "50%", filter: "blur(60px)" }} />
-        <div style={{ position: "absolute", bottom: "60px", right: "-30px", width: 160, height: 160, background: "rgba(139,92,246,0.15)", borderRadius: "50%", filter: "blur(50px)" }} />
+        <div style={{ position: "absolute", top: "-40px", left: "-40px", width: 200, height: 200, background: "rgba(15,118,110,0.22)", borderRadius: "50%", filter: "blur(60px)" }} />
+        <div style={{ position: "absolute", bottom: "60px", right: "-30px", width: 160, height: 160, background: "rgba(29,78,216,0.18)", borderRadius: "50%", filter: "blur(50px)" }} />
 
         <div style={{ position: "relative", zIndex: 1 }}>
           <p className="label" style={{ marginBottom: "1.25rem", color: "rgba(255,255,255,0.55)" }}>Why Mobilux</p>
@@ -109,7 +109,7 @@ export default function SignupPage() {
           <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", textDecoration: "none", marginBottom: "2.5rem" }}>
             <div style={{
               width: 38, height: 38,
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              background: "linear-gradient(135deg, var(--primary), var(--primary-l))",
               borderRadius: 10, display: "flex", alignItems: "center",
               justifyContent: "center", fontWeight: 700, color: "#fff", fontSize: "1rem",
             }}>M</div>

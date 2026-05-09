@@ -89,20 +89,25 @@ export interface BillItemResponse {
 export interface BillResponse {
   id: number;
   billNumber: string;
-  repairId: number;
+  repairId?: number | null;
+  repairLogId?: number | null;
   customerName: string;
-  customerEmail: string;
+  customerEmail?: string | null;
   deviceModel: string;
   issueDescription: string;
   repairmanName: string;
   spareParts?: string | null;
   discount?: number | null;
+  taxRate?: number | null;
+  taxAmount?: number | null;
   amountPaid?: number | null;
   balance?: number | null;
   loyaltyPoints?: number | null;
   notes?: string | null;
   subTotal: number;
   total: number;
+  invoiceStatus?: "DRAFT" | "ISSUED" | "PAID" | null;
+  paymentMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "ONLINE" | "OTHER" | null;
   items: BillItemResponse[];
   createdAt: string;
 }

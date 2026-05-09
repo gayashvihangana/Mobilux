@@ -42,7 +42,7 @@ const profitColor = (v: number | null) => v == null ? "#9aa3bd" : v > 0 ? "#0596
 
 const cardAccent = (r: RepairLog) => {
   if (!r.completed) return { border: "#d97706", chip: "rgba(217,119,6,0.12)", chipText: "#92400e" };
-  if (r.profit == null || r.profit === 0) return { border: "#4f46e5", chip: "rgba(79,70,229,0.1)", chipText: "#3730a3" };
+  if (r.profit == null || r.profit === 0) return { border: "#0f766e", chip: "rgba(15,118,110,0.1)", chipText: "#0f766e" };
   if (r.profit > 0) return { border: "#059669", chip: "rgba(5,150,105,0.1)", chipText: "#065f46" };
   return { border: "#e11d48", chip: "rgba(225,29,72,0.1)", chipText: "#9f1239" };
 };
@@ -356,7 +356,7 @@ export default function AdminRepairsPage() {
           {/* Stats */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", marginBottom: "1.25rem" }}>
             {[
-              { l: "Total",   v: String(logs.length),                   icon: "🔧", c: "#4f46e5", bg: "rgba(79,70,229,0.08)" },
+              { l: "Total",   v: String(logs.length),                   icon: "🔧", c: "#0f766e", bg: "rgba(15,118,110,0.08)" },
               { l: "Done",    v: String(logs.filter((r) => r.completed).length), icon: "✅", c: "#059669", bg: "rgba(5,150,105,0.1)" },
               { l: "Spent",   v: `LKR ${totalSpent.toLocaleString()}`,   icon: "💸", c: "#d97706", bg: "rgba(217,119,6,0.12)" },
               { l: "Profit",  v: `LKR ${totalProfit.toLocaleString()}`,  icon: "💰", c: totalProfit >= 0 ? "#059669" : "#e11d48", bg: totalProfit >= 0 ? "rgba(5,150,105,0.1)" : "rgba(225,29,72,0.12)" },
@@ -404,7 +404,7 @@ export default function AdminRepairsPage() {
           <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
             {[
               { c: "#059669", l: "Profit" }, { c: "#e11d48", l: "Loss" },
-              { c: "#4f46e5", l: "Break-even" }, { c: "#d97706", l: "Pending" },
+              { c: "#0f766e", l: "Break-even" }, { c: "#d97706", l: "Pending" },
             ].map((x) => (
               <div key={x.l} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.72rem", color: "var(--muted)" }}>
                 <div style={{ width: 10, height: 10, borderRadius: 3, background: x.c }} />
@@ -427,7 +427,7 @@ export default function AdminRepairsPage() {
                 alignItems: "center",
                 padding: "0.65rem 1rem",
                 borderRadius: 14,
-                background: "linear-gradient(135deg, rgba(79,70,229,0.08), rgba(217,119,6,0.08))",
+                background: "linear-gradient(135deg, rgba(15,118,110,0.08), rgba(217,119,6,0.08))",
                 border: "1px solid var(--border)",
                 color: "var(--muted)",
                 fontSize: "0.7rem",
@@ -469,7 +469,7 @@ export default function AdminRepairsPage() {
                 {visible.map((r) => {
                   const ac = cardAccent(r);
                   const device = [r.brand, r.model].filter(Boolean).join(" ");
-                  const billTarget = r.repId && /^\d+$/.test(r.repId) ? r.repId : String(r.id);
+                  const billTarget = String(r.id);
                   return (
                     <div key={r.id} onClick={() => setDetail(r)}
                       className="repair-grid repair-row"
@@ -554,7 +554,7 @@ export default function AdminRepairsPage() {
 
                       <span className="repair-cell" style={{ justifySelf: "end" }}>
                         <Link
-                          href={`/admin/bills?repairId=${encodeURIComponent(billTarget)}`}
+                          href={`/admin/bills?repairLogId=${encodeURIComponent(billTarget)}`}
                           className="btn-ghost"
                           onClick={(event) => event.stopPropagation()}
                           style={{ width: "auto", padding: "0.4rem 0.75rem", fontSize: "0.75rem" }}
@@ -581,7 +581,7 @@ export default function AdminRepairsPage() {
                 <p style={{ margin: "0.25rem 0 0", fontSize: "1.2rem", fontWeight: 700, color: "var(--text)" }}>{detail.owner || "Unknown"}</p>
               </div>
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button onClick={() => openEdit(detail)} style={{ fontSize: "0.78rem", padding: "0.4rem 1rem", background: "rgba(79,70,229,0.1)", border: "1px solid rgba(79,70,229,0.25)", color: "var(--primary)", borderRadius: 9, cursor: "pointer", fontWeight: 600 }}>Edit</button>
+                <button onClick={() => openEdit(detail)} style={{ fontSize: "0.78rem", padding: "0.4rem 1rem", background: "rgba(15,118,110,0.1)", border: "1px solid rgba(15,118,110,0.25)", color: "var(--primary)", borderRadius: 9, cursor: "pointer", fontWeight: 600 }}>Edit</button>
                 <button onClick={() => confirmDelete(detail)} style={{ fontSize: "0.78rem", padding: "0.4rem 1rem", background: "rgba(225,29,72,0.1)", border: "1px solid rgba(225,29,72,0.25)", color: "#be123c", borderRadius: 9, cursor: "pointer", fontWeight: 600 }}>Delete</button>
                 <button onClick={() => setDetail(null)} style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", color: "var(--muted)" }}>✕</button>
               </div>
@@ -592,7 +592,7 @@ export default function AdminRepairsPage() {
               <span style={{ fontSize: "0.72rem", fontWeight: 700, padding: "0.3rem 0.75rem", borderRadius: 999, background: detail.completed ? "rgba(5,150,105,0.12)" : "rgba(217,119,6,0.12)", color: detail.completed ? "#059669" : "#d97706" }}>
                 {detail.completed ? "✅ Completed" : "⏳ Pending"}
               </span>
-              {detail.brand && <span style={{ fontSize: "0.72rem", padding: "0.3rem 0.75rem", borderRadius: 999, background: "rgba(79,70,229,0.1)", color: "var(--primary)", fontWeight: 600 }}>{detail.brand}</span>}
+              {detail.brand && <span style={{ fontSize: "0.72rem", padding: "0.3rem 0.75rem", borderRadius: 999, background: "rgba(15,118,110,0.1)", color: "var(--primary)", fontWeight: 600 }}>{detail.brand}</span>}
               {detail.model && <span style={{ fontSize: "0.72rem", padding: "0.3rem 0.75rem", borderRadius: 999, background: "var(--bg3)", color: "var(--muted)" }}>{detail.model}</span>}
             </div>
 

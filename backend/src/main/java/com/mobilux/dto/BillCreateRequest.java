@@ -1,13 +1,23 @@
 package com.mobilux.dto;
 
+import com.mobilux.model.InvoiceStatus;
+import com.mobilux.model.PaymentMethod;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 
 public class BillCreateRequest {
-    @NotNull
     private Long repairId;
+
+    private Long repairLogId;
+
+    private String customerName;
+
+    private String customerEmail;
+
+    private String deviceModel;
+
+    private String issueDescription;
 
     private String repairmanName;
 
@@ -15,7 +25,13 @@ public class BillCreateRequest {
 
     private BigDecimal discount;
 
+    private BigDecimal taxRate;
+
     private BigDecimal amountPaid;
+
+    private InvoiceStatus invoiceStatus;
+
+    private PaymentMethod paymentMethod;
 
     private Integer loyaltyPoints;
 
@@ -30,6 +46,46 @@ public class BillCreateRequest {
 
     public void setRepairId(Long repairId) {
         this.repairId = repairId;
+    }
+
+    public Long getRepairLogId() {
+        return repairLogId;
+    }
+
+    public void setRepairLogId(Long repairLogId) {
+        this.repairLogId = repairLogId;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
+    }
+
+    public String getCustomerEmail() {
+        return customerEmail;
+    }
+
+    public void setCustomerEmail(String customerEmail) {
+        this.customerEmail = customerEmail;
+    }
+
+    public String getDeviceModel() {
+        return deviceModel;
+    }
+
+    public void setDeviceModel(String deviceModel) {
+        this.deviceModel = deviceModel;
+    }
+
+    public String getIssueDescription() {
+        return issueDescription;
+    }
+
+    public void setIssueDescription(String issueDescription) {
+        this.issueDescription = issueDescription;
     }
 
     public String getRepairmanName() {
@@ -56,12 +112,36 @@ public class BillCreateRequest {
         this.discount = discount;
     }
 
+    public BigDecimal getTaxRate() {
+        return taxRate;
+    }
+
+    public void setTaxRate(BigDecimal taxRate) {
+        this.taxRate = taxRate;
+    }
+
     public BigDecimal getAmountPaid() {
         return amountPaid;
     }
 
     public void setAmountPaid(BigDecimal amountPaid) {
         this.amountPaid = amountPaid;
+    }
+
+    public InvoiceStatus getInvoiceStatus() {
+        return invoiceStatus;
+    }
+
+    public void setInvoiceStatus(InvoiceStatus invoiceStatus) {
+        this.invoiceStatus = invoiceStatus;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 
     public Integer getLoyaltyPoints() {

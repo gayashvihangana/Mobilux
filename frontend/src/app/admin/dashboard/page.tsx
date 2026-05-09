@@ -130,7 +130,7 @@ export default function AdminDashboardPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", minWidth: 0 }}>
                       <div style={{
                         width: 40, height: 40, borderRadius: "var(--r-md)",
-                        background: "rgba(79,70,229,0.08)", border: "1px solid rgba(79,70,229,0.12)",
+                        background: "rgba(15,118,110,0.08)", border: "1px solid rgba(15,118,110,0.12)",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "1rem", flexShrink: 0,
                       }}>📱</div>
@@ -210,7 +210,7 @@ export default function AdminDashboardPage() {
                   borderRadius: "var(--r-lg)", cursor: "pointer",
                   transition: "all 0.2s", textDecoration: "none",
                 }}
-                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(79,70,229,0.3)"; el.style.background = "var(--bg2)"; el.style.transform = "translateY(-2px)"; el.style.boxShadow = "var(--shadow-md)"; }}
+                  onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "rgba(15,118,110,0.3)"; el.style.background = "var(--bg2)"; el.style.transform = "translateY(-2px)"; el.style.boxShadow = "var(--shadow-md)"; }}
                   onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.borderColor = "var(--border)"; el.style.background = "var(--bg3)"; el.style.transform = ""; el.style.boxShadow = ""; }}
                 >
                   <span style={{ fontSize: "1.5rem" }}>{item.icon}</span>

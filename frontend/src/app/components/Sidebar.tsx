@@ -27,9 +27,9 @@ const customerNav: NavItem[] = [
 ];
 
 const roleConfig = {
-  admin:    { label: "Administrator", color: "#4f46e5", bg: "rgba(79,70,229,0.08)" },
-  staff:    { label: "Staff Member",  color: "#06b6d4", bg: "rgba(6,182,212,0.08)" },
-  customer: { label: "Customer",      color: "#10b981", bg: "rgba(16,185,129,0.08)" },
+  admin:    { label: "Administrator", color: "#0f766e", bg: "rgba(15,118,110,0.08)" },
+  staff:    { label: "Staff Member",  color: "#0891b2", bg: "rgba(8,145,178,0.08)" },
+  customer: { label: "Customer",      color: "#059669", bg: "rgba(5,150,105,0.08)" },
 };
 
 type SidebarProps = {
@@ -72,11 +72,11 @@ export function Sidebar({ role = "admin", userName, userEmail, avatarUrl }: Side
         >
           <div style={{
             width: 34, height: 34,
-            background: "linear-gradient(135deg, #4f46e5, #8b5cf6)",
+            background: "linear-gradient(135deg, #0f766e, #14b8a6)",
             borderRadius: 10,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: "0.9rem", fontWeight: 800, color: "#fff",
-            boxShadow: "0 2px 8px rgba(79,70,229,0.35)",
+            boxShadow: "0 2px 8px rgba(15,118,110,0.32)",
             flexShrink: 0,
           }}>M</div>
           <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em" }}>

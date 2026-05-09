@@ -13,9 +13,9 @@ type UserSummary = {
 };
 
 const roleStyle: Record<string, { bg: string; color: string }> = {
-  ADMIN:    { bg: "rgba(79,70,229,0.1)",  color: "#4338ca" },
-  STAFF:    { bg: "rgba(8,145,178,0.1)",  color: "#0e7490" },
-  CUSTOMER: { bg: "rgba(5,150,105,0.1)",  color: "#065f46" },
+  ADMIN:    { bg: "rgba(15,118,110,0.12)", color: "#0f766e" },
+  STAFF:    { bg: "rgba(8,145,178,0.12)",  color: "#0e7490" },
+  CUSTOMER: { bg: "rgba(5,150,105,0.12)",  color: "#065f46" },
 };
 
 export default function AdminUsersPage() {
@@ -64,7 +64,7 @@ export default function AdminUsersPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                         <div style={{
                           width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-                          background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                          background: "linear-gradient(135deg, var(--primary), var(--primary-l))",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           fontSize: "0.9rem", fontWeight: 700, color: "#fff",
                         }}>
