@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS repair (
+CREATE TABLE IF NOT EXISTS repairs (
   id BIGSERIAL PRIMARY KEY,
   customer_id BIGINT NOT NULL REFERENCES users(id),
   assigned_staff_id BIGINT REFERENCES users(id),
