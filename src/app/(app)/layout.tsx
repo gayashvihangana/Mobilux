@@ -31,9 +31,10 @@ export default async function AppLayout({
                 { href: "/orders", label: "My orders" },
                 { href: "/shop", label: "Shop" },
               ]}
+              homeHref="/dashboard"
               triggerClassName="-ml-2 sm:hidden"
             />
-            <Logo />
+            <Logo href="/dashboard" />
             <AppNavLinks
               links={[
                 { href: "/dashboard", label: "Dashboard" },

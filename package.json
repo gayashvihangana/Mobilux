@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.10.0",
+    "@react-pdf/renderer": "^4.5.1",
     "@vercel/blob": "^2.6.1",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",

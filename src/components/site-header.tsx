@@ -9,19 +9,20 @@ import { MobileNav } from "@/components/mobile-nav";
 const navLinks = [
   { href: "/#services", label: "Services" },
   { href: "/#how-it-works", label: "How it works" },
-  { href: "/#why-mobilux", label: "Why Mobilux" },
   { href: "/shop", label: "Shop" },
 ];
 
 export async function SiteHeader() {
   const session = await auth();
   const user = session?.user;
+  // Logged-in users land on their dashboard, not the marketing page.
+  const homeHref = user ? (user.role === "ADMIN" ? "/admin" : "/dashboard") : "/";
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="mx-auto max-w-6xl px-4 pt-4">
         <div className="glass flex h-14 items-center justify-between rounded-2xl px-4 sm:px-5">
-          <Logo />
+          <Logo href={homeHref} />
           <nav className="hidden items-center gap-1 md:flex">
             {navLinks.map((link) => (
               <Link
@@ -58,7 +59,7 @@ export async function SiteHeader() {
                 </Button>
               </>
             )}
-            <MobileNav links={navLinks} triggerClassName="md:hidden">
+            <MobileNav links={navLinks} homeHref={homeHref} triggerClassName="md:hidden">
               {user ? (
                 <Button asChild variant="outline">
                   <Link href={user.role === "ADMIN" ? "/admin" : "/dashboard"}>

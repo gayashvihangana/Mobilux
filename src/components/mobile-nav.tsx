@@ -21,10 +21,12 @@ export type NavLink = { href: string; label: string };
 
 export function MobileNav({
   links,
+  homeHref = "/",
   triggerClassName,
   children,
 }: {
   links: NavLink[];
+  homeHref?: string;
   triggerClassName?: string;
   /** Extra actions rendered below the links, e.g. sign in / get started */
   children?: React.ReactNode;
@@ -47,7 +49,7 @@ export function MobileNav({
       <SheetContent side="right" className="w-72 gap-0 sm:w-80">
         <SheetHeader className="border-b border-border">
           <SheetTitle asChild>
-            <Logo />
+            <Logo href={homeHref} />
           </SheetTitle>
           <SheetDescription className="sr-only">
             Site navigation

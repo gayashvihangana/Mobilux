@@ -1,6 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Clock, Users, Wrench } from "lucide-react";
+import {
+  ArrowRight,
+  Banknote,
+  CheckCircle2,
+  Clock,
+  Percent,
+  Smartphone,
+  Target,
+  TrendingUp,
+  Users,
+  Wallet,
+  Wrench,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
 import { STATUS_META, STATUS_PIPELINE } from "@/lib/status";
@@ -12,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, formatDate, formatLKR } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Admin overview",
@@ -25,47 +37,177 @@ const ACTIVE_STATUSES = [
   "IN_PROGRESS",
 ] as const;
 
+const SUCCESS_STATUSES = ["COMPLETED", "READY_FOR_PICKUP", "PICKED_UP"] as const;
+
 export default async function AdminOverviewPage() {
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [activeCount, readyCount, completedThisMonth, customerCount, recentTickets, statusCounts] =
-    await Promise.all([
-      prisma.repairTicket.count({
-        where: { status: { in: [...ACTIVE_STATUSES] } },
-      }),
-      prisma.repairTicket.count({
-        where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
-      }),
-      prisma.repairTicket.count({
-        where: { completedAt: { gte: monthStart } },
-      }),
-      prisma.user.count({ where: { role: "CUSTOMER" } }),
-      prisma.repairTicket.findMany({
-        orderBy: { createdAt: "desc" },
-        take: 8,
-        include: { customer: { select: { name: true } } },
-      }),
-      prisma.repairTicket.groupBy({
-        by: ["status"],
-        _count: true,
-      }),
-    ]);
+  const [
+    activeCount,
+    readyCount,
+    customerCount,
+    recentTickets,
+    statusCounts,
+    financeTickets,
+    paidByTicket,
+  ] = await Promise.all([
+    prisma.repairTicket.count({
+      where: { status: { in: [...ACTIVE_STATUSES] } },
+    }),
+    prisma.repairTicket.count({
+      where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
+    }),
+    prisma.user.count({ where: { role: "CUSTOMER" } }),
+    prisma.repairTicket.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { customer: { select: { name: true } } },
+    }),
+    prisma.repairTicket.groupBy({
+      by: ["status"],
+      _count: true,
+    }),
+    prisma.repairTicket.findMany({
+      select: {
+        id: true,
+        status: true,
+        paidAmount: true,
+        partsCost: true,
+        completedAt: true,
+      },
+    }),
+    prisma.payment.groupBy({
+      by: ["ticketId"],
+      where: { status: "PAID", ticketId: { not: null } },
+      _sum: { amount: true },
+    }),
+  ]);
 
+  // ── Financials (repairs only) ──────────────────────────────────
+  // Revenue per ticket: verified online payments first, otherwise the
+  // shop's own paid-amount record — same preference the bill uses.
+  const paidPaymentByTicket = new Map(
+    paidByTicket.map((p) => [p.ticketId as string, Number(p._sum.amount ?? 0)]),
+  );
+
+  let revenue = 0;
+  let revenueThisMonth = 0;
+  let costs = 0;
+  let costsThisMonth = 0;
+
+  for (const t of financeTickets) {
+    const paymentSum = paidPaymentByTicket.get(t.id) ?? 0;
+    const ticketRevenue =
+      paymentSum > 0 ? paymentSum : t.paidAmount ? Number(t.paidAmount) : 0;
+    const ticketCost = t.partsCost ? Number(t.partsCost) : 0;
+    revenue += ticketRevenue;
+    costs += ticketCost;
+    if (t.completedAt && t.completedAt >= monthStart) {
+      revenueThisMonth += ticketRevenue;
+      costsThisMonth += ticketCost;
+    }
+  }
+
+  const profit = revenue - costs;
+  const profitThisMonth = revenueThisMonth - costsThisMonth;
+  const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+  // ── Repair outcomes ────────────────────────────────────────────
   const countByStatus = Object.fromEntries(
     statusCounts.map((s) => [s.status, s._count]),
   );
+  const totalTickets = statusCounts.reduce((sum, s) => sum + s._count, 0);
+  const succeeded = SUCCESS_STATUSES.reduce(
+    (sum, s) => sum + (countByStatus[s] ?? 0),
+    0,
+  );
+  const cancelled = countByStatus["CANCELLED"] ?? 0;
+  const closed = succeeded + cancelled;
+  const successRate = closed > 0 ? (succeeded / closed) * 100 : null;
+  const completedThisMonth = financeTickets.filter(
+    (t) => t.completedAt && t.completedAt >= monthStart,
+  ).length;
+  const paidRepairs = financeTickets.filter(
+    (t) =>
+      (paidPaymentByTicket.get(t.id) ?? 0) > 0 ||
+      (t.paidAmount !== null && Number(t.paidAmount) > 0),
+  ).length;
+  const avgPerRepair = paidRepairs > 0 ? revenue / paidRepairs : 0;
+
   const pipelineTotal = STATUS_PIPELINE.reduce(
     (sum, s) => sum + (countByStatus[s] ?? 0),
     0,
   );
 
-  const stats = [
-    { label: "Active repairs", value: activeCount, icon: Wrench, className: "text-primary" },
-    { label: "Awaiting pickup", value: readyCount, icon: Clock, className: "text-warning" },
-    { label: "Completed this month", value: completedThisMonth, icon: CheckCircle2, className: "text-success" },
-    { label: "Customers", value: customerCount, icon: Users, className: "text-info" },
+  const financeStats = [
+    {
+      label: "Total revenue",
+      value: formatLKR(revenue),
+      sub: `${formatLKR(revenueThisMonth)} this month`,
+      icon: Banknote,
+      className: "text-success",
+    },
+    {
+      label: "Parts & costs",
+      value: formatLKR(costs),
+      sub: `${formatLKR(costsThisMonth)} this month`,
+      icon: Wallet,
+      className: "text-warning",
+    },
+    {
+      label: "Net profit",
+      value: formatLKR(profit),
+      sub: `${formatLKR(profitThisMonth)} this month`,
+      icon: TrendingUp,
+      className: profit >= 0 ? "text-success" : "text-destructive",
+    },
+    {
+      label: "Profit margin",
+      value: `${profitMargin.toFixed(1)}%`,
+      sub: "of revenue kept as profit",
+      icon: Percent,
+      className: "text-info",
+    },
+  ];
+
+  const repairStats = [
+    {
+      label: "Total repairs",
+      value: String(totalTickets),
+      sub: `${completedThisMonth} completed this month`,
+      icon: Smartphone,
+      className: "text-primary",
+    },
+    {
+      label: "Repaired successfully",
+      value: String(succeeded),
+      sub: cancelled > 0 ? `${cancelled} cancelled` : "no cancellations",
+      icon: CheckCircle2,
+      className: "text-success",
+    },
+    {
+      label: "Success rate",
+      value: successRate === null ? "—" : `${successRate.toFixed(1)}%`,
+      sub: "of finished repairs succeeded",
+      icon: Target,
+      className: "text-info",
+    },
+    {
+      label: "Avg. per repair",
+      value: formatLKR(avgPerRepair),
+      sub: `across ${paidRepairs} paid repair${paidRepairs === 1 ? "" : "s"}`,
+      icon: Banknote,
+      className: "text-primary",
+    },
+  ];
+
+  const opsStats = [
+    { label: "Active repairs", value: String(activeCount), icon: Wrench, className: "text-primary" },
+    { label: "Awaiting pickup", value: String(readyCount), icon: Clock, className: "text-warning" },
+    { label: "Completed this month", value: String(completedThisMonth), icon: CheckCircle2, className: "text-success" },
+    { label: "Customers", value: String(customerCount), icon: Users, className: "text-info" },
   ];
 
   return (
@@ -79,8 +221,47 @@ export default async function AdminOverviewPage() {
         </p>
       </div>
 
+      {/* Financials */}
+      <section>
+        <h2 className="font-display mb-4 text-lg font-semibold">Business</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {financeStats.map((stat) => (
+            <div key={stat.label} className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
+                <stat.icon className={cn("size-4", stat.className)} />
+              </div>
+              <p className="font-display mt-2 text-2xl font-bold tracking-tight">
+                {stat.value}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{stat.sub}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Repair outcomes */}
+      <section>
+        <h2 className="font-display mb-4 text-lg font-semibold">Repairs</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {repairStats.map((stat) => (
+            <div key={stat.label} className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
+                <stat.icon className={cn("size-4", stat.className)} />
+              </div>
+              <p className="font-display mt-2 text-2xl font-bold tracking-tight">
+                {stat.value}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{stat.sub}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Today */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {opsStats.map((stat) => (
           <div key={stat.label} className="rounded-2xl border border-border bg-card p-5">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{stat.label}</p>

@@ -31,10 +31,11 @@ export default async function AdminLayout({
                 { href: "/admin/products", label: "Products" },
                 { href: "/admin/orders", label: "Orders" },
               ]}
+              homeHref="/admin"
               triggerClassName="-ml-2 shrink-0 sm:hidden"
             />
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <Logo />
+              <Logo href="/admin" />
               <span className="hidden shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
                 <ShieldCheck className="size-3" /> Admin
               </span>
