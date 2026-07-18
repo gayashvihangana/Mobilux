@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Receipt } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { discountForCount } from "@/lib/loyalty";
 import { DEVICE_TYPES } from "@/lib/status";
@@ -84,7 +85,16 @@ export default async function RepairDetailPage({
           </h1>
           <p className="mt-1 text-muted-foreground">{ticket.issueTitle}</p>
         </div>
-        <StatusBadge status={ticket.status} className="px-3 py-1.5 text-sm" />
+        <div className="flex flex-col items-end gap-2">
+          <StatusBadge status={ticket.status} className="px-3 py-1.5 text-sm" />
+          {ticket.finalCost ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/bill/${ticket.id}`} target="_blank">
+                <Receipt className="size-4" /> View bill
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {/* Pipeline stepper */}

@@ -8,6 +8,7 @@ import {
   Mail,
   NotebookPen,
   Phone,
+  Receipt,
   User,
   UserX,
   Wrench,
@@ -22,6 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEVICE_TYPES } from "@/lib/status";
@@ -109,10 +111,17 @@ export default async function AdminTicketDetailPage({
         </div>
         <div className="flex flex-col items-end gap-2">
           <StatusBadge status={ticket.status} className="px-3 py-1.5 text-sm" />
-          <DeleteTicketDialog
-            ticketId={ticket.id}
-            ticketNumber={ticket.ticketNumber}
-          />
+          <div className="flex gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/bill/${ticket.id}`} target="_blank">
+                <Receipt className="size-4" /> View bill
+              </Link>
+            </Button>
+            <DeleteTicketDialog
+              ticketId={ticket.id}
+              ticketNumber={ticket.ticketNumber}
+            />
+          </div>
         </div>
       </div>
 

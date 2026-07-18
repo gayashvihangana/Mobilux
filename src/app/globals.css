@@ -181,3 +181,12 @@
 @utility glow-primary {
   background: color-mix(in oklab, var(--primary) var(--glow-strength), transparent);
 }
+
+@media print {
+  @page {
+    margin: 10mm;
+  }
+  html {
+    background: white;
+  }
+}

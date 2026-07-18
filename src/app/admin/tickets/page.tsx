@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Receipt } from "lucide-react";
 import type { TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
@@ -99,12 +99,13 @@ export default async function AdminTicketsPage({
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Profit</TableHead>
               <TableHead className="text-right">Date</TableHead>
+              <TableHead className="text-right">Bill</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {tickets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                   No tickets match this filter.
                 </TableCell>
               </TableRow>
@@ -156,6 +157,19 @@ export default async function AdminTicketsPage({
                     </TableCell>
                     <TableCell className="text-right text-xs whitespace-nowrap text-muted-foreground">
                       {formatDate(ticket.createdAt)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {ticket.finalCost || ticket.paidAmount ? (
+                        <Link
+                          href={`/bill/${ticket.id}`}
+                          target="_blank"
+                          className="relative z-10 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          <Receipt className="size-3.5" /> Bill
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

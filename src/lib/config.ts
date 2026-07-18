@@ -13,3 +13,5 @@ export const SHOP = {
   email: "hello@mobilux.lk",
   city: "Colombo, Sri Lanka",
 } as const;
+
+export const WARRANTY_DAYS = 30;
