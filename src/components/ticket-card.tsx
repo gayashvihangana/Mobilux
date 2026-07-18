@@ -27,8 +27,8 @@ export function TicketCard({
     id: string;
     ticketNumber: string;
     deviceType: DeviceType;
-    brand: string;
-    model: string;
+    brand: string | null;
+    model: string | null;
     issueTitle: string;
     status: TicketStatus;
     createdAt: Date;
@@ -37,6 +37,8 @@ export function TicketCard({
 }) {
   const Icon = deviceIcons[ticket.deviceType];
   const progress = ticketProgress(ticket.status);
+  const deviceName =
+    [ticket.brand, ticket.model].filter(Boolean).join(" ") || "Device";
 
   return (
     <Link
@@ -49,9 +51,7 @@ export function TicketCard({
             <Icon className="size-5 text-primary" />
           </span>
           <div className="min-w-0">
-            <p className="truncate font-semibold">
-              {ticket.brand} {ticket.model}
-            </p>
+            <p className="truncate font-semibold">{deviceName}</p>
             <p className="truncate text-sm text-muted-foreground">
               {ticket.issueTitle}
             </p>

@@ -86,7 +86,10 @@ export async function submitReceipt(
       return { error: "A payment for this repair is already submitted or paid." };
     }
     const rules = await prisma.discountRule.findMany({ where: { active: true } });
-    discountPercent = discountForCount(rules, ticket.customer.completedRepairs);
+    discountPercent = discountForCount(
+      rules,
+      ticket.customer?.completedRepairs ?? 0,
+    );
     amount = applyDiscount(Number(ticket.finalCost), discountPercent);
     label = ticket.ticketNumber;
   } else {

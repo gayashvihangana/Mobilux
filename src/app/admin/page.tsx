@@ -166,9 +166,12 @@ export default async function AdminOverviewPage() {
                         {ticket.ticketNumber}
                       </Link>
                     </TableCell>
-                    <TableCell>{ticket.customer.name}</TableCell>
+                    <TableCell>
+                      {ticket.customer?.name ?? ticket.customerName ?? "—"}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {ticket.brand} {ticket.model}
+                      {[ticket.brand, ticket.model].filter(Boolean).join(" ") ||
+                        "—"}
                     </TableCell>
                     <TableCell className="max-w-50 truncate text-muted-foreground">
                       {ticket.issueTitle}

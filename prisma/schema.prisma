@@ -82,19 +82,28 @@ model User {
 model RepairTicket {
   id               String         @id @default(cuid())
   seq              Int            @unique @default(autoincrement())
-  ticketNumber     String         @unique // MBX-0001 style, derived from seq
-  customerId       String
-  customer         User           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  ticketNumber     String         @unique // MBX-0001 style (legacy imports keep REP-xxxx)
+  customerId       String? // linked account (optional — walk-ins have none)
+  customer         User?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName     String? // walk-in / legacy owner name when no account
   deviceType       DeviceType
-  brand            String
-  model            String
+  brand            String?
+  model            String?
   issueTitle       String
-  issueDescription String
+  issueDescription String?
+  solution         String? // what was actually done
   photos           String[]       @default([])
   status           TicketStatus   @default(RECEIVED)
   estimatedCost    Decimal?       @db.Decimal(10, 2)
   finalCost        Decimal?       @db.Decimal(10, 2)
   discountPercent  Decimal?       @db.Decimal(5, 2)
+  // Internal shop bookkeeping — never shown to customers
+  partsCost        Decimal?       @db.Decimal(10, 2) // what the shop spent
+  paidAmount       Decimal?       @db.Decimal(10, 2) // what the customer paid
+  duration         String? // e.g. "2 Hours", "1 Day"
+  partsUsed        String? // e.g. "Display, Battery"
+  partsSupplier    String? // e.g. "Trans Asia Cellular"
+  forgottenParts   String? // QA tracking, e.g. "3 Screws"
   adminNotes       String?
   statusUpdates    StatusUpdate[]
   payments         Payment[]

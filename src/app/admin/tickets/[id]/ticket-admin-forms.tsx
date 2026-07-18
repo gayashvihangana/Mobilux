@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, TriangleAlert } from "lucide-react";
-import type { TicketStatus } from "@prisma/client";
+import { Link2, Loader2, TriangleAlert } from "lucide-react";
+import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,17 +16,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  updateTicketCosts,
+  linkTicketCustomer,
+  updateTicketDetails,
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
-import { STATUS_META } from "@/lib/status";
+import { DEVICE_TYPES, STATUS_META } from "@/lib/status";
 
 function useSuccessToast(state: TicketFormState, message: string) {
   const last = useRef<TicketFormState>(null);
   useEffect(() => {
-    if (state !== last.current && state?.success) {
-      toast.success(message);
+    if (state !== last.current) {
+      if (state?.success) toast.success(message);
+      else if (state?.error) toast.error(state.error);
     }
     last.current = state;
   }, [state, message]);
@@ -55,7 +57,7 @@ export function StatusUpdateForm({
   currentStatus: TicketStatus;
 }) {
   const [state, formAction, pending] = useActionState(updateTicketStatus, null);
-  useSuccessToast(state, "Status updated — the customer has been notified.");
+  useSuccessToast(state, "Status updated.");
 
   return (
     <form action={formAction} className="space-y-4">
@@ -96,66 +98,250 @@ export function StatusUpdateForm({
   );
 }
 
-export function CostsForm({
-  ticketId,
-  estimatedCost,
-  finalCost,
-  adminNotes,
-}: {
+export type TicketDetailsValues = {
   ticketId: string;
+  deviceType: DeviceType;
+  brand: string | null;
+  model: string | null;
+  issueTitle: string;
+  issueDescription: string | null;
+  solution: string | null;
+  status: TicketStatus;
+  completedAt: string | null; // yyyy-mm-dd
   estimatedCost: string | null;
   finalCost: string | null;
+  partsCost: string | null;
+  paidAmount: string | null;
+  duration: string | null;
+  partsUsed: string | null;
+  partsSupplier: string | null;
   adminNotes: string | null;
-}) {
-  const [state, formAction, pending] = useActionState(updateTicketCosts, null);
-  useSuccessToast(state, "Costs saved.");
+  forgottenParts: string | null;
+};
+
+export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
+  const [state, formAction, pending] = useActionState(updateTicketDetails, null);
+  useSuccessToast(state, "Repair details saved.");
 
   return (
     <form action={formAction} className="space-y-4">
-      <input type="hidden" name="ticketId" value={ticketId} />
+      <input type="hidden" name="ticketId" value={values.ticketId} />
+      <input type="hidden" name="status" value={values.status} />
       <FormError state={state} />
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="space-y-2">
+          <Label htmlFor="deviceType">Device type</Label>
+          <Select name="deviceType" defaultValue={values.deviceType}>
+            <SelectTrigger id="deviceType" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DEVICE_TYPES.map((d) => (
+                <SelectItem key={d.value} value={d.value}>
+                  {d.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="brand">Brand</Label>
+          <Input id="brand" name="brand" defaultValue={values.brand ?? ""} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="model">Model</Label>
+          <Input id="model" name="model" defaultValue={values.model ?? ""} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="issueTitle">Issue</Label>
+        <Input
+          id="issueTitle"
+          name="issueTitle"
+          defaultValue={values.issueTitle}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="issueDescription">Issue details</Label>
+        <Textarea
+          id="issueDescription"
+          name="issueDescription"
+          rows={2}
+          defaultValue={values.issueDescription ?? ""}
+          className="resize-none"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="solution">Solution</Label>
+        <Textarea
+          id="solution"
+          name="solution"
+          rows={2}
+          defaultValue={values.solution ?? ""}
+          placeholder="What was done to fix it"
+          className="resize-none"
+        />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="estimatedCost">Estimated (LKR)</Label>
+          <Label htmlFor="estimatedCost">Quoted (LKR)</Label>
           <Input
             id="estimatedCost"
             name="estimatedCost"
             type="number"
             min="0"
             step="0.01"
-            defaultValue={estimatedCost ?? ""}
-            placeholder="0.00"
+            defaultValue={values.estimatedCost ?? ""}
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="finalCost">Final (LKR)</Label>
+          <Label htmlFor="finalCost">Final price (LKR)</Label>
           <Input
             id="finalCost"
             name="finalCost"
             type="number"
             min="0"
             step="0.01"
-            defaultValue={finalCost ?? ""}
-            placeholder="0.00"
+            defaultValue={values.finalCost ?? ""}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="partsCost">Parts cost (LKR)</Label>
+          <Input
+            id="partsCost"
+            name="partsCost"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={values.partsCost ?? ""}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="paidAmount">Customer paid (LKR)</Label>
+          <Input
+            id="paidAmount"
+            name="paidAmount"
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={values.paidAmount ?? ""}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="duration">Duration</Label>
+          <Input
+            id="duration"
+            name="duration"
+            defaultValue={values.duration ?? ""}
+            placeholder="e.g. 2 Hours"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="completedAt">Date completed</Label>
+          <Input
+            id="completedAt"
+            name="completedAt"
+            type="date"
+            defaultValue={values.completedAt ?? ""}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="partsUsed">Parts used</Label>
+          <Input
+            id="partsUsed"
+            name="partsUsed"
+            defaultValue={values.partsUsed ?? ""}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="partsSupplier">Parts supplier</Label>
+          <Input
+            id="partsSupplier"
+            name="partsSupplier"
+            defaultValue={values.partsSupplier ?? ""}
           />
         </div>
       </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="forgottenParts">Forgotten parts</Label>
+        <Input
+          id="forgottenParts"
+          name="forgottenParts"
+          defaultValue={values.forgottenParts ?? ""}
+          placeholder="e.g. 3 Screws"
+        />
+      </div>
       <div className="space-y-2">
         <Label htmlFor="adminNotes">
-          Internal notes <span className="text-muted-foreground">(not shown to customer)</span>
+          Internal comments <span className="text-muted-foreground">(not shown to customer)</span>
         </Label>
         <Textarea
           id="adminNotes"
           name="adminNotes"
-          rows={3}
-          defaultValue={adminNotes ?? ""}
-          placeholder="Parts ordered, supplier, serials…"
+          rows={4}
+          defaultValue={values.adminNotes ?? ""}
           className="resize-none"
         />
       </div>
+
       <Button type="submit" variant="secondary" className="w-full" disabled={pending}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-        {pending ? "Saving…" : "Save costs & notes"}
+        {pending ? "Saving…" : "Save details"}
+      </Button>
+    </form>
+  );
+}
+
+export function LinkCustomerForm({
+  ticketId,
+  currentCustomerId,
+  customers,
+}: {
+  ticketId: string;
+  currentCustomerId: string | null;
+  customers: { id: string; name: string; email: string }[];
+}) {
+  const [selected, setSelected] = useState(currentCustomerId ?? "none");
+  const [state, formAction, pending] = useActionState(linkTicketCustomer, null);
+  useSuccessToast(
+    state,
+    selected === "none" ? "Account unlinked." : "Customer account linked.",
+  );
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <input type="hidden" name="ticketId" value={ticketId} />
+      <Select name="userId" value={selected} onValueChange={setSelected}>
+        <SelectTrigger className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">No account (name only)</SelectItem>
+          {customers.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.name} — {c.email}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        type="submit"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        disabled={pending || selected === (currentCustomerId ?? "none")}
+      >
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Link2 className="size-4" />
+        )}
+        {selected === "none" ? "Unlink account" : "Link account"}
       </Button>
     </form>
   );

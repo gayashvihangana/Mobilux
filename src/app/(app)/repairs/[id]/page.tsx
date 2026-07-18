@@ -51,7 +51,7 @@ export default async function RepairDetailPage({
   const discountPercent =
     ticket.discountPercent !== null
       ? Number(ticket.discountPercent)
-      : discountForCount(discountRules, ticket.customer.completedRepairs);
+      : discountForCount(discountRules, ticket.customer?.completedRepairs ?? 0);
 
   const deviceLabel =
     DEVICE_TYPES.find((d) => d.value === ticket.deviceType)?.label ?? "Device";
@@ -79,7 +79,8 @@ export default async function RepairDetailPage({
             {ticket.ticketNumber} · Submitted {formatDate(ticket.createdAt)}
           </p>
           <h1 className="font-display mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-            {ticket.brand} {ticket.model}
+            {[ticket.brand, ticket.model].filter(Boolean).join(" ") ||
+              "Your device"}
           </h1>
           <p className="mt-1 text-muted-foreground">{ticket.issueTitle}</p>
         </div>
@@ -124,19 +125,30 @@ export default async function RepairDetailPage({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Brand</span>
-                <span className="font-medium">{ticket.brand}</span>
+                <span className="font-medium">{ticket.brand ?? "—"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Model</span>
-                <span className="font-medium">{ticket.model}</span>
+                <span className="font-medium">{ticket.model ?? "—"}</span>
               </div>
               <Separator />
               <div>
                 <p className="text-muted-foreground">Reported issue</p>
                 <p className="mt-1 leading-relaxed whitespace-pre-wrap">
-                  {ticket.issueDescription}
+                  {ticket.issueDescription ?? ticket.issueTitle}
                 </p>
               </div>
+              {ticket.solution ? (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-muted-foreground">What we did</p>
+                    <p className="mt-1 leading-relaxed font-medium whitespace-pre-wrap">
+                      {ticket.solution}
+                    </p>
+                  </div>
+                </>
+              ) : null}
             </CardContent>
           </Card>
 

@@ -126,7 +126,7 @@ export default async function AdminPaymentsPage() {
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {payment.ticket
-                        ? `${payment.ticket.brand} ${payment.ticket.model} · `
+                        ? `${[payment.ticket.brand, payment.ticket.model].filter(Boolean).join(" ") || "Device"} · `
                         : ""}
                       Submitted {formatDateTime(payment.createdAt)}
                     </p>

@@ -15,8 +15,40 @@ export type TicketFormState = {
   success?: boolean;
 } | null;
 
+const TICKET_STATUSES = [
+  "RECEIVED",
+  "DIAGNOSING",
+  "AWAITING_PARTS",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "READY_FOR_PICKUP",
+  "PICKED_UP",
+  "CANCELLED",
+] as const;
+
+const DEVICE_TYPES = ["PHONE", "TABLET", "LAPTOP", "SMARTWATCH", "OTHER"] as const;
+
+function optionalText(max: number) {
+  return z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => v || undefined);
+}
+
+function optionalMoney() {
+  return z
+    .union([z.literal(""), z.coerce.number().min(0)])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? undefined : v));
+}
+
+// ── Customer self-service submission ─────────────────────────────
+
 const createTicketSchema = z.object({
-  deviceType: z.enum(["PHONE", "TABLET", "LAPTOP", "SMARTWATCH", "OTHER"]),
+  deviceType: z.enum(DEVICE_TYPES),
   brand: z.string().trim().min(2, "Brand is required"),
   model: z.string().trim().min(1, "Model is required"),
   issueTitle: z.string().trim().min(5, "Give the issue a short title (min 5 characters)"),
@@ -74,7 +106,6 @@ export async function createTicket(
     return updated;
   });
 
-  // Notify all admins about the new request
   const admins = await prisma.user.findMany({
     where: { role: "ADMIN" },
     select: { id: true },
@@ -95,18 +126,249 @@ export async function createTicket(
   redirect(`/repairs/${ticket.id}?created=1`);
 }
 
+// ── Admin: manual repair log ─────────────────────────────────────
+
+const adminTicketSchema = z.object({
+  customerId: optionalText(50),
+  customerName: optionalText(120),
+  deviceType: z.enum(DEVICE_TYPES),
+  brand: optionalText(60),
+  model: optionalText(80),
+  issueTitle: z.string().trim().min(3, "Issue is required"),
+  issueDescription: optionalText(2000),
+  solution: optionalText(2000),
+  status: z.enum(TICKET_STATUSES),
+  completedAt: optionalText(20),
+  estimatedCost: optionalMoney(),
+  finalCost: optionalMoney(),
+  partsCost: optionalMoney(),
+  paidAmount: optionalMoney(),
+  duration: optionalText(60),
+  partsUsed: optionalText(200),
+  partsSupplier: optionalText(200),
+  adminNotes: optionalText(4000),
+  forgottenParts: optionalText(200),
+});
+
+function parseAdminTicketForm(formData: FormData) {
+  return adminTicketSchema.safeParse({
+    customerId: formData.get("customerId"),
+    customerName: formData.get("customerName"),
+    deviceType: formData.get("deviceType"),
+    brand: formData.get("brand"),
+    model: formData.get("model"),
+    issueTitle: formData.get("issueTitle"),
+    issueDescription: formData.get("issueDescription"),
+    solution: formData.get("solution"),
+    status: formData.get("status"),
+    completedAt: formData.get("completedAt"),
+    estimatedCost: formData.get("estimatedCost") ?? "",
+    finalCost: formData.get("finalCost") ?? "",
+    partsCost: formData.get("partsCost") ?? "",
+    paidAmount: formData.get("paidAmount") ?? "",
+    duration: formData.get("duration"),
+    partsUsed: formData.get("partsUsed"),
+    partsSupplier: formData.get("partsSupplier"),
+    adminNotes: formData.get("adminNotes"),
+    forgottenParts: formData.get("forgottenParts"),
+  });
+}
+
+function resolveCompletedAt(
+  status: TicketStatus,
+  completedAtInput: string | undefined,
+): Date | null {
+  const done = status === "COMPLETED" || status === "PICKED_UP";
+  if (!done) return null;
+  if (completedAtInput) {
+    const d = new Date(completedAtInput);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+export async function adminCreateTicket(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const parsed = parseAdminTicketForm(formData);
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const data = parsed.data;
+  const customerId = data.customerId === "none" ? undefined : data.customerId;
+  if (!customerId && !data.customerName) {
+    return { error: "Pick a customer account or enter a customer name." };
+  }
+
+  const completedAt = resolveCompletedAt(data.status, data.completedAt);
+
+  const ticket = await prisma.$transaction(async (tx) => {
+    const created = await tx.repairTicket.create({
+      data: {
+        ticketNumber: `TMP-${crypto.randomUUID()}`,
+        customerId: customerId ?? null,
+        customerName: data.customerName ?? null,
+        deviceType: data.deviceType,
+        brand: data.brand ?? null,
+        model: data.model ?? null,
+        issueTitle: data.issueTitle,
+        issueDescription: data.issueDescription ?? null,
+        solution: data.solution ?? null,
+        status: data.status,
+        estimatedCost: data.estimatedCost,
+        finalCost: data.finalCost,
+        partsCost: data.partsCost,
+        paidAmount: data.paidAmount,
+        duration: data.duration ?? null,
+        partsUsed: data.partsUsed ?? null,
+        partsSupplier: data.partsSupplier ?? null,
+        adminNotes: data.adminNotes ?? null,
+        forgottenParts: data.forgottenParts ?? null,
+        completedAt,
+      },
+    });
+    const updated = await tx.repairTicket.update({
+      where: { id: created.id },
+      data: { ticketNumber: `MBX-${String(created.seq).padStart(4, "0")}` },
+    });
+    await tx.statusUpdate.create({
+      data: {
+        ticketId: created.id,
+        status: data.status,
+        note: "Repair log added by shop.",
+        createdAt: completedAt ?? new Date(),
+      },
+    });
+    if (customerId && completedAt) {
+      await tx.user.update({
+        where: { id: customerId },
+        data: { completedRepairs: { increment: 1 } },
+      });
+    }
+    return updated;
+  });
+
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
+  redirect(`/admin/tickets/${ticket.id}`);
+}
+
+// ── Admin: edit full repair details ──────────────────────────────
+
+export async function updateTicketDetails(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const ticketId = formData.get("ticketId");
+  if (typeof ticketId !== "string") return { error: "Invalid ticket." };
+
+  const parsed = parseAdminTicketForm(formData);
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const data = parsed.data;
+
+  const existing = await prisma.repairTicket.findUnique({
+    where: { id: ticketId },
+    select: { id: true, completedAt: true },
+  });
+  if (!existing) return { error: "Ticket not found." };
+
+  await prisma.repairTicket.update({
+    where: { id: ticketId },
+    data: {
+      deviceType: data.deviceType,
+      brand: data.brand ?? null,
+      model: data.model ?? null,
+      issueTitle: data.issueTitle,
+      issueDescription: data.issueDescription ?? null,
+      solution: data.solution ?? null,
+      estimatedCost: data.estimatedCost ?? null,
+      finalCost: data.finalCost ?? null,
+      partsCost: data.partsCost ?? null,
+      paidAmount: data.paidAmount ?? null,
+      duration: data.duration ?? null,
+      partsUsed: data.partsUsed ?? null,
+      partsSupplier: data.partsSupplier ?? null,
+      adminNotes: data.adminNotes ?? null,
+      forgottenParts: data.forgottenParts ?? null,
+      ...(data.completedAt
+        ? { completedAt: resolveCompletedAt("COMPLETED", data.completedAt) }
+        : {}),
+    },
+  });
+
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath(`/repairs/${ticketId}`);
+  return { success: true };
+}
+
+// ── Admin: link / unlink a customer account ──────────────────────
+
+export async function linkTicketCustomer(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const ticketId = formData.get("ticketId");
+  const userId = formData.get("userId");
+  if (typeof ticketId !== "string" || typeof userId !== "string") {
+    return { error: "Invalid request." };
+  }
+
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: ticketId },
+    include: { customer: { select: { name: true } } },
+  });
+  if (!ticket) return { error: "Ticket not found." };
+
+  if (userId === "none") {
+    // Unlink — keep a name on record so the ticket still shows an owner
+    await prisma.repairTicket.update({
+      where: { id: ticketId },
+      data: {
+        customerId: null,
+        customerName: ticket.customerName ?? ticket.customer?.name ?? null,
+      },
+    });
+  } else {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return { error: "User not found." };
+    await prisma.repairTicket.update({
+      where: { id: ticketId },
+      data: { customerId: userId },
+    });
+    await prisma.notification.create({
+      data: {
+        userId,
+        title: `Repair ${ticket.ticketNumber} added to your account`,
+        body: `${[ticket.brand, ticket.model].filter(Boolean).join(" ") || "A repair"} — ${ticket.issueTitle}`,
+        href: `/repairs/${ticketId}`,
+      },
+    });
+  }
+
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+// ── Admin: status pipeline updates ───────────────────────────────
+
 const updateStatusSchema = z.object({
   ticketId: z.string().min(1),
-  status: z.enum([
-    "RECEIVED",
-    "DIAGNOSING",
-    "AWAITING_PARTS",
-    "IN_PROGRESS",
-    "COMPLETED",
-    "READY_FOR_PICKUP",
-    "PICKED_UP",
-    "CANCELLED",
-  ]),
+  status: z.enum(TICKET_STATUSES),
   note: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
@@ -148,21 +410,22 @@ export async function updateTicketStatus(
     await tx.statusUpdate.create({
       data: { ticketId, status: status as TicketStatus, note: note || null },
     });
-    if (becameCompleted) {
-      await tx.user.update({
-        where: { id: ticket.customerId },
-        data: { completedRepairs: { increment: 1 } },
+    if (ticket.customerId) {
+      if (becameCompleted) {
+        await tx.user.update({
+          where: { id: ticket.customerId },
+          data: { completedRepairs: { increment: 1 } },
+        });
+      }
+      await tx.notification.create({
+        data: {
+          userId: ticket.customerId,
+          title: `${ticket.ticketNumber} — ${STATUS_META[status as TicketStatus].label}`,
+          body: note || STATUS_META[status as TicketStatus].description,
+          href: `/repairs/${ticketId}`,
+        },
       });
     }
-    await tx.notification.create({
-      data: {
-        userId: ticket.customerId,
-        title: `${ticket.ticketNumber} — ${STATUS_META[status as TicketStatus].label}`,
-        body:
-          note || STATUS_META[status as TicketStatus].description,
-        href: `/repairs/${ticketId}`,
-      },
-    });
   });
 
   revalidatePath(`/admin/tickets/${ticketId}`);
@@ -170,45 +433,5 @@ export async function updateTicketStatus(
   revalidatePath("/admin");
   revalidatePath(`/repairs/${ticketId}`);
   revalidatePath("/dashboard");
-  return { success: true };
-}
-
-const costsSchema = z.object({
-  ticketId: z.string().min(1),
-  estimatedCost: z.coerce.number().min(0).optional(),
-  finalCost: z.coerce.number().min(0).optional(),
-  adminNotes: z.string().trim().max(1000).optional().or(z.literal("")),
-});
-
-export async function updateTicketCosts(
-  _prev: TicketFormState,
-  formData: FormData,
-): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
-    return { error: "Not authorized." };
-  }
-
-  const raw = {
-    ticketId: formData.get("ticketId"),
-    estimatedCost: formData.get("estimatedCost") || undefined,
-    finalCost: formData.get("finalCost") || undefined,
-    adminNotes: formData.get("adminNotes"),
-  };
-  const parsed = costsSchema.safeParse(raw);
-  if (!parsed.success) return { error: "Invalid values." };
-
-  const { ticketId, estimatedCost, finalCost, adminNotes } = parsed.data;
-  await prisma.repairTicket.update({
-    where: { id: ticketId },
-    data: {
-      estimatedCost: estimatedCost ?? null,
-      finalCost: finalCost ?? null,
-      adminNotes: adminNotes || null,
-    },
-  });
-
-  revalidatePath(`/admin/tickets/${ticketId}`);
-  revalidatePath(`/repairs/${ticketId}`);
   return { success: true };
 }
