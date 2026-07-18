@@ -15,7 +15,7 @@ const ALLOWED_TYPES: Record<string, string> = {
 // falls back to local public/uploads for development.
 export async function saveUploads(
   files: File[],
-  subdir: "tickets" | "receipts" | "products",
+  subdir: "tickets" | "receipts" | "products" | "avatars",
   maxFiles = 4,
 ): Promise<{ urls?: string[]; error?: string }> {
   const valid = files.filter((f) => f.size > 0);

@@ -56,6 +56,7 @@ export default async function AppLayout({
             <UserMenu
               name={session.user.name ?? "User"}
               email={session.user.email ?? ""}
+              image={session.user.image}
               isAdmin={false}
             />
           </div>

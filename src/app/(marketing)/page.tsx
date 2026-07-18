@@ -83,15 +83,15 @@ export default function HomePage() {
         <div className="relative mx-auto max-w-6xl px-4 pt-44 pb-28 sm:pt-56 sm:pb-36">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="animate-fade-up font-display text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-6xl lg:text-7xl">
-              Phone repair you can{" "}
-              <span className="text-gradient">actually track</span>
+              We fix your phone.{" "}
+              <span className="text-gradient">You watch it happen.</span>
             </h1>
             <p
               className="animate-fade-up mx-auto mt-6 max-w-xl text-base text-muted-foreground sm:text-lg"
               style={{ animationDelay: "100ms" }}
             >
-              Submit a repair in minutes, follow every step live, and pay
-              securely in LKR.
+              Cracked screens, dead batteries, water damage — repaired fast in
+              Colombo, with every step tracked live from drop-off to pickup.
             </p>
             <div
               className="animate-fade-up mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"

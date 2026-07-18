@@ -14,6 +14,7 @@ export default auth((req) => {
     nextUrl.pathname.startsWith("/dashboard") ||
     nextUrl.pathname.startsWith("/repairs") ||
     nextUrl.pathname.startsWith("/orders") ||
+    nextUrl.pathname.startsWith("/profile") ||
     nextUrl.pathname.startsWith("/bill");
   const isAuthPage = ["/login", "/register"].includes(nextUrl.pathname);
 

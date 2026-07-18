@@ -11,10 +11,15 @@ export const authConfig = {
   },
   providers: [],
   callbacks: {
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id as string;
         token.role = user.role;
+      }
+      // Profile edits refresh the JWT without forcing a re-login.
+      if (trigger === "update" && session?.user) {
+        if (typeof session.user.name === "string") token.name = session.user.name;
+        if (typeof session.user.image === "string") token.picture = session.user.image;
       }
       return token;
     },

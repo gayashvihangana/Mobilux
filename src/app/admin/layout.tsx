@@ -25,11 +25,13 @@ export default async function AdminLayout({
             <MobileNav
               links={[
                 { href: "/admin", label: "Overview" },
-                { href: "/admin/tickets", label: "Tickets" },
+                { href: "/admin/tickets", label: "Repairs" },
+                { href: "/admin/reports", label: "Reports" },
                 { href: "/admin/notes", label: "Notes" },
                 { href: "/admin/payments", label: "Payments" },
                 { href: "/admin/products", label: "Products" },
                 { href: "/admin/orders", label: "Orders" },
+                { href: "/admin/loyalty", label: "Loyalty" },
               ]}
               homeHref="/admin"
               triggerClassName="-ml-2 shrink-0 sm:hidden"
@@ -43,11 +45,13 @@ export default async function AdminLayout({
             <AppNavLinks
               links={[
                 { href: "/admin", label: "Overview" },
-                { href: "/admin/tickets", label: "Tickets" },
+                { href: "/admin/tickets", label: "Repairs" },
+                { href: "/admin/reports", label: "Reports" },
                 { href: "/admin/notes", label: "Notes" },
                 { href: "/admin/payments", label: "Payments" },
                 { href: "/admin/products", label: "Products" },
                 { href: "/admin/orders", label: "Orders" },
+                { href: "/admin/loyalty", label: "Loyalty" },
               ]}
             />
           </div>
@@ -57,6 +61,7 @@ export default async function AdminLayout({
             <UserMenu
               name={session.user.name ?? "Admin"}
               email={session.user.email ?? ""}
+              image={session.user.image}
               isAdmin
             />
           </div>

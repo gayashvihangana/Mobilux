@@ -53,8 +53,8 @@ export const STATUS_META: Record<
   PICKED_UP: {
     label: "Picked Up",
     description: "Device collected. Thank you!",
-    className: "bg-muted text-muted-foreground border-border",
-    dotClassName: "bg-muted-foreground",
+    className: "bg-success/15 text-success border-success/30",
+    dotClassName: "bg-success",
   },
   CANCELLED: {
     label: "Cancelled",

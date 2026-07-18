@@ -14,12 +14,15 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   }
 
   const currentIndex = STATUS_PIPELINE.indexOf(status);
+  // The last pipeline step is terminal — once reached, the whole journey
+  // is finished, so it renders filled with a check instead of "current".
+  const finished = currentIndex === STATUS_PIPELINE.length - 1;
 
   return (
     <ol className="flex items-start">
       {STATUS_PIPELINE.map((step, index) => {
-        const done = index < currentIndex;
-        const current = index === currentIndex;
+        const done = index < currentIndex || (finished && index === currentIndex);
+        const current = !done && index === currentIndex;
         return (
           <li key={step} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
@@ -28,15 +31,17 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                   "h-0.5 flex-1",
                   index === 0
                     ? "bg-transparent"
-                    : done || current
-                      ? "bg-primary"
-                      : "bg-border",
+                    : done
+                      ? "bg-success"
+                      : current
+                        ? "bg-primary"
+                        : "bg-border",
                 )}
               />
               <span
                 className={cn(
                   "grid size-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-bold",
-                  done && "border-primary bg-primary text-primary-foreground",
+                  done && "border-success bg-success text-white",
                   current &&
                     "border-primary bg-primary/15 text-primary shadow-[0_0_12px] shadow-primary/40",
                   !done && !current && "border-border bg-card text-muted-foreground",
@@ -49,8 +54,8 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                   "h-0.5 flex-1",
                   index === STATUS_PIPELINE.length - 1
                     ? "bg-transparent"
-                    : done
-                      ? "bg-primary"
+                    : done && index < currentIndex
+                      ? "bg-success"
                       : "bg-border",
                 )}
               />
@@ -61,7 +66,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                 current
                   ? "font-semibold text-primary"
                   : done
-                    ? "text-foreground"
+                    ? "font-medium text-success"
                     : "text-muted-foreground",
               )}
             >

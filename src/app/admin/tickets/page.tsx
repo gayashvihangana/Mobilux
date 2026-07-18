@@ -4,6 +4,7 @@ import { Plus, Receipt } from "lucide-react";
 import type { TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
+import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
 import { STATUS_META } from "@/lib/status";
 import {
@@ -17,7 +18,7 @@ import {
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 
 export const metadata: Metadata = {
-  title: "Tickets",
+  title: "Repairs",
 };
 
 const FILTERS: { value: string; label: string }[] = [
@@ -54,10 +55,10 @@ export default async function AdminTicketsPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-            Repair tickets
+            Repairs
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {tickets.length} ticket{tickets.length === 1 ? "" : "s"}
+            {tickets.length} repair{tickets.length === 1 ? "" : "s"}
             {filter ? ` · ${STATUS_META[filter].label}` : ""}
           </p>
         </div>
@@ -106,7 +107,7 @@ export default async function AdminTicketsPage({
             {tickets.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                  No tickets match this filter.
+                  No repairs match this filter.
                 </TableCell>
               </TableRow>
             ) : (
@@ -118,11 +119,14 @@ export default async function AdminTicketsPage({
                     ? (paid ?? 0) - (parts ?? 0)
                     : null;
                 return (
-                  <TableRow key={ticket.id} className="relative">
+                  <LinkedTableRow
+                    key={ticket.id}
+                    href={`/admin/tickets/${ticket.id}`}
+                  >
                     <TableCell className="font-mono text-xs">
                       <Link
                         href={`/admin/tickets/${ticket.id}`}
-                        className="after:absolute after:inset-0"
+                        className="hover:underline"
                       >
                         {ticket.ticketNumber}
                       </Link>
@@ -163,7 +167,7 @@ export default async function AdminTicketsPage({
                         <Link
                           href={`/bill/${ticket.id}`}
                           target="_blank"
-                          className="relative z-10 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                         >
                           <Receipt className="size-3.5" /> Bill
                         </Link>
@@ -171,7 +175,7 @@ export default async function AdminTicketsPage({
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                  </TableRow>
+                  </LinkedTableRow>
                 );
               })
             )}

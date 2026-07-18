@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
 import { STATUS_META, STATUS_PIPELINE } from "@/lib/status";
 import {
@@ -141,6 +142,7 @@ export default async function AdminOverviewPage() {
     0,
   );
 
+  const profitTone = profit >= 0 ? "text-success" : "text-destructive";
   const financeStats = [
     {
       label: "Total revenue",
@@ -148,6 +150,7 @@ export default async function AdminOverviewPage() {
       sub: `${formatLKR(revenueThisMonth)} this month`,
       icon: Banknote,
       className: "text-success",
+      valueClassName: "text-success",
     },
     {
       label: "Parts & costs",
@@ -155,20 +158,23 @@ export default async function AdminOverviewPage() {
       sub: `${formatLKR(costsThisMonth)} this month`,
       icon: Wallet,
       className: "text-warning",
+      valueClassName: "",
     },
     {
       label: "Net profit",
       value: formatLKR(profit),
       sub: `${formatLKR(profitThisMonth)} this month`,
       icon: TrendingUp,
-      className: profit >= 0 ? "text-success" : "text-destructive",
+      className: profitTone,
+      valueClassName: profitTone,
     },
     {
       label: "Profit margin",
       value: `${profitMargin.toFixed(1)}%`,
       sub: "of revenue kept as profit",
       icon: Percent,
-      className: "text-info",
+      className: profitTone,
+      valueClassName: profitTone,
     },
   ];
 
@@ -179,6 +185,7 @@ export default async function AdminOverviewPage() {
       sub: `${completedThisMonth} completed this month`,
       icon: Smartphone,
       className: "text-primary",
+      valueClassName: "",
     },
     {
       label: "Repaired successfully",
@@ -186,13 +193,15 @@ export default async function AdminOverviewPage() {
       sub: cancelled > 0 ? `${cancelled} cancelled` : "no cancellations",
       icon: CheckCircle2,
       className: "text-success",
+      valueClassName: "text-success",
     },
     {
       label: "Success rate",
       value: successRate === null ? "—" : `${successRate.toFixed(1)}%`,
       sub: "of finished repairs succeeded",
       icon: Target,
-      className: "text-info",
+      className: "text-success",
+      valueClassName: "text-success",
     },
     {
       label: "Avg. per repair",
@@ -200,6 +209,7 @@ export default async function AdminOverviewPage() {
       sub: `across ${paidRepairs} paid repair${paidRepairs === 1 ? "" : "s"}`,
       icon: Banknote,
       className: "text-primary",
+      valueClassName: "",
     },
   ];
 
@@ -231,7 +241,12 @@ export default async function AdminOverviewPage() {
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
                 <stat.icon className={cn("size-4", stat.className)} />
               </div>
-              <p className="font-display mt-2 text-2xl font-bold tracking-tight">
+              <p
+                className={cn(
+                  "font-display mt-2 text-2xl font-bold tracking-tight",
+                  stat.valueClassName,
+                )}
+              >
                 {stat.value}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{stat.sub}</p>
@@ -250,7 +265,12 @@ export default async function AdminOverviewPage() {
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
                 <stat.icon className={cn("size-4", stat.className)} />
               </div>
-              <p className="font-display mt-2 text-2xl font-bold tracking-tight">
+              <p
+                className={cn(
+                  "font-display mt-2 text-2xl font-bold tracking-tight",
+                  stat.valueClassName,
+                )}
+              >
                 {stat.value}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{stat.sub}</p>
@@ -308,19 +328,19 @@ export default async function AdminOverviewPage() {
       {/* Recent tickets */}
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">Recent tickets</h2>
+          <h2 className="font-display text-lg font-semibold">Recent repairs</h2>
           <Link
             href="/admin/tickets"
             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
           >
-            All tickets <ArrowRight className="size-3.5" />
+            All repairs <ArrowRight className="size-3.5" />
           </Link>
         </div>
         <div className="overflow-x-auto rounded-2xl border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Ticket</TableHead>
+                <TableHead>Repair</TableHead>
                 <TableHead>Customer</TableHead>
                 <TableHead>Device</TableHead>
                 <TableHead>Issue</TableHead>
@@ -332,17 +352,20 @@ export default async function AdminOverviewPage() {
               {recentTickets.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    No tickets yet — they&apos;ll appear here as customers submit
+                    No repairs yet — they&apos;ll appear here as customers submit
                     repair requests.
                   </TableCell>
                 </TableRow>
               ) : (
                 recentTickets.map((ticket) => (
-                  <TableRow key={ticket.id} className="relative">
+                  <LinkedTableRow
+                    key={ticket.id}
+                    href={`/admin/tickets/${ticket.id}`}
+                  >
                     <TableCell className="font-mono text-xs">
                       <Link
                         href={`/admin/tickets/${ticket.id}`}
-                        className="after:absolute after:inset-0"
+                        className="hover:underline"
                       >
                         {ticket.ticketNumber}
                       </Link>
@@ -363,7 +386,7 @@ export default async function AdminOverviewPage() {
                     <TableCell className="text-right text-xs whitespace-nowrap text-muted-foreground">
                       {formatDate(ticket.createdAt)}
                     </TableCell>
-                  </TableRow>
+                  </LinkedTableRow>
                 ))
               )}
             </TableBody>

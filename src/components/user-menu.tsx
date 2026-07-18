@@ -5,9 +5,10 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  UserRound,
   Wrench,
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,10 +22,12 @@ import { logout } from "@/lib/actions/auth";
 export function UserMenu({
   name,
   email,
+  image,
   isAdmin,
 }: {
   name: string;
   email: string;
+  image?: string | null;
   isAdmin: boolean;
 }) {
   const initials = name
@@ -38,6 +41,7 @@ export function UserMenu({
     <DropdownMenu>
       <DropdownMenuTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <Avatar className="size-9 border border-border">
+          {image ? <AvatarImage src={image} alt={name} /> : null}
           <AvatarFallback className="bg-primary/15 text-sm font-semibold text-primary">
             {initials}
           </AvatarFallback>
@@ -67,6 +71,11 @@ export function UserMenu({
             <DropdownMenuItem asChild>
               <Link href="/repairs">
                 <Wrench className="size-4" /> My repairs
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/profile">
+                <UserRound className="size-4" /> My profile
               </Link>
             </DropdownMenuItem>
           </>
