@@ -1,0 +1,217 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  STAFF // Phase 2
+}
+
+enum TicketStatus {
+  RECEIVED
+  DIAGNOSING
+  AWAITING_PARTS
+  IN_PROGRESS
+  COMPLETED
+  READY_FOR_PICKUP
+  PICKED_UP
+  CANCELLED
+}
+
+enum DeviceType {
+  PHONE
+  TABLET
+  LAPTOP
+  SMARTWATCH
+  OTHER
+}
+
+enum PaymentMethod {
+  PAYHERE
+  BANK_TRANSFER
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PENDING_VERIFICATION
+  PAID
+  REJECTED
+  REFUNDED
+}
+
+enum ProductCategory {
+  ACCESSORY
+  PHONE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  CANCELLED
+}
+
+// ─── Core models ─────────────────────────────────────────────────────
+
+model User {
+  id               String         @id @default(cuid())
+  name             String
+  email            String         @unique
+  phone            String?
+  passwordHash     String
+  role             Role           @default(CUSTOMER)
+  avatarUrl        String?
+  completedRepairs Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  tickets          RepairTicket[]
+  payments         Payment[]
+  orders           Order[]
+  notifications    Notification[]
+}
+
+model RepairTicket {
+  id               String         @id @default(cuid())
+  seq              Int            @unique @default(autoincrement())
+  ticketNumber     String         @unique // MBX-0001 style, derived from seq
+  customerId       String
+  customer         User           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deviceType       DeviceType
+  brand            String
+  model            String
+  issueTitle       String
+  issueDescription String
+  photos           String[]       @default([])
+  status           TicketStatus   @default(RECEIVED)
+  estimatedCost    Decimal?       @db.Decimal(10, 2)
+  finalCost        Decimal?       @db.Decimal(10, 2)
+  discountPercent  Decimal?       @db.Decimal(5, 2)
+  adminNotes       String?
+  statusUpdates    StatusUpdate[]
+  payments         Payment[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  completedAt      DateTime?
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model StatusUpdate {
+  id        String       @id @default(cuid())
+  ticketId  String
+  ticket    RepairTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  status    TicketStatus
+  note      String?
+  createdAt DateTime     @default(now())
+
+  @@index([ticketId])
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketId   String?
+  ticket     RepairTicket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  orderId    String?
+  order      Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  amount     Decimal       @db.Decimal(10, 2)
+  method     PaymentMethod
+  status     PaymentStatus @default(PENDING)
+  receiptUrl String? // bank-transfer receipt upload
+  reference  String? // bank ref / PayHere payment id
+  adminNote  String? // reason on rejection
+  verifiedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ─── Storefront ──────────────────────────────────────────────────────
+
+model Product {
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  description String
+  category    ProductCategory
+  price       Decimal         @db.Decimal(10, 2)
+  stock       Int             @default(0)
+  images      String[]        @default([])
+  visible     Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  orderItems  OrderItem[]
+
+  @@index([category, visible])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  seq         Int         @unique @default(autoincrement())
+  orderNumber String      @unique
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      OrderStatus @default(PENDING)
+  total       Decimal     @db.Decimal(10, 2)
+  items       OrderItem[]
+  payments    Payment[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+}
+
+// ─── Loyalty & notifications ─────────────────────────────────────────
+
+model DiscountRule {
+  id              String   @id @default(cuid())
+  minRepairs      Int // discount applies from this completed-repair count
+  discountPercent Decimal  @db.Decimal(5, 2)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  @@unique([minRepairs])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  href      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+// ─── Settings (key-value, e.g. phone storefront visibility) ─────────
+
+model Setting {
+  key   String @id
+  value String
+}
