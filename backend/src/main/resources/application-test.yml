@@ -1,8 +1,0 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/mobilux_test
-    username: mobilux
-    password: mobilux
-  jpa:
-    hibernate:
-      ddl-auto: update
