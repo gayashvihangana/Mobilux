@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 
 const navLinks = [
@@ -31,6 +32,7 @@ export async function SiteHeader() {
             ))}
           </nav>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             {user ? (
               <>
                 <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">

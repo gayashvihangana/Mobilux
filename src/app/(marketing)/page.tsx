@@ -113,7 +113,7 @@ export default function HomePage() {
       <section className="relative overflow-hidden">
         <div className="bg-grid absolute inset-0" aria-hidden />
         <div
-          className="animate-glow-pulse absolute -top-40 left-1/2 h-130 w-190 -translate-x-1/2 rounded-full bg-primary/20 blur-[120px]"
+          className="animate-glow-pulse glow-primary absolute -top-40 left-1/2 h-130 w-190 -translate-x-1/2 rounded-full blur-[120px]"
           aria-hidden
         />
         <div className="relative mx-auto max-w-6xl px-4 pt-40 pb-20 sm:pt-48">
@@ -183,8 +183,8 @@ export default function HomePage() {
                     <span key={i} className="h-1.5 flex-1 rounded-full bg-primary" />
                   ))}
                   <span className="h-1.5 flex-1 rounded-full bg-primary/40" />
-                  <span className="h-1.5 flex-1 rounded-full bg-muted" />
-                  <span className="h-1.5 flex-1 rounded-full bg-muted" />
+                  <span className="h-1.5 flex-1 rounded-full bg-border" />
+                  <span className="h-1.5 flex-1 rounded-full bg-border" />
                 </div>
                 <div className="mt-2 flex justify-between text-[11px] text-muted-foreground sm:text-xs">
                   <span>Received</span>
@@ -327,7 +327,7 @@ export default function HomePage() {
       {/* ── CTA ──────────────────────────────────────────────── */}
       <section className="relative overflow-hidden py-20 sm:py-24">
         <div
-          className="absolute top-1/2 left-1/2 h-72 w-160 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/15 blur-[100px]"
+          className="glow-primary absolute top-1/2 left-1/2 h-72 w-160 -translate-x-1/2 -translate-y-1/2 rounded-full blur-[100px]"
           aria-hidden
         />
         <div className="relative mx-auto max-w-3xl px-4 text-center">

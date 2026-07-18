@@ -30,7 +30,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                     ? "bg-transparent"
                     : done || current
                       ? "bg-primary"
-                      : "bg-muted",
+                      : "bg-border",
                 )}
               />
               <span
@@ -39,7 +39,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                   done && "border-primary bg-primary text-primary-foreground",
                   current &&
                     "border-primary bg-primary/15 text-primary shadow-[0_0_12px] shadow-primary/40",
-                  !done && !current && "border-muted bg-card text-muted-foreground",
+                  !done && !current && "border-border bg-card text-muted-foreground",
                 )}
               >
                 {done ? <Check className="size-3.5" /> : index + 1}
@@ -51,7 +51,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                     ? "bg-transparent"
                     : done
                       ? "bg-primary"
-                      : "bg-muted",
+                      : "bg-border",
                 )}
               />
             </div>

@@ -59,7 +59,7 @@ export function TicketCard({
         </div>
         <StatusBadge status={ticket.status} />
       </div>
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-border">
         <div
           className={cn(
             "h-full rounded-full transition-all",
