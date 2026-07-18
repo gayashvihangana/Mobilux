@@ -51,6 +51,85 @@ async function main() {
     create: { minRepairs: 5, discountPercent: 10 },
   });
 
+  // ── Storefront ─────────────────────────────────────────
+  await prisma.setting.upsert({
+    where: { key: "phones_storefront_visible" },
+    update: {},
+    create: { key: "phones_storefront_visible", value: "true" },
+  });
+
+  const productCount = await prisma.product.count();
+  if (productCount === 0) {
+    await prisma.product.createMany({
+      data: [
+        {
+          name: "Tempered Glass Screen Protector",
+          slug: "tempered-glass-screen-protector",
+          category: "ACCESSORY",
+          description:
+            "9H hardness tempered glass with oleophobic coating. Fitted free at the shop — bubbles guaranteed out. Available for most iPhone and Samsung models.",
+          price: 1500,
+          stock: 40,
+        },
+        {
+          name: "USB-C 30W Fast Charger",
+          slug: "usb-c-30w-fast-charger",
+          category: "ACCESSORY",
+          description:
+            "Genuine 30W USB-C power adapter with over-current protection. Charges an iPhone or Android flagship to 50% in about 25 minutes. 6-month warranty.",
+          price: 4500,
+          stock: 18,
+        },
+        {
+          name: "Shockproof Clear Case (iPhone 13/14)",
+          slug: "shockproof-clear-case-iphone-13-14",
+          category: "ACCESSORY",
+          description:
+            "Military-grade drop protection with anti-yellowing clear TPU. Raised edges protect the camera and screen. We fit it for you at pickup.",
+          price: 2800,
+          stock: 25,
+        },
+        {
+          name: "Braided Lightning Cable 1m",
+          slug: "braided-lightning-cable-1m",
+          category: "ACCESSORY",
+          description:
+            "MFi-certified braided lightning cable rated for 30,000 bends. The cable we recommend after replacing worn charging ports. 12-month warranty.",
+          price: 2200,
+          stock: 30,
+        },
+        {
+          name: "Wireless Earbuds Pro",
+          slug: "wireless-earbuds-pro",
+          category: "ACCESSORY",
+          description:
+            "Bluetooth 5.3 earbuds with active noise cancellation, 30-hour total battery with the case, and IPX4 sweat resistance. Tested by our technicians.",
+          price: 8900,
+          stock: 10,
+        },
+        {
+          name: "iPhone 12 128GB (Pre-owned, Grade A)",
+          slug: "iphone-12-128gb-pre-owned",
+          category: "PHONE",
+          description:
+            "Fully serviced pre-owned iPhone 12 — new battery fitted by us (100% health), original display, no face ID issues. 3-month shop warranty included.",
+          price: 145000,
+          stock: 2,
+        },
+        {
+          name: "Samsung Galaxy A54 (Pre-owned, Grade A)",
+          slug: "samsung-galaxy-a54-pre-owned",
+          category: "PHONE",
+          description:
+            "Excellent-condition Galaxy A54 5G, 8GB/128GB. Battery health verified above 90%, screen flawless. Comes with charger and 3-month shop warranty.",
+          price: 89000,
+          stock: 3,
+        },
+      ],
+    });
+    console.log("Seeded 7 products");
+  }
+
   // ── Sample tickets ─────────────────────────────────────
   const existing = await prisma.repairTicket.count();
   if (existing > 0) {

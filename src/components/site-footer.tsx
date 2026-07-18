@@ -18,6 +18,9 @@ export function SiteFooter() {
           <Link href="/#how-it-works" className="transition-colors hover:text-foreground">
             How it works
           </Link>
+          <Link href="/shop" className="transition-colors hover:text-foreground">
+            Shop
+          </Link>
           <Link href="/register" className="transition-colors hover:text-foreground">
             Start a repair
           </Link>

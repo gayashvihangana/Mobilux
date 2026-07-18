@@ -28,6 +28,8 @@ export default async function AppLayout({
               links={[
                 { href: "/dashboard", label: "Dashboard" },
                 { href: "/repairs", label: "My repairs" },
+                { href: "/orders", label: "My orders" },
+                { href: "/shop", label: "Shop" },
               ]}
             />
           </div>

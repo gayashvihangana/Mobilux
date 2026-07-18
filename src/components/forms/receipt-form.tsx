@@ -8,7 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { submitReceipt, type PaymentFormState } from "@/lib/actions/payments";
 
-export function ReceiptForm({ ticketId }: { ticketId: string }) {
+export function ReceiptForm({
+  ticketId,
+  orderId,
+}: {
+  ticketId?: string;
+  orderId?: string;
+}) {
   const [state, formAction, pending] = useActionState(submitReceipt, null);
   const last = useRef<PaymentFormState>(null);
 
@@ -21,7 +27,10 @@ export function ReceiptForm({ ticketId }: { ticketId: string }) {
 
   return (
     <form action={formAction} className="space-y-4">
-      <input type="hidden" name="ticketId" value={ticketId} />
+      {ticketId ? (
+        <input type="hidden" name="ticketId" value={ticketId} />
+      ) : null}
+      {orderId ? <input type="hidden" name="orderId" value={orderId} /> : null}
       {state?.error ? (
         <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <TriangleAlert className="size-4 shrink-0" />

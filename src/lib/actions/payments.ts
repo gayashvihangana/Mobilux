@@ -16,6 +16,27 @@ export type PaymentFormState = {
 
 const OPEN_PAYMENT_STATUSES = ["PENDING", "PENDING_VERIFICATION", "PAID"] as const;
 
+async function notifyAdmins(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  title: string,
+  body: string,
+) {
+  const admins = await tx.user.findMany({
+    where: { role: "ADMIN" },
+    select: { id: true },
+  });
+  if (admins.length > 0) {
+    await tx.notification.createMany({
+      data: admins.map((a) => ({
+        userId: a.id,
+        title,
+        body,
+        href: "/admin/payments",
+      })),
+    });
+  }
+}
+
 export async function submitReceipt(
   _prev: PaymentFormState,
   formData: FormData,
@@ -25,35 +46,70 @@ export async function submitReceipt(
 
   const parsed = z
     .object({
-      ticketId: z.string().min(1),
+      ticketId: z.string().min(1).optional(),
+      orderId: z.string().min(1).optional(),
       reference: z.string().trim().max(100).optional().or(z.literal("")),
     })
+    .refine((v) => !!v.ticketId !== !!v.orderId, "one target required")
     .safeParse({
-      ticketId: formData.get("ticketId"),
+      ticketId: formData.get("ticketId") ?? undefined,
+      orderId: formData.get("orderId") ?? undefined,
       reference: formData.get("reference"),
     });
   if (!parsed.success) return { error: "Invalid submission." };
 
-  const { ticketId, reference } = parsed.data;
+  const { ticketId, orderId, reference } = parsed.data;
 
-  const ticket = await prisma.repairTicket.findUnique({
-    where: { id: ticketId },
-    include: {
-      payments: {
-        where: { status: { in: [...OPEN_PAYMENT_STATUSES] } },
-        select: { id: true },
+  // Resolve what is being paid and how much
+  let amount: number;
+  let discountPercent = 0;
+  let label: string;
+
+  if (ticketId) {
+    const ticket = await prisma.repairTicket.findUnique({
+      where: { id: ticketId },
+      include: {
+        payments: {
+          where: { status: { in: [...OPEN_PAYMENT_STATUSES] } },
+          select: { id: true },
+        },
+        customer: { select: { completedRepairs: true } },
       },
-      customer: { select: { completedRepairs: true } },
-    },
-  });
-  if (!ticket || ticket.customerId !== session.user.id) {
-    return { error: "Ticket not found." };
-  }
-  if (!ticket.finalCost) {
-    return { error: "The final price hasn't been confirmed yet." };
-  }
-  if (ticket.payments.length > 0) {
-    return { error: "A payment for this repair is already submitted or paid." };
+    });
+    if (!ticket || ticket.customerId !== session.user.id) {
+      return { error: "Ticket not found." };
+    }
+    if (!ticket.finalCost) {
+      return { error: "The final price hasn't been confirmed yet." };
+    }
+    if (ticket.payments.length > 0) {
+      return { error: "A payment for this repair is already submitted or paid." };
+    }
+    const rules = await prisma.discountRule.findMany({ where: { active: true } });
+    discountPercent = discountForCount(rules, ticket.customer.completedRepairs);
+    amount = applyDiscount(Number(ticket.finalCost), discountPercent);
+    label = ticket.ticketNumber;
+  } else {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId! },
+      include: {
+        payments: {
+          where: { status: { in: [...OPEN_PAYMENT_STATUSES] } },
+          select: { id: true },
+        },
+      },
+    });
+    if (!order || order.userId !== session.user.id) {
+      return { error: "Order not found." };
+    }
+    if (order.status !== "PENDING") {
+      return { error: "This order is not awaiting payment." };
+    }
+    if (order.payments.length > 0) {
+      return { error: "A payment for this order is already submitted or paid." };
+    }
+    amount = Number(order.total);
+    label = order.orderNumber;
   }
 
   const receipt = formData.get("receipt");
@@ -65,18 +121,12 @@ export async function submitReceipt(
     return { error: uploaded.error ?? "Could not save the receipt." };
   }
 
-  const rules = await prisma.discountRule.findMany({ where: { active: true } });
-  const discountPercent = discountForCount(
-    rules,
-    ticket.customer.completedRepairs,
-  );
-  const amount = applyDiscount(Number(ticket.finalCost), discountPercent);
-
   await prisma.$transaction(async (tx) => {
     await tx.payment.create({
       data: {
         userId: session.user.id,
-        ticketId,
+        ticketId: ticketId ?? null,
+        orderId: orderId ?? null,
         amount,
         method: "BANK_TRANSFER",
         status: "PENDING_VERIFICATION",
@@ -84,27 +134,21 @@ export async function submitReceipt(
         reference: reference || null,
       },
     });
-    await tx.repairTicket.update({
-      where: { id: ticketId },
-      data: { discountPercent },
-    });
-    const admins = await tx.user.findMany({
-      where: { role: "ADMIN" },
-      select: { id: true },
-    });
-    if (admins.length > 0) {
-      await tx.notification.createMany({
-        data: admins.map((a) => ({
-          userId: a.id,
-          title: `Receipt uploaded for ${ticket.ticketNumber}`,
-          body: `${formatLKR(amount)} bank transfer awaiting verification.`,
-          href: "/admin/payments",
-        })),
+    if (ticketId) {
+      await tx.repairTicket.update({
+        where: { id: ticketId },
+        data: { discountPercent },
       });
     }
+    await notifyAdmins(
+      tx,
+      `Receipt uploaded for ${label}`,
+      `${formatLKR(amount)} bank transfer awaiting verification.`,
+    );
   });
 
-  revalidatePath(`/repairs/${ticketId}`);
+  if (ticketId) revalidatePath(`/repairs/${ticketId}`);
+  if (orderId) revalidatePath(`/orders/${orderId}`);
   revalidatePath("/admin/payments");
   return { success: true };
 }
@@ -129,7 +173,10 @@ async function reviewPayment(
 
   const payment = await prisma.payment.findUnique({
     where: { id: parsed.data.paymentId },
-    include: { ticket: { select: { id: true, ticketNumber: true } } },
+    include: {
+      ticket: { select: { id: true, ticketNumber: true } },
+      order: { select: { id: true, orderNumber: true, status: true } },
+    },
   });
   if (!payment) return { error: "Payment not found." };
   if (payment.status !== "PENDING_VERIFICATION") {
@@ -137,6 +184,14 @@ async function reviewPayment(
   }
 
   const verified = outcome === "PAID";
+  const label =
+    payment.ticket?.ticketNumber ?? payment.order?.orderNumber ?? "payment";
+  const customerHref = payment.ticket
+    ? `/repairs/${payment.ticket.id}`
+    : payment.order
+      ? `/orders/${payment.order.id}`
+      : "/dashboard";
+
   await prisma.$transaction(async (tx) => {
     await tx.payment.update({
       where: { id: payment.id },
@@ -146,17 +201,23 @@ async function reviewPayment(
         verifiedAt: verified ? new Date() : null,
       },
     });
+    if (verified && payment.order && payment.order.status === "PENDING") {
+      await tx.order.update({
+        where: { id: payment.order.id },
+        data: { status: "PAID" },
+      });
+    }
     await tx.notification.create({
       data: {
         userId: payment.userId,
         title: verified
-          ? `Payment confirmed — ${payment.ticket?.ticketNumber ?? "order"}`
-          : `Payment could not be verified — ${payment.ticket?.ticketNumber ?? "order"}`,
+          ? `Payment confirmed — ${label}`
+          : `Payment could not be verified — ${label}`,
         body: verified
           ? `We received your ${formatLKR(payment.amount.toString())} transfer. Thank you!`
           : parsed.data.adminNote ||
             "Please check your receipt and try again, or contact us.",
-        href: payment.ticket ? `/repairs/${payment.ticket.id}` : "/dashboard",
+        href: customerHref,
       },
     });
   });
@@ -164,6 +225,11 @@ async function reviewPayment(
   if (payment.ticket) {
     revalidatePath(`/repairs/${payment.ticket.id}`);
     revalidatePath(`/admin/tickets/${payment.ticket.id}`);
+  }
+  if (payment.order) {
+    revalidatePath(`/orders/${payment.order.id}`);
+    revalidatePath("/admin/orders");
+    revalidatePath("/orders");
   }
   revalidatePath("/admin/payments");
   revalidatePath("/admin");

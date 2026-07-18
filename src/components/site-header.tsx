@@ -9,6 +9,7 @@ const navLinks = [
   { href: "/#services", label: "Services" },
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#why-mobilux", label: "Why Mobilux" },
+  { href: "/shop", label: "Shop" },
 ];
 
 export async function SiteHeader() {

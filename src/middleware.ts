@@ -12,7 +12,8 @@ export default auth((req) => {
   const isAdminArea = nextUrl.pathname.startsWith("/admin");
   const isCustomerArea =
     nextUrl.pathname.startsWith("/dashboard") ||
-    nextUrl.pathname.startsWith("/repairs");
+    nextUrl.pathname.startsWith("/repairs") ||
+    nextUrl.pathname.startsWith("/orders");
   const isAuthPage = ["/login", "/register"].includes(nextUrl.pathname);
 
   if (isAuthPage && isLoggedIn) {

@@ -16,7 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { BANK_DETAILS } from "@/lib/config";
 import { applyDiscount } from "@/lib/loyalty";
 import { formatDateTime, formatLKR } from "@/lib/utils";
-import { ReceiptForm } from "./receipt-form";
+import { ReceiptForm } from "@/components/forms/receipt-form";
 
 export function PaymentCard({
   ticket,

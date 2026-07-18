@@ -1,4 +1,4 @@
-import type { DeviceType, TicketStatus } from "@prisma/client";
+import type { DeviceType, OrderStatus, TicketStatus } from "@prisma/client";
 
 export const STATUS_PIPELINE: TicketStatus[] = [
   "RECEIVED",
@@ -59,6 +59,32 @@ export const STATUS_META: Record<
   CANCELLED: {
     label: "Cancelled",
     description: "This ticket was cancelled.",
+    className: "bg-destructive/15 text-destructive border-destructive/30",
+    dotClassName: "bg-destructive",
+  },
+};
+
+export const ORDER_STATUS_META: Record<
+  OrderStatus,
+  { label: string; className: string; dotClassName: string }
+> = {
+  PENDING: {
+    label: "Awaiting payment",
+    className: "bg-warning/15 text-warning border-warning/30",
+    dotClassName: "bg-warning",
+  },
+  PAID: {
+    label: "Paid",
+    className: "bg-success/15 text-success border-success/30",
+    dotClassName: "bg-success",
+  },
+  FULFILLED: {
+    label: "Fulfilled",
+    className: "bg-muted text-muted-foreground border-border",
+    dotClassName: "bg-muted-foreground",
+  },
+  CANCELLED: {
+    label: "Cancelled",
     className: "bg-destructive/15 text-destructive border-destructive/30",
     dotClassName: "bg-destructive",
   },
