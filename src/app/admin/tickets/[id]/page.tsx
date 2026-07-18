@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   Banknote,
   Mail,
+  NotebookPen,
   Phone,
   User,
   UserX,
@@ -14,6 +15,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
 import { StatusHistory, StatusStepper } from "@/components/status-timeline";
+import { JournalNote } from "@/components/journal-note";
 import {
   Card,
   CardContent,
@@ -21,9 +23,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEVICE_TYPES } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
+  DeleteTicketDialog,
   LinkCustomerForm,
   StatusUpdateForm,
   TicketDetailsForm,
@@ -103,7 +107,13 @@ export default async function AdminTicketDetailPage({
             {ticket.issueTitle} · {ownerName}
           </p>
         </div>
-        <StatusBadge status={ticket.status} className="px-3 py-1.5 text-sm" />
+        <div className="flex flex-col items-end gap-2">
+          <StatusBadge status={ticket.status} className="px-3 py-1.5 text-sm" />
+          <DeleteTicketDialog
+            ticketId={ticket.id}
+            ticketNumber={ticket.ticketNumber}
+          />
+        </div>
       </div>
 
       <Card>
@@ -113,173 +123,222 @@ export default async function AdminTicketDetailPage({
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-5">
-        <div className="space-y-6 lg:col-span-3">
-          {/* Bookkeeping summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display flex items-center gap-2 text-lg">
-                <Banknote className="size-5 text-primary" /> Money
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-xs text-muted-foreground">Parts cost</p>
-                  <p className="font-display mt-1 text-lg font-bold">
-                    {parts !== null ? formatLKR(parts) : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Customer paid</p>
-                  <p className="font-display mt-1 text-lg font-bold">
-                    {paid !== null ? formatLKR(paid) : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Profit</p>
-                  <p
-                    className={cn(
-                      "font-display mt-1 text-lg font-bold",
-                      profit !== null && profit > 0 && "text-success",
-                      profit !== null && profit < 0 && "text-destructive",
-                    )}
-                  >
-                    {profit !== null ? formatLKR(profit) : "—"}
-                  </p>
-                </div>
-              </div>
-              {(ticket.partsUsed || ticket.partsSupplier || ticket.duration) && (
-                <>
-                  <Separator className="my-4" />
-                  <div className="grid gap-3 text-sm sm:grid-cols-3">
-                    {ticket.partsUsed ? (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Parts used</p>
-                        <p className="mt-0.5 font-medium">{ticket.partsUsed}</p>
+        <div className="lg:col-span-3">
+          <Tabs defaultValue="overview">
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="notes" className="gap-1.5">
+                <NotebookPen className="size-3.5" />
+                Notes & Lessons
+                {ticket.adminNotes ? (
+                  <span className="ml-0.5 size-1.5 rounded-full bg-warning" />
+                ) : null}
+              </TabsTrigger>
+              <TabsTrigger value="edit">Edit</TabsTrigger>
+            </TabsList>
+
+            {/* ── Overview ─────────────────────────────────── */}
+            <TabsContent value="overview" className="mt-4 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display flex items-center gap-2 text-lg">
+                    <Banknote className="size-5 text-primary" /> Money
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Parts cost</p>
+                      <p className="font-display mt-1 text-lg font-bold">
+                        {parts !== null ? formatLKR(parts) : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Customer paid
+                      </p>
+                      <p className="font-display mt-1 text-lg font-bold">
+                        {paid !== null ? formatLKR(paid) : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Profit</p>
+                      <p
+                        className={cn(
+                          "font-display mt-1 text-lg font-bold",
+                          profit !== null && profit > 0 && "text-success",
+                          profit !== null && profit < 0 && "text-destructive",
+                        )}
+                      >
+                        {profit !== null ? formatLKR(profit) : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  {(ticket.partsUsed ||
+                    ticket.partsSupplier ||
+                    ticket.duration) && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="grid gap-3 text-sm sm:grid-cols-3">
+                        {ticket.partsUsed ? (
+                          <div>
+                            <p className="text-xs text-muted-foreground">
+                              Parts used
+                            </p>
+                            <p className="mt-0.5 font-medium">
+                              {ticket.partsUsed}
+                            </p>
+                          </div>
+                        ) : null}
+                        {ticket.partsSupplier ? (
+                          <div>
+                            <p className="text-xs text-muted-foreground">
+                              Supplier
+                            </p>
+                            <p className="mt-0.5 font-medium">
+                              {ticket.partsSupplier}
+                            </p>
+                          </div>
+                        ) : null}
+                        {ticket.duration ? (
+                          <div>
+                            <p className="text-xs text-muted-foreground">
+                              Duration
+                            </p>
+                            <p className="mt-0.5 font-medium">
+                              {ticket.duration}
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                    {ticket.partsSupplier ? (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Supplier</p>
-                        <p className="mt-0.5 font-medium">{ticket.partsSupplier}</p>
-                      </div>
-                    ) : null}
-                    {ticket.duration ? (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Duration</p>
-                        <p className="mt-0.5 font-medium">{ticket.duration}</p>
-                      </div>
+                    </>
+                  )}
+                  {ticket.forgottenParts ? (
+                    <p className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                      Forgotten parts: {ticket.forgottenParts}
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display flex items-center gap-2 text-lg">
+                    <Wrench className="size-5 text-primary" /> Repair record
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Issue</p>
+                    <p className="mt-0.5 font-medium">{ticket.issueTitle}</p>
+                    {ticket.issueDescription ? (
+                      <p className="mt-1 leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                        {ticket.issueDescription}
+                      </p>
                     ) : null}
                   </div>
-                </>
-              )}
-              {ticket.forgottenParts ? (
-                <p className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                  Forgotten parts: {ticket.forgottenParts}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
+                  {ticket.solution ? (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Solution</p>
+                      <p className="mt-0.5 leading-relaxed font-medium whitespace-pre-wrap">
+                        {ticket.solution}
+                      </p>
+                    </div>
+                  ) : null}
+                  {ticket.photos.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                      {ticket.photos.map((photo) => (
+                        <a
+                          key={photo}
+                          href={photo}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="group relative aspect-square overflow-hidden rounded-xl border border-border"
+                        >
+                          <Image
+                            src={photo}
+                            alt="Device photo"
+                            fill
+                            sizes="150px"
+                            className="object-cover transition-transform group-hover:scale-105"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
 
-          {/* Issue, solution, notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display flex items-center gap-2 text-lg">
-                <Wrench className="size-5 text-primary" /> Repair record
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Issue</p>
-                <p className="mt-0.5 font-medium">{ticket.issueTitle}</p>
-                {ticket.issueDescription ? (
-                  <p className="mt-1 leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                    {ticket.issueDescription}
-                  </p>
-                ) : null}
-              </div>
-              {ticket.solution ? (
-                <div>
-                  <p className="text-xs text-muted-foreground">Solution</p>
-                  <p className="mt-0.5 leading-relaxed font-medium whitespace-pre-wrap">
-                    {ticket.solution}
-                  </p>
-                </div>
-              ) : null}
-              {ticket.adminNotes ? (
-                <div className="rounded-xl bg-muted/50 p-3">
-                  <p className="text-xs text-muted-foreground">
-                    Internal comments
-                  </p>
-                  <p className="mt-1 leading-relaxed whitespace-pre-wrap">
-                    {ticket.adminNotes}
-                  </p>
-                </div>
-              ) : null}
-              {ticket.photos.length > 0 ? (
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                  {ticket.photos.map((photo) => (
-                    <a
-                      key={photo}
-                      href={photo}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group relative aspect-square overflow-hidden rounded-xl border border-border"
-                    >
-                      <Image
-                        src={photo}
-                        alt="Device photo"
-                        fill
-                        sizes="150px"
-                        className="object-cover transition-transform group-hover:scale-105"
-                      />
-                    </a>
-                  ))}
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display text-lg">Timeline</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <StatusHistory updates={ticket.statusUpdates} />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          {/* Edit everything */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Edit repair details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TicketDetailsForm
-                values={{
-                  ticketId: ticket.id,
-                  deviceType: ticket.deviceType,
-                  brand: ticket.brand,
-                  model: ticket.model,
-                  issueTitle: ticket.issueTitle,
-                  issueDescription: ticket.issueDescription,
-                  solution: ticket.solution,
-                  status: ticket.status,
-                  completedAt: toDateInput(ticket.completedAt),
-                  estimatedCost: ticket.estimatedCost?.toString() ?? null,
-                  finalCost: ticket.finalCost?.toString() ?? null,
-                  partsCost: ticket.partsCost?.toString() ?? null,
-                  paidAmount: ticket.paidAmount?.toString() ?? null,
-                  duration: ticket.duration,
-                  partsUsed: ticket.partsUsed,
-                  partsSupplier: ticket.partsSupplier,
-                  adminNotes: ticket.adminNotes,
-                  forgottenParts: ticket.forgottenParts,
-                }}
-              />
-            </CardContent>
-          </Card>
+            {/* ── Notes & Lessons ──────────────────────────── */}
+            <TabsContent value="notes" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display flex items-center gap-2 text-lg">
+                    <NotebookPen className="size-5 text-warning" /> Notes &
+                    lessons
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Private to you — mistakes, advice to yourself, things you
+                    learned on this repair. Never shown to the customer.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {ticket.adminNotes ? (
+                    <JournalNote text={ticket.adminNotes} />
+                  ) : (
+                    <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                      Nothing written yet. Add a note from the Edit tab.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-          {/* Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <StatusHistory updates={ticket.statusUpdates} />
-            </CardContent>
-          </Card>
+            {/* ── Edit ─────────────────────────────────────── */}
+            <TabsContent value="edit" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-display text-lg">
+                    Edit repair details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TicketDetailsForm
+                    values={{
+                      ticketId: ticket.id,
+                      deviceType: ticket.deviceType,
+                      brand: ticket.brand,
+                      model: ticket.model,
+                      issueTitle: ticket.issueTitle,
+                      issueDescription: ticket.issueDescription,
+                      solution: ticket.solution,
+                      status: ticket.status,
+                      completedAt: toDateInput(ticket.completedAt),
+                      estimatedCost: ticket.estimatedCost?.toString() ?? null,
+                      finalCost: ticket.finalCost?.toString() ?? null,
+                      partsCost: ticket.partsCost?.toString() ?? null,
+                      paidAmount: ticket.paidAmount?.toString() ?? null,
+                      duration: ticket.duration,
+                      partsUsed: ticket.partsUsed,
+                      partsSupplier: ticket.partsSupplier,
+                      adminNotes: ticket.adminNotes,
+                      forgottenParts: ticket.forgottenParts,
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         <div className="space-y-6 lg:col-span-2">

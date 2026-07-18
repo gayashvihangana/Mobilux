@@ -238,12 +238,17 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="adminNotes">Internal comments</Label>
+        <Label htmlFor="adminNotes">
+          Notes & lessons{" "}
+          <span className="text-muted-foreground">
+            (private — mistakes, advice to yourself, things learned)
+          </span>
+        </Label>
         <Textarea
           id="adminNotes"
           name="adminNotes"
           rows={4}
-          placeholder="Anything worth remembering about this repair…"
+          placeholder="What went wrong, what you'd do differently, anything worth remembering…"
           className="resize-none"
         />
       </div>

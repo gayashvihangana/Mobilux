@@ -435,3 +435,29 @@ export async function updateTicketStatus(
   revalidatePath("/dashboard");
   return { success: true };
 }
+
+// ── Admin: delete a repair record ────────────────────────────────
+
+export async function deleteTicket(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const ticketId = formData.get("ticketId");
+  if (typeof ticketId !== "string") return { error: "Invalid ticket." };
+
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: ticketId },
+    select: { id: true, ticketNumber: true },
+  });
+  if (!ticket) return { error: "Ticket not found." };
+
+  await prisma.repairTicket.delete({ where: { id: ticketId } });
+
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
+  revalidatePath("/admin/notes");
+  redirect("/admin/tickets");
+}

@@ -31,6 +31,7 @@ export default async function AdminLayout({
               links={[
                 { href: "/admin", label: "Overview" },
                 { href: "/admin/tickets", label: "Tickets" },
+                { href: "/admin/notes", label: "Notes" },
                 { href: "/admin/payments", label: "Payments" },
                 { href: "/admin/products", label: "Products" },
                 { href: "/admin/orders", label: "Orders" },

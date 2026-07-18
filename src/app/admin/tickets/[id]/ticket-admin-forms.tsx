@@ -2,9 +2,18 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Link2, Loader2, TriangleAlert } from "lucide-react";
+import { Link2, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  deleteTicket,
   linkTicketCustomer,
   updateTicketDetails,
   updateTicketStatus,
@@ -278,13 +288,17 @@ export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
       </div>
       <div className="space-y-2">
         <Label htmlFor="adminNotes">
-          Internal comments <span className="text-muted-foreground">(not shown to customer)</span>
+          Notes & lessons{" "}
+          <span className="text-muted-foreground">
+            (private — never shown to the customer)
+          </span>
         </Label>
         <Textarea
           id="adminNotes"
           name="adminNotes"
           rows={4}
           defaultValue={values.adminNotes ?? ""}
+          placeholder="What went wrong, what you'd do differently, anything worth remembering…"
           className="resize-none"
         />
       </div>
@@ -294,6 +308,62 @@ export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
         {pending ? "Saving…" : "Save details"}
       </Button>
     </form>
+  );
+}
+
+export function DeleteTicketDialog({
+  ticketId,
+  ticketNumber,
+}: {
+  ticketId: string;
+  ticketNumber: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(deleteTicket, null);
+
+  useEffect(() => {
+    if (state?.error) toast.error(state.error);
+  }, [state]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive hover:text-destructive"
+        >
+          <Trash2 className="size-4" /> Delete record
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <DialogHeader>
+            <DialogTitle>Delete {ticketNumber}?</DialogTitle>
+            <DialogDescription>
+              This permanently removes the repair record, its timeline, and
+              your notes. This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {state?.error ? (
+            <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <TriangleAlert className="size-4 shrink-0" />
+              {state.error}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="destructive" disabled={pending}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
