@@ -4,6 +4,7 @@ import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
+import { MobileNav } from "@/components/mobile-nav";
 
 const navLinks = [
   { href: "/#services", label: "Services" },
@@ -32,7 +33,7 @@ export async function SiteHeader() {
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <ThemeToggle />
             {user ? (
               <>
@@ -49,7 +50,7 @@ export async function SiteHeader() {
               </>
             ) : (
               <>
-                <Button asChild variant="ghost" size="sm">
+                <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
                   <Link href="/login">Sign in</Link>
                 </Button>
                 <Button asChild size="sm">
@@ -57,6 +58,19 @@ export async function SiteHeader() {
                 </Button>
               </>
             )}
+            <MobileNav links={navLinks} triggerClassName="md:hidden">
+              {user ? (
+                <Button asChild variant="outline">
+                  <Link href={user.role === "ADMIN" ? "/admin" : "/dashboard"}>
+                    Dashboard
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline">
+                  <Link href="/login">Sign in</Link>
+                </Button>
+              )}
+            </MobileNav>
           </div>
         </div>
       </div>

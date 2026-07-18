@@ -8,6 +8,7 @@ import { UserMenu } from "@/components/user-menu";
 import { AppNavLinks } from "@/components/app-nav-links";
 import { Notifications } from "@/components/notifications";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { MobileNav } from "@/components/mobile-nav";
 
 export default async function AppLayout({
   children,
@@ -21,8 +22,17 @@ export default async function AppLayout({
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-          <div className="flex items-center gap-8">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-8">
+            <MobileNav
+              links={[
+                { href: "/dashboard", label: "Dashboard" },
+                { href: "/repairs", label: "My repairs" },
+                { href: "/orders", label: "My orders" },
+                { href: "/shop", label: "Shop" },
+              ]}
+              triggerClassName="-ml-2 sm:hidden"
+            />
             <Logo />
             <AppNavLinks
               links={[
@@ -33,7 +43,7 @@ export default async function AppLayout({
               ]}
             />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <Button asChild size="sm">
               <Link href="/repairs/new">
                 <Plus className="size-4" />
