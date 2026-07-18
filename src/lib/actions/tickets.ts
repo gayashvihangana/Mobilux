@@ -8,6 +8,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import { STATUS_META } from "@/lib/status";
+import { nextTicketNumber } from "@/lib/next-ticket-number";
 
 export type TicketFormState = {
   error?: string;
@@ -83,18 +84,14 @@ export async function createTicket(
   if (uploaded.error) return { error: uploaded.error };
 
   const ticket = await prisma.$transaction(async (tx) => {
+    const ticketNumber = await nextTicketNumber(tx);
     const created = await tx.repairTicket.create({
       data: {
         ...parsed.data,
         customerId: session.user.id,
         photos: uploaded.urls ?? [],
-        ticketNumber: `TMP-${crypto.randomUUID()}`,
+        ticketNumber,
       },
-    });
-    const ticketNumber = `MBX-${String(created.seq).padStart(4, "0")}`;
-    const updated = await tx.repairTicket.update({
-      where: { id: created.id },
-      data: { ticketNumber },
     });
     await tx.statusUpdate.create({
       data: {
@@ -103,7 +100,7 @@ export async function createTicket(
         note: "Repair request submitted. We'll begin diagnosis shortly.",
       },
     });
-    return updated;
+    return created;
   });
 
   const admins = await prisma.user.findMany({
@@ -174,6 +171,37 @@ function parseAdminTicketForm(formData: FormData) {
   });
 }
 
+// Same shape as adminTicketSchema minus customerId/customerName —
+// the edit-details form doesn't render those fields (customer linking
+// is handled separately by linkTicketCustomer), so requiring them here
+// made formData.get() return null and fail validation silently.
+const ticketDetailsSchema = adminTicketSchema.omit({
+  customerId: true,
+  customerName: true,
+});
+
+function parseTicketDetailsForm(formData: FormData) {
+  return ticketDetailsSchema.safeParse({
+    deviceType: formData.get("deviceType"),
+    brand: formData.get("brand"),
+    model: formData.get("model"),
+    issueTitle: formData.get("issueTitle"),
+    issueDescription: formData.get("issueDescription"),
+    solution: formData.get("solution"),
+    status: formData.get("status"),
+    completedAt: formData.get("completedAt"),
+    estimatedCost: formData.get("estimatedCost") ?? "",
+    finalCost: formData.get("finalCost") ?? "",
+    partsCost: formData.get("partsCost") ?? "",
+    paidAmount: formData.get("paidAmount") ?? "",
+    duration: formData.get("duration"),
+    partsUsed: formData.get("partsUsed"),
+    partsSupplier: formData.get("partsSupplier"),
+    adminNotes: formData.get("adminNotes"),
+    forgottenParts: formData.get("forgottenParts"),
+  });
+}
+
 function resolveCompletedAt(
   status: TicketStatus,
   completedAtInput: string | undefined,
@@ -207,9 +235,10 @@ export async function adminCreateTicket(
   const completedAt = resolveCompletedAt(data.status, data.completedAt);
 
   const ticket = await prisma.$transaction(async (tx) => {
+    const ticketNumber = await nextTicketNumber(tx);
     const created = await tx.repairTicket.create({
       data: {
-        ticketNumber: `TMP-${crypto.randomUUID()}`,
+        ticketNumber,
         customerId: customerId ?? null,
         customerName: data.customerName ?? null,
         deviceType: data.deviceType,
@@ -231,10 +260,6 @@ export async function adminCreateTicket(
         completedAt,
       },
     });
-    const updated = await tx.repairTicket.update({
-      where: { id: created.id },
-      data: { ticketNumber: `MBX-${String(created.seq).padStart(4, "0")}` },
-    });
     await tx.statusUpdate.create({
       data: {
         ticketId: created.id,
@@ -249,7 +274,7 @@ export async function adminCreateTicket(
         data: { completedRepairs: { increment: 1 } },
       });
     }
-    return updated;
+    return created;
   });
 
   revalidatePath("/admin/tickets");
@@ -269,7 +294,7 @@ export async function updateTicketDetails(
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
 
-  const parsed = parseAdminTicketForm(formData);
+  const parsed = parseTicketDetailsForm(formData);
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
