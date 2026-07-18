@@ -1,0 +1,65 @@
+"use client";
+
+import { useActionState, useEffect, useRef } from "react";
+import { toast } from "sonner";
+import { FileUp, Loader2, TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { submitReceipt, type PaymentFormState } from "@/lib/actions/payments";
+
+export function ReceiptForm({ ticketId }: { ticketId: string }) {
+  const [state, formAction, pending] = useActionState(submitReceipt, null);
+  const last = useRef<PaymentFormState>(null);
+
+  useEffect(() => {
+    if (state !== last.current && state?.success) {
+      toast.success("Receipt submitted — we'll verify it shortly.");
+    }
+    last.current = state;
+  }, [state]);
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <input type="hidden" name="ticketId" value={ticketId} />
+      {state?.error ? (
+        <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <TriangleAlert className="size-4 shrink-0" />
+          {state.error}
+        </div>
+      ) : null}
+      <div className="space-y-2">
+        <Label htmlFor="reference">
+          Bank reference <span className="text-muted-foreground">(optional)</span>
+        </Label>
+        <Input
+          id="reference"
+          name="reference"
+          placeholder="e.g. transfer confirmation number"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="receipt">Transfer receipt</Label>
+        <Input
+          id="receipt"
+          name="receipt"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          required
+          className="cursor-pointer file:text-primary"
+        />
+        <p className="text-xs text-muted-foreground">
+          Photo or PDF of your bank transfer slip — max 5 MB.
+        </p>
+      </div>
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <FileUp className="size-4" />
+        )}
+        {pending ? "Uploading…" : "Submit receipt"}
+      </Button>
+    </form>
+  );
+}

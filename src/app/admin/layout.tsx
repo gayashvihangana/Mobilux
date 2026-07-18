@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
 import { AppNavLinks } from "@/components/app-nav-links";
+import { Notifications } from "@/components/notifications";
 
 export default async function AdminLayout({
   children,
@@ -29,14 +30,18 @@ export default async function AdminLayout({
               links={[
                 { href: "/admin", label: "Overview" },
                 { href: "/admin/tickets", label: "Tickets" },
+                { href: "/admin/payments", label: "Payments" },
               ]}
             />
           </div>
-          <UserMenu
-            name={session.user.name ?? "Admin"}
-            email={session.user.email ?? ""}
-            isAdmin
-          />
+          <div className="flex items-center gap-3">
+            <Notifications userId={session.user.id} />
+            <UserMenu
+              name={session.user.name ?? "Admin"}
+              email={session.user.email ?? ""}
+              isAdmin
+            />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8 sm:py-10">{children}</main>

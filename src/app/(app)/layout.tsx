@@ -6,6 +6,7 @@ import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
 import { AppNavLinks } from "@/components/app-nav-links";
+import { Notifications } from "@/components/notifications";
 
 export default async function AppLayout({
   children,
@@ -36,6 +37,7 @@ export default async function AppLayout({
                 <span className="hidden sm:inline">New repair</span>
               </Link>
             </Button>
+            <Notifications userId={session.user.id} />
             <UserMenu
               name={session.user.name ?? "User"}
               email={session.user.email ?? ""}

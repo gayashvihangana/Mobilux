@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DEVICE_TYPES } from "@/lib/status";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate, formatLKR } from "@/lib/utils";
 import { CostsForm, StatusUpdateForm } from "./ticket-admin-forms";
 
 export const metadata: Metadata = {
@@ -40,6 +40,7 @@ export default async function AdminTicketDetailPage({
         },
       },
       statusUpdates: { orderBy: { createdAt: "desc" } },
+      payments: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!ticket) notFound();
@@ -183,6 +184,57 @@ export default async function AdminTicketDetailPage({
               />
             </CardContent>
           </Card>
+
+          {/* Payments */}
+          {ticket.payments.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-display text-lg">Payments</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {ticket.payments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {formatLKR(payment.amount.toString())}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(payment.createdAt)} · Bank transfer
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs font-medium",
+                        payment.status === "PAID" &&
+                          "border-success/30 bg-success/15 text-success",
+                        payment.status === "PENDING_VERIFICATION" &&
+                          "border-warning/30 bg-warning/15 text-warning",
+                        payment.status === "REJECTED" &&
+                          "border-destructive/30 bg-destructive/15 text-destructive",
+                      )}
+                    >
+                      {payment.status === "PAID"
+                        ? "Paid"
+                        : payment.status === "PENDING_VERIFICATION"
+                          ? "Under review"
+                          : payment.status === "REJECTED"
+                            ? "Rejected"
+                            : payment.status}
+                    </span>
+                  </div>
+                ))}
+                <Link
+                  href="/admin/payments"
+                  className="block text-xs text-primary hover:underline"
+                >
+                  Manage in Payments →
+                </Link>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Costs */}
           <Card>

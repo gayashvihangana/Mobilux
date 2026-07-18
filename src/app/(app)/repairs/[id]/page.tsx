@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Info } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
@@ -14,8 +14,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { discountForCount } from "@/lib/loyalty";
 import { DEVICE_TYPES } from "@/lib/status";
-import { formatDate, formatLKR } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { PaymentCard } from "./payment-card";
 
 export const metadata: Metadata = {
   title: "Repair details",
@@ -37,9 +39,19 @@ export default async function RepairDetailPage({
     where: { id },
     include: {
       statusUpdates: { orderBy: { createdAt: "desc" } },
+      payments: { orderBy: { createdAt: "desc" }, take: 1 },
+      customer: { select: { completedRepairs: true } },
     },
   });
   if (!ticket || ticket.customerId !== session.user.id) notFound();
+
+  const discountRules = await prisma.discountRule.findMany({
+    where: { active: true },
+  });
+  const discountPercent =
+    ticket.discountPercent !== null
+      ? Number(ticket.discountPercent)
+      : discountForCount(discountRules, ticket.customer.completedRepairs);
 
   const deviceLabel =
     DEVICE_TYPES.find((d) => d.value === ticket.deviceType)?.label ?? "Device";
@@ -93,38 +105,12 @@ export default async function RepairDetailPage({
         </Card>
 
         <div className="space-y-6 lg:col-span-2">
-          {/* Cost */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Cost</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Estimated</span>
-                <span className="font-medium">
-                  {ticket.estimatedCost
-                    ? formatLKR(ticket.estimatedCost.toString())
-                    : "Pending diagnosis"}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Final</span>
-                <span className="font-display text-lg font-bold">
-                  {ticket.finalCost
-                    ? formatLKR(ticket.finalCost.toString())
-                    : "—"}
-                </span>
-              </div>
-              {!ticket.finalCost ? (
-                <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-                  <Info className="mt-0.5 size-3.5 shrink-0" />
-                  The final price is confirmed after diagnosis. Payment options
-                  appear here once the repair is complete.
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
+          {/* Cost & payment */}
+          <PaymentCard
+            ticket={ticket}
+            latestPayment={ticket.payments[0] ?? null}
+            discountPercent={discountPercent}
+          />
 
           {/* Device details */}
           <Card>
