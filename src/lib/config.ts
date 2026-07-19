@@ -9,11 +9,11 @@ export const BANK_DETAILS = {
 
 export const SHOP = {
   name: "Mobilux",
-  phone: "+94 77 123 4567",
+  phone: "+94 71 949 5825",
   email: "hello@mobilux.lk",
   city: "Colombo, Sri Lanka",
   // Digits only, international format — used for wa.me chat links.
-  whatsapp: "94771234567",
+  whatsapp: "94719495825",
 } as const;
 
 export const WARRANTY_DAYS = 30;

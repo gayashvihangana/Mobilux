@@ -218,6 +218,17 @@ model Notification {
   @@index([userId, read])
 }
 
+// ─── Password reset (email OTP) ──────────────────────────────────────
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  email     String   @unique // one active code per email
+  codeHash  String // bcrypt hash of the 6-digit code
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
 // ─── Settings (key-value, e.g. phone storefront visibility) ─────────
 
 model Setting {

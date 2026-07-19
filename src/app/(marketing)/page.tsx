@@ -134,7 +134,7 @@ export default function HomePage() {
                 variant="outline"
                 className="h-12 w-full px-7 text-base sm:w-auto"
               >
-                <Link href="/login">Track my device</Link>
+                <Link href="/track">Track my device</Link>
               </Button>
             </div>
           </div>

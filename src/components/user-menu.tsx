@@ -56,11 +56,18 @@ export function UserMenu({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {isAdmin ? (
-          <DropdownMenuItem asChild>
-            <Link href="/admin">
-              <ShieldCheck className="size-4" /> Admin panel
-            </Link>
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem asChild>
+              <Link href="/admin">
+                <ShieldCheck className="size-4" /> Admin panel
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/profile">
+                <UserRound className="size-4" /> My profile
+              </Link>
+            </DropdownMenuItem>
+          </>
         ) : (
           <>
             <DropdownMenuItem asChild>

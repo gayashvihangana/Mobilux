@@ -66,6 +66,7 @@ export async function updateProfile(
   });
 
   revalidatePath("/profile");
+  revalidatePath("/admin/profile");
   revalidatePath("/dashboard");
 
   return { success: true };

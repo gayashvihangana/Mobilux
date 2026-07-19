@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight, BadgePercent, CheckCircle2, Plus, Wrench } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { DONE_TICKET_STATUSES } from "@/lib/completed-repairs";
 import { Button } from "@/components/ui/button";
 import { TicketCard } from "@/components/ticket-card";
 
@@ -24,7 +25,7 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [user, activeTickets, discountRules] = await Promise.all([
+  const [user, activeTickets, discountRules, liveCompleted] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { name: true, completedRepairs: true },
@@ -40,10 +41,25 @@ export default async function DashboardPage() {
       where: { active: true },
       orderBy: { minRepairs: "asc" },
     }),
+    prisma.repairTicket.count({
+      where: {
+        customerId: session.user.id,
+        status: { in: DONE_TICKET_STATUSES },
+      },
+    }),
   ]);
   if (!user) redirect("/login");
 
-  const completed = user.completedRepairs;
+  // Heal counters that drifted before syncCompletedRepairs existed —
+  // the loyalty discount at payment time reads the stored counter.
+  if (liveCompleted !== user.completedRepairs) {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { completedRepairs: liveCompleted },
+    });
+  }
+
+  const completed = liveCompleted;
   const currentRule = [...discountRules]
     .reverse()
     .find((r) => completed >= r.minRepairs);

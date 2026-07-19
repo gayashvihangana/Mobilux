@@ -12,9 +12,21 @@ type EmailInput = {
   cta?: { label: string; url: string };
 };
 
-export async function sendEmail({ to, subject, heading, lines, cta }: EmailInput) {
+export function emailConfigured() {
+  return !!process.env.RESEND_API_KEY;
+}
+
+// Returns whether the email was accepted for delivery. Callers that only
+// notify can ignore the result; flows that depend on delivery (OTP) check it.
+export async function sendEmail({
+  to,
+  subject,
+  heading,
+  lines,
+  cta,
+}: EmailInput): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return;
+  if (!apiKey) return false;
 
   const from = process.env.EMAIL_FROM ?? `${SHOP.name} <onboarding@resend.dev>`;
 
@@ -34,10 +46,13 @@ export async function sendEmail({ to, subject, heading, lines, cta }: EmailInput
     });
     if (!res.ok) {
       console.error("sendEmail failed:", res.status, await res.text());
+      return false;
     }
+    return true;
   } catch (error) {
     // Email must never break the action that triggered it.
     console.error("sendEmail error:", error);
+    return false;
   }
 }
 

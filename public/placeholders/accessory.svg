@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151b30"/>
+      <stop offset="1" stop-color="#0b0f1c"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.42" r="0.5">
+      <stop offset="0" stop-color="#2563eb" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg)"/>
+  <rect width="600" height="600" fill="url(#halo)"/>
+  <g fill="none" stroke="#3b82f6" stroke-width="7" stroke-linejoin="round">
+    <path d="M180 240 L300 180 L420 240 L420 390 L300 450 L180 390 Z" fill="#1a2138"/>
+    <path d="M180 240 L300 300 L420 240"/>
+    <path d="M300 300 L300 450"/>
+  </g>
+  <path d="M240 210 L360 270 L360 330 L330 315 L330 285 L240 240 Z" fill="#3b82f6" opacity="0.55"/>
+  <text x="300" y="540" text-anchor="middle" fill="#445070" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="bold" letter-spacing="8">MOBILUX</text>
+</svg>

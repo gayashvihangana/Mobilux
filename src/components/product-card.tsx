@@ -1,11 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Package, Smartphone } from "lucide-react";
 import type { Product } from "@prisma/client";
 import { cn, formatLKR } from "@/lib/utils";
 
+// Branded fallback art for products without photos (SVGs skip the
+// next/image optimizer, hence the plain <img>).
+export function productPlaceholder(category: Product["category"]) {
+  return category === "PHONE"
+    ? "/placeholders/phone.svg"
+    : "/placeholders/accessory.svg";
+}
+
 export function ProductCard({ product }: { product: Product }) {
-  const Icon = product.category === "PHONE" ? Smartphone : Package;
   const image = product.images[0];
   const out = product.stock === 0;
 
@@ -24,9 +30,12 @@ export function ProductCard({ product }: { product: Product }) {
             className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
-          <div className="grid size-full place-items-center">
-            <Icon className="size-10 text-muted-foreground/40" />
-          </div>
+          // eslint-disable-next-line @next/next/no-img-element -- static SVG placeholder
+          <img
+            src={productPlaceholder(product.category)}
+            alt=""
+            className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
         )}
         {out ? (
           <span className="absolute top-3 left-3 rounded-full bg-background/85 px-2.5 py-1 text-xs font-medium text-muted-foreground backdrop-blur">

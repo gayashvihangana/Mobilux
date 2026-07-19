@@ -10,6 +10,10 @@ import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
 import { STATUS_META } from "@/lib/status";
+import {
+  DONE_TICKET_STATUSES,
+  syncCompletedRepairs,
+} from "@/lib/completed-repairs";
 import { nextTicketNumber } from "@/lib/next-ticket-number";
 
 export type TicketFormState = {
@@ -270,11 +274,8 @@ export async function adminCreateTicket(
         createdAt: completedAt ?? new Date(),
       },
     });
-    if (customerId && completedAt) {
-      await tx.user.update({
-        where: { id: customerId },
-        data: { completedRepairs: { increment: 1 } },
-      });
+    if (customerId) {
+      await syncCompletedRepairs(tx, customerId);
     }
     return created;
   });
@@ -359,29 +360,42 @@ export async function linkTicketCustomer(
   });
   if (!ticket) return { error: "Ticket not found." };
 
+  const previousCustomerId = ticket.customerId;
+
   if (userId === "none") {
-    // Unlink — keep a name on record so the ticket still shows an owner
-    await prisma.repairTicket.update({
-      where: { id: ticketId },
-      data: {
-        customerId: null,
-        customerName: ticket.customerName ?? ticket.customer?.name ?? null,
-      },
+    await prisma.$transaction(async (tx) => {
+      // Unlink — keep a name on record so the ticket still shows an owner
+      await tx.repairTicket.update({
+        where: { id: ticketId },
+        data: {
+          customerId: null,
+          customerName: ticket.customerName ?? ticket.customer?.name ?? null,
+        },
+      });
+      if (previousCustomerId) {
+        await syncCompletedRepairs(tx, previousCustomerId);
+      }
     });
   } else {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return { error: "User not found." };
-    await prisma.repairTicket.update({
-      where: { id: ticketId },
-      data: { customerId: userId },
-    });
-    await prisma.notification.create({
-      data: {
-        userId,
-        title: `Repair ${ticket.ticketNumber} added to your account`,
-        body: `${[ticket.brand, ticket.model].filter(Boolean).join(" ") || "A repair"} — ${ticket.issueTitle}`,
-        href: `/repairs/${ticketId}`,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.repairTicket.update({
+        where: { id: ticketId },
+        data: { customerId: userId },
+      });
+      await syncCompletedRepairs(tx, userId);
+      if (previousCustomerId && previousCustomerId !== userId) {
+        await syncCompletedRepairs(tx, previousCustomerId);
+      }
+      await tx.notification.create({
+        data: {
+          userId,
+          title: `Repair ${ticket.ticketNumber} added to your account`,
+          body: `${[ticket.brand, ticket.model].filter(Boolean).join(" ") || "A repair"} — ${ticket.issueTitle}`,
+          href: `/repairs/${ticketId}`,
+        },
+      });
     });
   }
 
@@ -423,6 +437,7 @@ export async function updateTicketStatus(
       status: true,
       ticketNumber: true,
       customerId: true,
+      completedAt: true,
       brand: true,
       model: true,
       customer: { select: { name: true, email: true } },
@@ -431,27 +446,27 @@ export async function updateTicketStatus(
   if (!ticket) return { error: "Ticket not found." };
   if (ticket.status === status) return { error: "Ticket is already in this status." };
 
-  const becameCompleted =
-    status === "COMPLETED" && ticket.status !== "COMPLETED";
+  // Reaching any done status marks the repair completed — statuses often
+  // jump straight to READY_FOR_PICKUP without passing through COMPLETED.
+  const becameDone =
+    DONE_TICKET_STATUSES.includes(status as TicketStatus) &&
+    !DONE_TICKET_STATUSES.includes(ticket.status);
 
   await prisma.$transaction(async (tx) => {
     await tx.repairTicket.update({
       where: { id: ticketId },
       data: {
         status: status as TicketStatus,
-        ...(becameCompleted ? { completedAt: new Date() } : {}),
+        ...(becameDone && !ticket.completedAt
+          ? { completedAt: new Date() }
+          : {}),
       },
     });
     await tx.statusUpdate.create({
       data: { ticketId, status: status as TicketStatus, note: note || null },
     });
     if (ticket.customerId) {
-      if (becameCompleted) {
-        await tx.user.update({
-          where: { id: ticket.customerId },
-          data: { completedRepairs: { increment: 1 } },
-        });
-      }
+      await syncCompletedRepairs(tx, ticket.customerId);
       await tx.notification.create({
         data: {
           userId: ticket.customerId,
@@ -506,11 +521,16 @@ export async function deleteTicket(
 
   const ticket = await prisma.repairTicket.findUnique({
     where: { id: ticketId },
-    select: { id: true, ticketNumber: true },
+    select: { id: true, ticketNumber: true, customerId: true },
   });
   if (!ticket) return { error: "Ticket not found." };
 
-  await prisma.repairTicket.delete({ where: { id: ticketId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.repairTicket.delete({ where: { id: ticketId } });
+    if (ticket.customerId) {
+      await syncCompletedRepairs(tx, ticket.customerId);
+    }
+  });
 
   revalidatePath("/admin/tickets");
   revalidatePath("/admin");

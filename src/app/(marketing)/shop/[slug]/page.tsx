@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Package, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { phonesVisible } from "@/lib/settings";
 import { SITE_URL, whatsappLink } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp";
+import { productPlaceholder } from "@/components/product-card";
 import { cn, formatLKR } from "@/lib/utils";
 import { BuyForm } from "./buy-form";
 
@@ -50,7 +51,6 @@ export default async function ProductPage({
   if (!product || !product.visible) notFound();
   if (product.category === "PHONE" && !showPhones) notFound();
 
-  const Icon = product.category === "PHONE" ? Smartphone : Package;
   const image = product.images[0];
   const out = product.stock === 0;
   const low = !out && product.stock <= 3;
@@ -99,9 +99,12 @@ export default async function ProductPage({
               priority
             />
           ) : (
-            <div className="grid size-full place-items-center">
-              <Icon className="size-16 text-muted-foreground/40" />
-            </div>
+            // eslint-disable-next-line @next/next/no-img-element -- static SVG placeholder
+            <img
+              src={productPlaceholder(product.category)}
+              alt=""
+              className="size-full object-cover"
+            />
           )}
         </div>
 

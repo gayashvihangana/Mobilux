@@ -53,11 +53,11 @@ export async function SiteHeader() {
               </>
             ) : (
               <>
-                <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-                  <Link href="/login">Sign in</Link>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/login">Log in</Link>
                 </Button>
-                <Button asChild size="sm">
-                  <Link href="/register">Get started</Link>
+                <Button asChild size="sm" className="hidden sm:inline-flex">
+                  <Link href="/register">Sign up</Link>
                 </Button>
               </>
             )}
@@ -69,9 +69,14 @@ export async function SiteHeader() {
                   </Link>
                 </Button>
               ) : (
-                <Button asChild variant="outline">
-                  <Link href="/login">Sign in</Link>
-                </Button>
+                <>
+                  <Button asChild variant="outline">
+                    <Link href="/login">Log in</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/register">Sign up</Link>
+                  </Button>
+                </>
               )}
             </MobileNav>
           </div>

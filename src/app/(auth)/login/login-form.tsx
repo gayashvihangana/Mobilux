@@ -37,7 +37,15 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
         <FieldError errors={state?.fieldErrors?.email} />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            href="/forgot-password"
+            className="text-xs text-muted-foreground transition-colors hover:text-primary"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Input
           id="password"
           name="password"
@@ -51,15 +59,15 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       </div>
       <Button type="submit" className="h-11 w-full" disabled={pending}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-        {pending ? "Signing in…" : "Sign in"}
+        {pending ? "Logging in…" : "Log in"}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
-        New to Mobilux?{" "}
+        Don&apos;t have an account?{" "}
         <Link
           href="/register"
           className="font-medium text-primary hover:underline"
         >
-          Create an account
+          Sign up
         </Link>
       </p>
     </form>
