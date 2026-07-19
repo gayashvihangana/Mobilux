@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   Document,
+  Image,
   Page,
   renderToBuffer,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   View,
 } from "@react-pdf/renderer";
 import { SHOP, WARRANTY_DAYS } from "@/lib/config";
+import { trackQrDataUrl } from "@/lib/track-qr";
 import { computeBill, type BillTicket } from "@/lib/bill";
 import { STATUS_META } from "@/lib/status";
 import { formatDate, formatLKR } from "@/lib/utils";
@@ -126,6 +128,18 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  trackBox: {
+    marginTop: 28,
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  trackQr: { width: 64, height: 64 },
   footer: {
     marginTop: 32,
     borderTopWidth: 1,
@@ -136,7 +150,7 @@ const s = StyleSheet.create({
   footerText: { fontSize: 8.5, color: C.gray400, marginTop: 3 },
 });
 
-function BillPdf({ ticket }: { ticket: BillTicket }) {
+function BillPdf({ ticket, trackQr }: { ticket: BillTicket; trackQr: string }) {
   const {
     deviceName,
     owner,
@@ -259,6 +273,19 @@ function BillPdf({ ticket }: { ticket: BillTicket }) {
             </Text>
           </View>
 
+          <View style={s.trackBox}>
+            <Image style={s.trackQr} src={trackQr} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: "Helvetica-Bold", fontSize: 10 }}>
+                Track this repair anytime
+              </Text>
+              <Text style={{ fontSize: 8.5, color: C.gray500, marginTop: 3 }}>
+                Scan the code or enter ticket {ticket.ticketNumber} on our
+                online tracker — live status, no sign-in needed.
+              </Text>
+            </View>
+          </View>
+
           <View style={s.footer}>
             <Text style={s.footerText}>
               {warrantyExpiry
@@ -275,6 +302,7 @@ function BillPdf({ ticket }: { ticket: BillTicket }) {
   );
 }
 
-export function renderBillPdf(ticket: BillTicket) {
-  return renderToBuffer(<BillPdf ticket={ticket} />);
+export async function renderBillPdf(ticket: BillTicket) {
+  const trackQr = await trackQrDataUrl(ticket.ticketNumber);
+  return renderToBuffer(<BillPdf ticket={ticket} trackQr={trackQr} />);
 }

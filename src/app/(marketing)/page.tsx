@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SHOP, SITE_URL } from "@/lib/config";
 import {
   ArrowRight,
   BatteryCharging,
@@ -70,9 +71,30 @@ const steps = [
   },
 ];
 
+// LocalBusiness rich-result data so Google shows shop info in search
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ElectronicsStore",
+  name: SHOP.name,
+  url: SITE_URL,
+  telephone: SHOP.phone,
+  email: SHOP.email,
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Colombo",
+    addressCountry: "LK",
+  },
+  description:
+    "Phone repair and accessories shop in Colombo — screen replacement, battery service, water damage recovery, with live online repair tracking.",
+};
+
 export default function HomePage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="bg-grid absolute inset-0" aria-hidden />

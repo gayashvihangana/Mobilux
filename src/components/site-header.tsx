@@ -10,6 +10,7 @@ const navLinks = [
   { href: "/#services", label: "Services" },
   { href: "/#how-it-works", label: "How it works" },
   { href: "/shop", label: "Shop" },
+  { href: "/track", label: "Track repair" },
 ];
 
 export async function SiteHeader() {

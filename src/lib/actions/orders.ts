@@ -6,6 +6,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { phonesVisible } from "@/lib/settings";
+import { sendEmail } from "@/lib/email";
+import { SITE_URL } from "@/lib/config";
 import { formatLKR } from "@/lib/utils";
 
 export type OrderFormState = {
@@ -119,7 +121,7 @@ export async function updateOrderStatus(
   const { orderId, status } = parsed.data;
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { items: true },
+    include: { items: true, user: { select: { name: true, email: true } } },
   });
   if (!order) return { error: "Order not found." };
   if (order.status === "FULFILLED" || order.status === "CANCELLED") {
@@ -147,6 +149,20 @@ export async function updateOrderStatus(
         href: `/orders/${orderId}`,
       },
     });
+  });
+
+  await sendEmail({
+    to: order.user.email,
+    subject: `Order ${order.orderNumber} ${status === "FULFILLED" ? "is ready" : "was cancelled"}`,
+    heading:
+      status === "FULFILLED" ? "Your order is ready 🎉" : "Order cancelled",
+    lines: [
+      `Hi ${order.user.name},`,
+      status === "FULFILLED"
+        ? `Order ${order.orderNumber} is ready — collect it at the shop or contact us for delivery.`
+        : `Order ${order.orderNumber} was cancelled. Contact us if this looks wrong.`,
+    ],
+    cta: { label: "View order", url: `${SITE_URL}/orders/${orderId}` },
   });
 
   revalidatePath("/admin/orders");

@@ -6,6 +6,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
+import { sendEmail } from "@/lib/email";
+import { SITE_URL } from "@/lib/config";
 import { applyDiscount, discountForCount } from "@/lib/loyalty";
 import { formatLKR } from "@/lib/utils";
 
@@ -179,6 +181,7 @@ async function reviewPayment(
     include: {
       ticket: { select: { id: true, ticketNumber: true } },
       order: { select: { id: true, orderNumber: true, status: true } },
+      user: { select: { name: true, email: true } },
     },
   });
   if (!payment) return { error: "Payment not found." };
@@ -223,6 +226,22 @@ async function reviewPayment(
         href: customerHref,
       },
     });
+  });
+
+  await sendEmail({
+    to: payment.user.email,
+    subject: verified
+      ? `Payment confirmed — ${label}`
+      : `Payment could not be verified — ${label}`,
+    heading: verified ? "Payment confirmed" : "Payment needs another look",
+    lines: [
+      `Hi ${payment.user.name},`,
+      verified
+        ? `We received your ${formatLKR(payment.amount.toString())} bank transfer for ${label}. Thank you!`
+        : parsed.data.adminNote ||
+          `We couldn't verify your ${formatLKR(payment.amount.toString())} transfer for ${label}. Please check your receipt and try again, or contact us.`,
+    ],
+    cta: { label: "View details", url: `${SITE_URL}${customerHref}` },
   });
 
   if (payment.ticket) {

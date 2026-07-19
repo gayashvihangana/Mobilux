@@ -8,7 +8,13 @@ export type { BillTicket };
 
 // Hardcoded light "paper" palette — a printed bill should look the
 // same regardless of the site's dark/light theme.
-export function BillDocument({ ticket }: { ticket: BillTicket }) {
+export function BillDocument({
+  ticket,
+  trackQr,
+}: {
+  ticket: BillTicket;
+  trackQr?: string;
+}) {
   const {
     deviceName,
     owner,
@@ -178,6 +184,26 @@ export function BillDocument({ ticket }: { ticket: BillTicket }) {
             {formatLKR(total)}
           </p>
         </div>
+
+        {/* Scan-to-track */}
+        {trackQr ? (
+          <div className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static data URL */}
+            <img
+              src={trackQr}
+              alt={`QR code to track repair ${ticket.ticketNumber}`}
+              className="size-20 shrink-0 rounded-md border border-neutral-200 bg-white p-1"
+            />
+            <div>
+              <p className="text-sm font-semibold">Track this repair anytime</p>
+              <p className="mt-0.5 text-xs text-neutral-500">
+                Scan the code or visit {SHOP.name.toLowerCase()} online and
+                enter ticket {ticket.ticketNumber} — live status, no sign-in
+                needed.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         {/* Footer */}
         <div className="space-y-1 border-t border-neutral-200 pt-6 text-center text-xs text-neutral-400">

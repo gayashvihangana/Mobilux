@@ -7,6 +7,8 @@ import type { TicketStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
+import { sendEmail } from "@/lib/email";
+import { SITE_URL } from "@/lib/config";
 import { STATUS_META } from "@/lib/status";
 import { nextTicketNumber } from "@/lib/next-ticket-number";
 
@@ -416,7 +418,15 @@ export async function updateTicketStatus(
   const { ticketId, status, note } = parsed.data;
   const ticket = await prisma.repairTicket.findUnique({
     where: { id: ticketId },
-    select: { id: true, status: true, ticketNumber: true, customerId: true },
+    select: {
+      id: true,
+      status: true,
+      ticketNumber: true,
+      customerId: true,
+      brand: true,
+      model: true,
+      customer: { select: { name: true, email: true } },
+    },
   });
   if (!ticket) return { error: "Ticket not found." };
   if (ticket.status === status) return { error: "Ticket is already in this status." };
@@ -452,6 +462,27 @@ export async function updateTicketStatus(
       });
     }
   });
+
+  // Email is best-effort — sendEmail never throws and no-ops when
+  // RESEND_API_KEY isn't configured.
+  if (ticket.customer?.email) {
+    const meta = STATUS_META[status as TicketStatus];
+    const device = [ticket.brand, ticket.model].filter(Boolean).join(" ");
+    await sendEmail({
+      to: ticket.customer.email,
+      subject: `${ticket.ticketNumber} — ${meta.label}`,
+      heading: `Your repair is now: ${meta.label}`,
+      lines: [
+        `Hi ${ticket.customer.name},`,
+        note || meta.description,
+        `Ticket ${ticket.ticketNumber}${device ? ` · ${device}` : ""}`,
+      ],
+      cta: {
+        label: "View repair status",
+        url: `${SITE_URL}/repairs/${ticketId}`,
+      },
+    });
+  }
 
   revalidatePath(`/admin/tickets/${ticketId}`);
   revalidatePath("/admin/tickets");

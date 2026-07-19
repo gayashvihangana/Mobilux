@@ -6,7 +6,9 @@ import { ArrowLeft, CheckCircle2, Package, ShieldCheck, Smartphone } from "lucid
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { phonesVisible } from "@/lib/settings";
+import { SITE_URL, whatsappLink } from "@/lib/config";
 import { Button } from "@/components/ui/button";
+import { WhatsAppIcon } from "@/components/whatsapp";
 import { cn, formatLKR } from "@/lib/utils";
 import { BuyForm } from "./buy-form";
 
@@ -17,7 +19,20 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const product = await prisma.product.findUnique({ where: { slug } });
-  return { title: product ? product.name : "Product" };
+  if (!product) return { title: "Product" };
+
+  const description = product.description.slice(0, 160);
+  return {
+    title: product.name,
+    description,
+    openGraph: {
+      type: "website",
+      title: product.name,
+      description,
+      url: `/shop/${product.slug}`,
+      ...(product.images[0] ? { images: [{ url: product.images[0] }] } : {}),
+    },
+  };
 }
 
 export default async function ProductPage({
@@ -40,8 +55,30 @@ export default async function ProductPage({
   const out = product.stock === 0;
   const low = !out && product.stock <= 3;
 
+  // Product rich-result data for Google Shopping / search cards
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    ...(image ? { image } : {}),
+    offers: {
+      "@type": "Offer",
+      url: `${SITE_URL}/shop/${product.slug}`,
+      priceCurrency: "LKR",
+      price: Number(product.price),
+      availability: out
+        ? "https://schema.org/OutOfStock"
+        : "https://schema.org/InStock",
+    },
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 pt-32 pb-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Link
         href="/shop"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -126,6 +163,25 @@ export default async function ProductPage({
                 </p>
               </div>
             )}
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="mt-3 h-11 sm:px-8"
+            >
+              <a
+                href={whatsappLink(
+                  out
+                    ? `Hi Mobilux! When will "${product.name}" be back in stock? ${SITE_URL}/shop/${product.slug}`
+                    : `Hi Mobilux! I'd like to order "${product.name}" (${formatLKR(product.price.toString())}). ${SITE_URL}/shop/${product.slug}`,
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <WhatsAppIcon className="size-4 text-[#25D366]" />
+                {out ? "Ask when it's back" : "Order via WhatsApp"}
+              </a>
+            </Button>
           </div>
 
           <div className="mt-10 space-y-2.5 border-t border-border pt-6 text-sm text-muted-foreground">

@@ -24,7 +24,7 @@ export function SiteFooter() {
           <Link href="/register" className="transition-colors hover:text-foreground">
             Start a repair
           </Link>
-          <Link href="/login" className="transition-colors hover:text-foreground">
+          <Link href="/track" className="transition-colors hover:text-foreground">
             Track my device
           </Link>
         </nav>

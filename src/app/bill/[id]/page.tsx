@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { fetchBillTicket } from "@/lib/bill-data";
+import { trackQrDataUrl } from "@/lib/track-qr";
 import { BillDocument } from "@/components/bill-document";
 import { DownloadBillButton } from "@/components/bill-print-button";
 
@@ -32,6 +33,8 @@ export default async function BillPage({
     ? `/admin/tickets/${result.bill.id}`
     : `/repairs/${result.bill.id}`;
 
+  const trackQr = await trackQrDataUrl(result.bill.ticketNumber);
+
   return (
     <div className="min-h-dvh bg-neutral-100 py-10">
       <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between px-4">
@@ -47,7 +50,7 @@ export default async function BillPage({
         />
       </div>
       <div className="px-4">
-        <BillDocument ticket={result.bill} />
+        <BillDocument ticket={result.bill} trackQr={trackQr} />
       </div>
     </div>
   );
