@@ -153,9 +153,10 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
             </SelectTrigger>
             <SelectContent>
               {Object.entries(STATUS_META)
-                // "Submitted" only applies to online customer submissions
-                // awaiting acceptance — not relevant to a manual shop log.
-                .filter(([value]) => value !== "SUBMITTED")
+                // Submitted/Confirmed only apply to online requests that
+                // haven't physically arrived — a manual shop log starts
+                // from the device being in hand.
+                .filter(([value]) => value !== "SUBMITTED" && value !== "CONFIRMED")
                 .map(([value, meta]) => (
                   <SelectItem key={value} value={value}>
                     {meta.label}

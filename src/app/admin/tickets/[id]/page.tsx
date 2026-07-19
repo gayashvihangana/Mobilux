@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
-import { StatusHistory, StatusStepper } from "@/components/status-timeline";
+import { StatusStepper } from "@/components/status-timeline";
+import { EditableStatusHistory } from "./editable-status-history";
 import { JournalNote } from "@/components/journal-note";
 import {
   Card,
@@ -283,9 +284,13 @@ export default async function AdminTicketDetailPage({
               <Card>
                 <CardHeader>
                   <CardTitle className="font-display text-lg">Timeline</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Notes here are visible to the customer — use the pencil to
+                    fix one, or the trash to remove an entry.
+                  </p>
                 </CardHeader>
                 <CardContent>
-                  <StatusHistory updates={ticket.statusUpdates} />
+                  <EditableStatusHistory updates={ticket.statusUpdates} />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -361,8 +366,9 @@ export default async function AdminTicketDetailPage({
                   <Inbox className="size-5" /> New repair request
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Submitted online by the customer. Accept it to move this
-                  repair into your pipeline — they&apos;ll be notified.
+                  Submitted online by the customer. Accepting confirms the
+                  request and asks them to bring the device in — mark it
+                  Received once it&apos;s physically at the shop.
                 </p>
               </CardHeader>
               <CardContent>

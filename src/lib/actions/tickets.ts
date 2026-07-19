@@ -24,6 +24,7 @@ export type TicketFormState = {
 
 const TICKET_STATUSES = [
   "SUBMITTED",
+  "CONFIRMED",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",
@@ -406,6 +407,73 @@ export async function linkTicketCustomer(
   revalidatePath(`/admin/tickets/${ticketId}`);
   revalidatePath("/admin/tickets");
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+// ── Admin: edit a timeline note ──────────────────────────────────
+
+const updateNoteSchema = z.object({
+  updateId: z.string().min(1),
+  note: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+export async function updateStatusNote(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const parsed = updateNoteSchema.safeParse({
+    updateId: formData.get("updateId"),
+    note: formData.get("note"),
+  });
+  if (!parsed.success) return { error: "Invalid note." };
+
+  const update = await prisma.statusUpdate.findUnique({
+    where: { id: parsed.data.updateId },
+    select: { id: true, ticketId: true },
+  });
+  if (!update) return { error: "Timeline entry not found." };
+
+  // Empty note falls back to the status's default description everywhere
+  // the timeline renders.
+  await prisma.statusUpdate.update({
+    where: { id: update.id },
+    data: { note: parsed.data.note || null },
+  });
+
+  revalidatePath(`/admin/tickets/${update.ticketId}`);
+  revalidatePath(`/repairs/${update.ticketId}`);
+  revalidatePath("/track");
+  return { success: true };
+}
+
+export async function deleteStatusUpdate(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const updateId = formData.get("updateId");
+  if (typeof updateId !== "string" || !updateId) {
+    return { error: "Invalid request." };
+  }
+
+  const update = await prisma.statusUpdate.findUnique({
+    where: { id: updateId },
+    select: { id: true, ticketId: true },
+  });
+  if (!update) return { error: "Timeline entry not found." };
+
+  // Removes only the timeline entry — the ticket's current status is
+  // stored on the ticket itself and is not affected.
+  await prisma.statusUpdate.delete({ where: { id: update.id } });
+
+  revalidatePath(`/admin/tickets/${update.ticketId}`);
+  revalidatePath(`/repairs/${update.ticketId}`);
+  revalidatePath("/track");
   return { success: true };
 }
 

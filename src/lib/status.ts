@@ -2,6 +2,7 @@ import type { DeviceType, OrderStatus, TicketStatus } from "@prisma/client";
 
 export const STATUS_PIPELINE: TicketStatus[] = [
   "SUBMITTED",
+  "CONFIRMED",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",
@@ -21,6 +22,13 @@ export const STATUS_META: Record<
       "Submitted online — our team will review and confirm shortly.",
     className: "bg-warning/15 text-warning border-warning/30",
     dotClassName: "bg-warning",
+  },
+  CONFIRMED: {
+    label: "Confirmed",
+    description:
+      "Request accepted — please bring your device to the shop.",
+    className: "bg-primary/15 text-primary border-primary/30",
+    dotClassName: "bg-primary",
   },
   RECEIVED: {
     label: "Received",

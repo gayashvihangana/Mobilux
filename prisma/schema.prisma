@@ -17,7 +17,8 @@ enum Role {
 
 enum TicketStatus {
   SUBMITTED // customer submitted online — awaiting shop acceptance
-  RECEIVED
+  CONFIRMED // shop accepted the request — waiting for the device to arrive
+  RECEIVED // device is physically at the shop
   DIAGNOSING
   AWAITING_PARTS
   IN_PROGRESS

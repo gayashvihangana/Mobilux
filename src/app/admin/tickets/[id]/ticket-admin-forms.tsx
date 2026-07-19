@@ -2,7 +2,14 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Link2, Loader2, Trash2, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Link2,
+  Loader2,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,6 +66,20 @@ const STATUS_OPTIONS = Object.entries(STATUS_META).map(([value, meta]) => ({
   label: meta.label,
 }));
 
+// One-click advance through the normal pipeline. The prompt is the
+// question the admin answers; the target is the status it moves to.
+// SUBMITTED is handled by the dedicated Accept card, and dead ends
+// (PICKED_UP, CANCELLED) fall back to the manual dropdown only.
+const NEXT_STEP: Partial<Record<TicketStatus, { prompt: string; next: TicketStatus }>> = {
+  CONFIRMED: { prompt: "Device received?", next: "RECEIVED" },
+  RECEIVED: { prompt: "Start diagnosing?", next: "DIAGNOSING" },
+  DIAGNOSING: { prompt: "Diagnosed?", next: "AWAITING_PARTS" },
+  AWAITING_PARTS: { prompt: "Parts arrived?", next: "IN_PROGRESS" },
+  IN_PROGRESS: { prompt: "Repair done?", next: "COMPLETED" },
+  COMPLETED: { prompt: "Ready for pickup?", next: "READY_FOR_PICKUP" },
+  READY_FOR_PICKUP: { prompt: "Picked up?", next: "PICKED_UP" },
+};
+
 export function StatusUpdateForm({
   ticketId,
   currentStatus,
@@ -68,26 +89,17 @@ export function StatusUpdateForm({
 }) {
   const [state, formAction, pending] = useActionState(updateTicketStatus, null);
   useSuccessToast(state, "Status updated.");
+  const [selected, setSelected] = useState<TicketStatus>(currentStatus);
+  useEffect(() => setSelected(currentStatus), [currentStatus]);
 
+  const step = currentStatus === "SUBMITTED" ? undefined : NEXT_STEP[currentStatus];
+
+  // The clicked submit button supplies the "status" field, so the quick
+  // next-step button and the manual dropdown share one form (and note).
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="ticketId" value={ticketId} />
       <FormError state={state} />
-      <div className="space-y-2">
-        <Label htmlFor="status">New status</Label>
-        <Select name="status" defaultValue={currentStatus} key={currentStatus}>
-          <SelectTrigger id="status" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
       <div className="space-y-2">
         <Label htmlFor="note">
           Note for customer <span className="text-muted-foreground">(optional)</span>
@@ -100,27 +112,73 @@ export function StatusUpdateForm({
           className="resize-none"
         />
       </div>
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-        {pending ? "Updating…" : "Update status"}
-      </Button>
+
+      {step ? (
+        <>
+          <Button
+            type="submit"
+            name="status"
+            value={step.next}
+            className="w-full"
+            disabled={pending}
+          >
+            {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+            {step.prompt}
+            <ArrowRight className="size-4" />
+            {STATUS_META[step.next].label}
+          </Button>
+          <div className="flex items-center gap-3">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">or set any status</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+        </>
+      ) : null}
+
+      <div className="flex gap-2">
+        <Select
+          value={selected}
+          onValueChange={(value) => setSelected(value as TicketStatus)}
+        >
+          <SelectTrigger id="status" className="flex-1" aria-label="New status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="submit"
+          name="status"
+          value={selected}
+          variant={step ? "secondary" : "default"}
+          disabled={pending || selected === currentStatus}
+        >
+          {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+          Update
+        </Button>
+      </div>
     </form>
   );
 }
 
 // Shown only while a ticket is SUBMITTED (customer-submitted online, not
-// yet accepted). Accepting moves it to RECEIVED and enters the normal
-// pipeline — same updateTicketStatus action other status changes use,
-// so it notifies the customer by notification/email exactly like any
-// other timeline step, just with a friendlier one-purpose form.
+// yet accepted). Accepting moves it to CONFIRMED — the request is agreed,
+// but "Received" is reserved for the device physically arriving at the
+// shop. Reuses updateTicketStatus, so the customer gets the same
+// notification/email as any other timeline step.
 export function AcceptTicketForm({ ticketId }: { ticketId: string }) {
   const [state, formAction, pending] = useActionState(updateTicketStatus, null);
-  useSuccessToast(state, "Repair accepted — customer notified.");
+  useSuccessToast(state, "Request confirmed — customer notified.");
 
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="ticketId" value={ticketId} />
-      <input type="hidden" name="status" value="RECEIVED" />
+      <input type="hidden" name="status" value="CONFIRMED" />
       <FormError state={state} />
       <div className="space-y-2">
         <Label htmlFor="accept-note">
@@ -130,7 +188,7 @@ export function AcceptTicketForm({ ticketId }: { ticketId: string }) {
           id="accept-note"
           name="note"
           rows={3}
-          placeholder="e.g. Got it — we'll start diagnosing today."
+          placeholder="e.g. We can take this in — drop your device any day 9am–7pm."
           className="resize-none"
         />
       </div>
@@ -140,7 +198,7 @@ export function AcceptTicketForm({ ticketId }: { ticketId: string }) {
         ) : (
           <CheckCircle2 className="size-4" />
         )}
-        {pending ? "Accepting…" : "Accept repair"}
+        {pending ? "Accepting…" : "Accept request"}
       </Button>
     </form>
   );

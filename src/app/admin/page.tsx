@@ -34,6 +34,7 @@ export const metadata: Metadata = {
 };
 
 const ACTIVE_STATUSES = [
+  "CONFIRMED",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",

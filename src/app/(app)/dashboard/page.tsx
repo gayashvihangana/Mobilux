@@ -14,6 +14,7 @@ export const metadata: Metadata = {
 
 const ACTIVE_STATUSES = [
   "SUBMITTED",
+  "CONFIRMED",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",
