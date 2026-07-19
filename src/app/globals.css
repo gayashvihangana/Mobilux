@@ -108,6 +108,8 @@
   --animate-fade-up: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-in: fade-in 0.5s ease-out both;
   --animate-glow-pulse: glow-pulse 4s ease-in-out infinite;
+  --animate-float: float-y 6s ease-in-out infinite;
+  --animate-marquee: marquee 28s linear infinite;
 
   @keyframes fade-up {
     from {
@@ -134,6 +136,20 @@
     }
     50% {
       opacity: 1;
+    }
+  }
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
     }
   }
 }
@@ -180,6 +196,30 @@
 /* Ambient glow blob — strength tuned per theme via --glow-strength */
 @utility glow-primary {
   background: color-mix(in oklab, var(--primary) var(--glow-strength), transparent);
+}
+
+/* ── Scroll reveal ────────────────────────────────────────────────
+   The .reveal class is added client-side by <ScrollReveal> on mount,
+   so content stays visible without JavaScript and for crawlers. */
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+}
+.reveal.reveal-left {
+  transform: translateX(-40px);
+}
+.reveal.reveal-right {
+  transform: translateX(40px);
+}
+.reveal.reveal-scale {
+  transform: scale(0.94) translateY(20px);
+}
+.reveal.is-inview {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0s),
+    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0s);
 }
 
 @media print {
