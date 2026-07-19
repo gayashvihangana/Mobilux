@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle, Loader2, Trash2, TriangleAlert, Link2 } from "lucide-react";
+import { Link2, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +29,6 @@ import {
   linkTicketCustomer,
   updateTicketDetails,
   updateTicketStatus,
-  acceptRepair,
   type TicketFormState,
 } from "@/lib/actions/tickets";
 import { DEVICE_TYPES, STATUS_META } from "@/lib/status";
@@ -55,54 +54,10 @@ function FormError({ state }: { state: TicketFormState }) {
   );
 }
 
-const STATUS_OPTIONS = Object.entries(STATUS_META)
-  .filter(([value]) => value !== "PENDING_ACCEPTANCE")
-  .map(([value, meta]) => ({
-    value: value as TicketStatus,
-    label: meta.label,
-  }));
-
-export function AcceptRepairForm({ ticketId }: { ticketId: string }) {
-  const [state, formAction, pending] = useActionState(acceptRepair, null);
-
-  useEffect(() => {
-    if (state?.error) toast.error(state.error);
-    // On success the page revalidates — no toast needed as UI updates.
-  }, [state]);
-
-  return (
-    <form action={formAction} className="space-y-4">
-      <input type="hidden" name="ticketId" value={ticketId} />
-      <FormError state={state} />
-      <div className="space-y-2">
-        <Label htmlFor="accept-note">
-          Note for customer{" "}
-          <span className="text-muted-foreground">(optional)</span>
-        </Label>
-        <Textarea
-          id="accept-note"
-          name="note"
-          rows={3}
-          placeholder="e.g. We've reviewed your request and will begin diagnosis shortly."
-          className="resize-none"
-        />
-      </div>
-      <Button
-        type="submit"
-        className="w-full gap-2 bg-success hover:bg-success/90 text-white"
-        disabled={pending}
-      >
-        {pending ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <CheckCircle className="size-4" />
-        )}
-        {pending ? "Accepting…" : "Accept Repair Request"}
-      </Button>
-    </form>
-  );
-}
-
+const STATUS_OPTIONS = Object.entries(STATUS_META).map(([value, meta]) => ({
+  value: value as TicketStatus,
+  label: meta.label,
+}));
 
 export function StatusUpdateForm({
   ticketId,

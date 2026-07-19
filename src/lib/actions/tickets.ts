@@ -23,7 +23,6 @@ export type TicketFormState = {
 } | null;
 
 const TICKET_STATUSES = [
-  "PENDING_ACCEPTANCE",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",
@@ -98,14 +97,13 @@ export async function createTicket(
         customerId: session.user.id,
         photos: uploaded.urls ?? [],
         ticketNumber,
-        status: "PENDING_ACCEPTANCE",
       },
     });
     await tx.statusUpdate.create({
       data: {
         ticketId: created.id,
-        status: "PENDING_ACCEPTANCE",
-        note: "Repair request submitted online. Awaiting shop review.",
+        status: "RECEIVED",
+        note: "Repair request submitted. We'll begin diagnosis shortly.",
       },
     });
     return created;
@@ -129,95 +127,6 @@ export async function createTicket(
   revalidatePath("/dashboard");
   revalidatePath("/admin");
   redirect(`/repairs/${ticket.id}?created=1`);
-}
-
-// ── Admin: accept an online repair request ────────────────────────
-
-const acceptRepairSchema = z.object({
-  ticketId: z.string().min(1),
-  note: z.string().trim().max(500).optional().or(z.literal("")),
-});
-
-export async function acceptRepair(
-  _prev: TicketFormState,
-  formData: FormData,
-): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
-
-  const parsed = acceptRepairSchema.safeParse({
-    ticketId: formData.get("ticketId"),
-    note: formData.get("note"),
-  });
-  if (!parsed.success) return { error: "Invalid request." };
-
-  const { ticketId, note } = parsed.data;
-  const ticket = await prisma.repairTicket.findUnique({
-    where: { id: ticketId },
-    select: {
-      id: true,
-      status: true,
-      ticketNumber: true,
-      customerId: true,
-      brand: true,
-      model: true,
-      customer: { select: { name: true, email: true } },
-    },
-  });
-  if (!ticket) return { error: "Ticket not found." };
-  if (ticket.status !== "PENDING_ACCEPTANCE") {
-    return { error: "This ticket has already been accepted." };
-  }
-
-  const acceptNote =
-    note?.trim() ||
-    "Your repair request has been accepted. We'll begin diagnosis shortly.";
-
-  await prisma.$transaction(async (tx) => {
-    await tx.repairTicket.update({
-      where: { id: ticketId },
-      data: { status: "RECEIVED" },
-    });
-    await tx.statusUpdate.create({
-      data: { ticketId, status: "RECEIVED", note: acceptNote },
-    });
-    if (ticket.customerId) {
-      await tx.notification.create({
-        data: {
-          userId: ticket.customerId,
-          title: `${ticket.ticketNumber} — Repair Accepted`,
-          body: acceptNote,
-          href: `/repairs/${ticketId}`,
-        },
-      });
-    }
-  });
-
-  // Send acceptance email (best-effort)
-  if (ticket.customer?.email) {
-    const device = [ticket.brand, ticket.model].filter(Boolean).join(" ");
-    await sendEmail({
-      to: ticket.customer.email,
-      subject: `${ticket.ticketNumber} — Repair Accepted`,
-      heading: "Your repair request has been accepted!",
-      lines: [
-        `Hi ${ticket.customer.name},`,
-        acceptNote,
-        `Ticket ${ticket.ticketNumber}${device ? ` · ${device}` : ""}`,
-      ],
-      cta: {
-        label: "Track your repair",
-        url: `${SITE_URL}/repairs/${ticketId}`,
-      },
-    });
-  }
-
-  revalidatePath(`/admin/tickets/${ticketId}`);
-  revalidatePath("/admin/tickets");
-  revalidatePath("/admin");
-  revalidatePath(`/repairs/${ticketId}`);
-  revalidatePath("/dashboard");
-  return { success: true };
 }
 
 // ── Admin: manual repair log ─────────────────────────────────────

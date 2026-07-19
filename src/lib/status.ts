@@ -1,7 +1,6 @@
 import type { DeviceType, OrderStatus, TicketStatus } from "@prisma/client";
 
 export const STATUS_PIPELINE: TicketStatus[] = [
-  "PENDING_ACCEPTANCE",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",
@@ -15,12 +14,6 @@ export const STATUS_META: Record<
   TicketStatus,
   { label: string; description: string; className: string; dotClassName: string }
 > = {
-  PENDING_ACCEPTANCE: {
-    label: "Awaiting Review",
-    description: "Your repair request has been received and is awaiting admin review.",
-    className: "bg-muted/60 text-muted-foreground border-border",
-    dotClassName: "bg-muted-foreground",
-  },
   RECEIVED: {
     label: "Received",
     description: "Your device has been received and logged.",
