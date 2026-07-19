@@ -33,6 +33,7 @@ import {
   LinkCustomerForm,
   StatusUpdateForm,
   TicketDetailsForm,
+  AcceptRepairForm,
 } from "./ticket-admin-forms";
 
 export const metadata: Metadata = {
@@ -124,6 +125,20 @@ export default async function AdminTicketDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Pending acceptance banner */}
+      {ticket.status === "PENDING_ACCEPTANCE" ? (
+        <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <span className="mt-0.5 shrink-0 text-lg leading-none">⏳</span>
+          <div>
+            <p className="font-semibold">Online submission — awaiting your acceptance</p>
+            <p className="mt-0.5 text-warning/80">
+              This repair was requested online by the customer. Review the details and accept it to
+              begin the repair workflow.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="pt-2 pb-5">
@@ -406,18 +421,35 @@ export default async function AdminTicketDetailPage({
             </CardContent>
           </Card>
 
-          {/* Status update */}
-          <Card className="border-primary/30">
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Update status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <StatusUpdateForm
-                ticketId={ticket.id}
-                currentStatus={ticket.status}
-              />
-            </CardContent>
-          </Card>
+          {/* Accept repair / Update status */}
+          {ticket.status === "PENDING_ACCEPTANCE" ? (
+            <Card className="border-success/40 bg-success/5">
+              <CardHeader>
+                <CardTitle className="font-display text-lg text-success">
+                  Accept Repair Request
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Accepting moves the ticket to <strong>Received</strong> and
+                  notifies the customer. You can add a personalised note below.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <AcceptRepairForm ticketId={ticket.id} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-primary/30">
+              <CardHeader>
+                <CardTitle className="font-display text-lg">Update status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StatusUpdateForm
+                  ticketId={ticket.id}
+                  currentStatus={ticket.status}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Online payments */}
           {ticket.payments.length > 0 ? (

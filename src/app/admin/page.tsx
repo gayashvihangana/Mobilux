@@ -33,6 +33,7 @@ export const metadata: Metadata = {
 };
 
 const ACTIVE_STATUSES = [
+  "PENDING_ACCEPTANCE",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",
@@ -49,6 +50,7 @@ export default async function AdminOverviewPage() {
   const [
     activeCount,
     readyCount,
+    pendingCount,
     customerCount,
     recentTickets,
     statusCounts,
@@ -60,6 +62,9 @@ export default async function AdminOverviewPage() {
     }),
     prisma.repairTicket.count({
       where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
+    }),
+    prisma.repairTicket.count({
+      where: { status: "PENDING_ACCEPTANCE" },
     }),
     prisma.user.count({ where: { role: "CUSTOMER" } }),
     prisma.repairTicket.findMany({
@@ -220,10 +225,11 @@ export default async function AdminOverviewPage() {
   ];
 
   const opsStats = [
-    { label: "Active repairs", value: <CountUp value={activeCount} />, icon: Wrench, className: "text-primary" },
-    { label: "Awaiting pickup", value: <CountUp value={readyCount} />, icon: Clock, className: "text-warning" },
-    { label: "Completed this month", value: <CountUp value={completedThisMonth} />, icon: CheckCircle2, className: "text-success" },
-    { label: "Customers", value: <CountUp value={customerCount} />, icon: Users, className: "text-info" },
+    { label: "Active repairs", value: <CountUp value={activeCount} />, icon: Wrench, className: "text-primary", href: "/admin/tickets" },
+    { label: "Awaiting pickup", value: <CountUp value={readyCount} />, icon: Clock, className: "text-warning", href: "/admin/tickets?status=READY_FOR_PICKUP" },
+    { label: "Pending review", value: <CountUp value={pendingCount} />, icon: Clock, className: "text-muted-foreground", href: "/admin/tickets?status=PENDING_ACCEPTANCE" },
+    { label: "Completed this month", value: <CountUp value={completedThisMonth} />, icon: CheckCircle2, className: "text-success", href: undefined },
+    { label: "Customers", value: <CountUp value={customerCount} />, icon: Users, className: "text-info", href: undefined },
   ];
 
   return (
@@ -286,16 +292,31 @@ export default async function AdminOverviewPage() {
       </section>
 
       {/* Today */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {opsStats.map((stat) => (
-          <div key={stat.label} className="rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <stat.icon className={cn("size-4", stat.className)} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {opsStats.map((stat) => {
+          const inner = (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">{stat.label}</p>
+                <stat.icon className={cn("size-4", stat.className)} />
+              </div>
+              <p className="font-display mt-2 text-3xl font-bold">{stat.value}</p>
+            </>
+          );
+          return stat.href ? (
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/30 hover:bg-card/80"
+            >
+              {inner}
+            </Link>
+          ) : (
+            <div key={stat.label} className="rounded-2xl border border-border bg-card p-5">
+              {inner}
             </div>
-            <p className="font-display mt-2 text-3xl font-bold">{stat.value}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pipeline breakdown */}

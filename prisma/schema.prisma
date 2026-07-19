@@ -16,6 +16,7 @@ enum Role {
 }
 
 enum TicketStatus {
+  PENDING_ACCEPTANCE
   RECEIVED
   DIAGNOSING
   AWAITING_PARTS
@@ -93,7 +94,7 @@ model RepairTicket {
   issueDescription String?
   solution         String? // what was actually done
   photos           String[]       @default([])
-  status           TicketStatus   @default(RECEIVED)
+  status           TicketStatus   @default(PENDING_ACCEPTANCE)
   estimatedCost    Decimal?       @db.Decimal(10, 2)
   finalCost        Decimal?       @db.Decimal(10, 2)
   discountPercent  Decimal?       @db.Decimal(5, 2)
