@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   Banknote,
+  Inbox,
   Mail,
   NotebookPen,
   Phone,
@@ -29,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEVICE_TYPES } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
+  AcceptTicketForm,
   DeleteTicketDialog,
   LinkCustomerForm,
   StatusUpdateForm,
@@ -351,6 +353,24 @@ export default async function AdminTicketDetailPage({
         </div>
 
         <div className="space-y-6 lg:col-span-2">
+          {/* Awaiting acceptance */}
+          {ticket.status === "SUBMITTED" ? (
+            <Card className="border-warning/40 bg-warning/5">
+              <CardHeader>
+                <CardTitle className="font-display flex items-center gap-2 text-lg text-warning">
+                  <Inbox className="size-5" /> New repair request
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Submitted online by the customer. Accept it to move this
+                  repair into your pipeline — they&apos;ll be notified.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <AcceptTicketForm ticketId={ticket.id} />
+              </CardContent>
+            </Card>
+          ) : null}
+
           {/* Customer */}
           <Card>
             <CardHeader>

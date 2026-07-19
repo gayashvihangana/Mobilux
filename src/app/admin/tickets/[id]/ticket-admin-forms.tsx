@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Link2, Loader2, Trash2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Link2, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,6 +103,44 @@ export function StatusUpdateForm({
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
         {pending ? "Updating…" : "Update status"}
+      </Button>
+    </form>
+  );
+}
+
+// Shown only while a ticket is SUBMITTED (customer-submitted online, not
+// yet accepted). Accepting moves it to RECEIVED and enters the normal
+// pipeline — same updateTicketStatus action other status changes use,
+// so it notifies the customer by notification/email exactly like any
+// other timeline step, just with a friendlier one-purpose form.
+export function AcceptTicketForm({ ticketId }: { ticketId: string }) {
+  const [state, formAction, pending] = useActionState(updateTicketStatus, null);
+  useSuccessToast(state, "Repair accepted — customer notified.");
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <input type="hidden" name="ticketId" value={ticketId} />
+      <input type="hidden" name="status" value="RECEIVED" />
+      <FormError state={state} />
+      <div className="space-y-2">
+        <Label htmlFor="accept-note">
+          Note for customer <span className="text-muted-foreground">(optional)</span>
+        </Label>
+        <Textarea
+          id="accept-note"
+          name="note"
+          rows={3}
+          placeholder="e.g. Got it — we'll start diagnosing today."
+          className="resize-none"
+        />
+      </div>
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <CheckCircle2 className="size-4" />
+        )}
+        {pending ? "Accepting…" : "Accept repair"}
       </Button>
     </form>
   );

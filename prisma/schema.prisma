@@ -16,6 +16,7 @@ enum Role {
 }
 
 enum TicketStatus {
+  SUBMITTED // customer submitted online — awaiting shop acceptance
   RECEIVED
   DIAGNOSING
   AWAITING_PARTS

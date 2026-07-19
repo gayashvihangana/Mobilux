@@ -5,6 +5,7 @@ import {
   Banknote,
   CheckCircle2,
   Clock,
+  Inbox,
   Percent,
   Smartphone,
   Target,
@@ -47,6 +48,7 @@ export default async function AdminOverviewPage() {
   monthStart.setHours(0, 0, 0, 0);
 
   const [
+    pendingCount,
     activeCount,
     readyCount,
     customerCount,
@@ -55,6 +57,7 @@ export default async function AdminOverviewPage() {
     financeTickets,
     paidByTicket,
   ] = await Promise.all([
+    prisma.repairTicket.count({ where: { status: "SUBMITTED" } }),
     prisma.repairTicket.count({
       where: { status: { in: [...ACTIVE_STATUSES] } },
     }),
@@ -220,6 +223,7 @@ export default async function AdminOverviewPage() {
   ];
 
   const opsStats = [
+    { label: "Needs confirmation", value: <CountUp value={pendingCount} />, icon: Inbox, className: "text-warning" },
     { label: "Active repairs", value: <CountUp value={activeCount} />, icon: Wrench, className: "text-primary" },
     { label: "Awaiting pickup", value: <CountUp value={readyCount} />, icon: Clock, className: "text-warning" },
     { label: "Completed this month", value: <CountUp value={completedThisMonth} />, icon: CheckCircle2, className: "text-success" },
@@ -286,9 +290,17 @@ export default async function AdminOverviewPage() {
       </section>
 
       {/* Today */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {opsStats.map((stat) => (
-          <div key={stat.label} className="rounded-2xl border border-border bg-card p-5">
+          <div
+            key={stat.label}
+            className={cn(
+              "rounded-2xl border bg-card p-5",
+              stat.label === "Needs confirmation" && pendingCount > 0
+                ? "border-warning/40 bg-warning/5"
+                : "border-border",
+            )}
+          >
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{stat.label}</p>
               <stat.icon className={cn("size-4", stat.className)} />

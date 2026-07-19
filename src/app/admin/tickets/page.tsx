@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 
 const FILTERS: { value: string; label: string }[] = [
   { value: "all", label: "All" },
+  { value: "SUBMITTED", label: "Needs confirmation" },
   { value: "RECEIVED", label: "Received" },
   { value: "DIAGNOSING", label: "Diagnosing" },
   { value: "AWAITING_PARTS", label: "Awaiting parts" },

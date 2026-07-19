@@ -23,6 +23,7 @@ export type TicketFormState = {
 } | null;
 
 const TICKET_STATUSES = [
+  "SUBMITTED",
   "RECEIVED",
   "DIAGNOSING",
   "AWAITING_PARTS",
@@ -97,13 +98,16 @@ export async function createTicket(
         customerId: session.user.id,
         photos: uploaded.urls ?? [],
         ticketNumber,
+        // Online submissions wait for shop acceptance before entering the
+        // normal pipeline — see acceptTicket.
+        status: "SUBMITTED",
       },
     });
     await tx.statusUpdate.create({
       data: {
         ticketId: created.id,
-        status: "RECEIVED",
-        note: "Repair request submitted. We'll begin diagnosis shortly.",
+        status: "SUBMITTED",
+        note: "Repair request submitted online. Our team will review and confirm shortly.",
       },
     });
     return created;
@@ -117,7 +121,7 @@ export async function createTicket(
     await prisma.notification.createMany({
       data: admins.map((a) => ({
         userId: a.id,
-        title: `New repair request ${ticket.ticketNumber}`,
+        title: `New repair request ${ticket.ticketNumber} — needs confirmation`,
         body: `${parsed.data.brand} ${parsed.data.model} — ${parsed.data.issueTitle}`,
         href: `/admin/tickets/${ticket.id}`,
       })),

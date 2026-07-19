@@ -152,11 +152,15 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(STATUS_META).map(([value, meta]) => (
-                <SelectItem key={value} value={value}>
-                  {meta.label}
-                </SelectItem>
-              ))}
+              {Object.entries(STATUS_META)
+                // "Submitted" only applies to online customer submissions
+                // awaiting acceptance — not relevant to a manual shop log.
+                .filter(([value]) => value !== "SUBMITTED")
+                .map(([value, meta]) => (
+                  <SelectItem key={value} value={value}>
+                    {meta.label}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
