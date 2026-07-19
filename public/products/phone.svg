@@ -8,12 +8,19 @@
       <stop offset="0" stop-color="#2563eb" stop-opacity="0.28"/>
       <stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b3763"/>
+      <stop offset="1" stop-color="#1c2440"/>
+    </linearGradient>
   </defs>
   <rect width="600" height="600" fill="url(#bg)"/>
   <rect width="600" height="600" fill="url(#halo)"/>
   <rect x="212" y="140" width="176" height="330" rx="30" fill="#1a2138" stroke="#3b82f6" stroke-width="7"/>
-  <rect x="234" y="176" width="132" height="238" rx="10" fill="#232c4a"/>
+  <rect x="234" y="176" width="132" height="238" rx="10" fill="url(#screen)"/>
   <circle cx="300" cy="160" r="5" fill="#3b82f6"/>
+  <circle cx="268" cy="230" r="16" fill="#3b82f6" opacity="0.5"/>
+  <rect x="252" y="262" width="96" height="8" rx="4" fill="#60a5fa" opacity="0.45"/>
+  <rect x="252" y="282" width="64" height="8" rx="4" fill="#60a5fa" opacity="0.25"/>
   <rect x="266" y="440" width="68" height="9" rx="4.5" fill="#3b82f6" opacity="0.7"/>
   <text x="300" y="540" text-anchor="middle" fill="#445070" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="bold" letter-spacing="8">MOBILUX</text>
 </svg>

@@ -17,6 +17,7 @@ import { phonesVisible } from "@/lib/settings";
 import { SHOP, SITE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { HeroVisual } from "@/components/hero-visual";
+import { Parallax } from "@/components/parallax";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { ProductCard } from "@/components/product-card";
 import { cn } from "@/lib/utils";
@@ -81,17 +82,6 @@ const steps = [
   },
 ];
 
-const marqueeItems = [
-  "Fix",
-  "Track",
-  "Trust",
-  "Screens",
-  "Batteries",
-  "Water damage",
-  "Live tracking",
-  "30-day warranty",
-];
-
 // LocalBusiness rich-result data so Google shows shop info in search
 const jsonLd = {
   "@context": "https://schema.org",
@@ -127,28 +117,49 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        <div className="bg-grid absolute inset-0" aria-hidden />
+      {/* ── Hero — full-bleed cover with parallax depth ──────── */}
+      <section className="relative flex min-h-svh items-center overflow-hidden">
+        {/* Cover image (theme-matched), drifting slower than the page */}
+        <Parallax speed={0.35} className="absolute inset-x-0 -inset-y-[14%]">
+          <div className="absolute inset-0 bg-[url('/hero-cover-light.svg')] bg-cover bg-center dark:hidden" />
+          <div className="absolute inset-0 hidden bg-[url('/hero-cover-dark.svg')] bg-cover bg-center dark:block" />
+        </Parallax>
+        <div className="bg-grid absolute inset-0 opacity-50" aria-hidden />
         <div
           className="animate-glow-pulse glow-primary absolute -top-40 left-1/2 h-130 w-190 -translate-x-1/2 rounded-full blur-[120px]"
           aria-hidden
         />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-16 px-4 pt-40 pb-24 sm:pt-48 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8 lg:pb-32">
+        {/* Fade the cover into the page below */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent to-background"
+          aria-hidden
+        />
+
+        <div className="relative mx-auto grid w-full max-w-6xl items-center gap-16 px-4 pt-32 pb-24 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8">
           <div className="text-center lg:text-left">
-            <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
+            <p className="animate-fade-up inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary backdrop-blur">
               <span className="relative flex size-2">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
                 <span className="relative inline-flex size-2 rounded-full bg-primary" />
               </span>
               Live repair tracking · Colombo
             </p>
-            <h1
-              className="animate-fade-up font-display mt-5 text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-6xl lg:text-[4.2rem]"
-              style={{ animationDelay: "80ms" }}
-            >
-              We fix your phone.{" "}
-              <span className="text-gradient">You watch it happen.</span>
+            <h1 className="font-display mt-5 text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-6xl lg:text-[4.4rem]">
+              {"We fix your phone.".split(" ").map((word, i) => (
+                <span
+                  key={word + i}
+                  className="animate-fade-up inline-block"
+                  style={{ animationDelay: `${80 + i * 80}ms` }}
+                >
+                  {word}&nbsp;
+                </span>
+              ))}
+              <span
+                className="text-gradient animate-fade-up inline-block"
+                style={{ animationDelay: "440ms" }}
+              >
+                You watch it happen.
+              </span>
             </h1>
             <p
               className="animate-fade-up mx-auto mt-6 max-w-xl text-base text-muted-foreground sm:text-lg lg:mx-0"
@@ -181,7 +192,7 @@ export default async function HomePage() {
             </div>
             <div
               className="animate-fade-up mt-9 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground lg:justify-start"
-              style={{ animationDelay: "320ms" }}
+              style={{ animationDelay: "560ms" }}
             >
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="size-4 text-success" /> Same-day fixes
@@ -196,30 +207,26 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <HeroVisual />
+          {/* Foreground drifts slightly ahead of the scroll for depth */}
+          <Parallax speed={-0.08}>
+            <HeroVisual />
+          </Parallax>
+        </div>
+
+        {/* Scroll cue */}
+        <div
+          className="animate-fade-in absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2.5 sm:flex"
+          style={{ animationDelay: "1100ms" }}
+          aria-hidden
+        >
+          <span className="text-[10px] font-semibold tracking-[0.35em] text-muted-foreground uppercase">
+            Scroll
+          </span>
+          <span className="relative h-10 w-px overflow-hidden bg-border">
+            <span className="animate-scroll-hint absolute top-0 left-0 h-4 w-px bg-primary" />
+          </span>
         </div>
       </section>
-
-      {/* ── Brand marquee ────────────────────────────────────── */}
-      <div className="overflow-hidden border-y border-border bg-card/40 py-4">
-        <div className="animate-marquee flex w-max items-center" aria-hidden>
-          {[0, 1].map((copy) => (
-            <div key={copy} className="flex items-center">
-              {marqueeItems.map((item) => (
-                <span
-                  key={`${copy}-${item}`}
-                  className="flex items-center gap-8 pr-8"
-                >
-                  <span className="font-display text-sm font-semibold tracking-[0.25em] text-muted-foreground/70 uppercase">
-                    {item}
-                  </span>
-                  <span className="size-1.5 rounded-full bg-primary/50" />
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* ── Featured shop items ──────────────────────────────── */}
       {featuredProducts.length > 0 ? (

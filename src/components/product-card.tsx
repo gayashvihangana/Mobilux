@@ -3,12 +3,23 @@ import Link from "next/link";
 import type { Product } from "@prisma/client";
 import { cn, formatLKR } from "@/lib/utils";
 
-// Branded fallback art for products without photos (SVGs skip the
+// Branded mock art for products without photos, matched to the product
+// type by name so each item gets distinct artwork (SVGs skip the
 // next/image optimizer, hence the plain <img>).
-export function productPlaceholder(category: Product["category"]) {
-  return category === "PHONE"
-    ? "/placeholders/phone.svg"
-    : "/placeholders/accessory.svg";
+const PRODUCT_ART: [RegExp, string][] = [
+  [/case|cover|bumper/i, "/products/case.svg"],
+  [/glass|protector|screen guard/i, "/products/glass.svg"],
+  [/charger|adapter|power bank|wall plug/i, "/products/charger.svg"],
+  [/cable|cord|lightning|usb|type-?c/i, "/products/cable.svg"],
+  [/earbud|earphone|headphone|airpod|headset|speaker|audio/i, "/products/earbuds.svg"],
+];
+
+export function productPlaceholder(
+  product: Pick<Product, "name" | "category">,
+) {
+  if (product.category === "PHONE") return "/products/phone.svg";
+  const match = PRODUCT_ART.find(([pattern]) => pattern.test(product.name));
+  return match ? match[1] : "/products/accessory.svg";
 }
 
 export function ProductCard({ product }: { product: Product }) {
@@ -32,7 +43,7 @@ export function ProductCard({ product }: { product: Product }) {
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- static SVG placeholder
           <img
-            src={productPlaceholder(product.category)}
+            src={productPlaceholder(product)}
             alt=""
             className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
           />

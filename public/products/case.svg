@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#151b30"/>
+      <stop offset="1" stop-color="#0b0f1c"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.42" r="0.5">
+      <stop offset="0" stop-color="#2563eb" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="600" height="600" fill="url(#bg)"/>
+  <rect width="600" height="600" fill="url(#halo)"/>
+  <!-- Case, back view with camera island -->
+  <rect x="205" y="135" width="190" height="340" rx="38" fill="#1a2138" stroke="#3b82f6" stroke-width="7"/>
+  <rect x="222" y="152" width="156" height="306" rx="26" fill="#202a48" opacity="0.7"/>
+  <rect x="238" y="172" width="76" height="76" rx="20" fill="#141b31" stroke="#60a5fa" stroke-width="5"/>
+  <circle cx="262" cy="196" r="12" fill="#2b3763" stroke="#60a5fa" stroke-width="4"/>
+  <circle cx="292" cy="226" r="12" fill="#2b3763" stroke="#60a5fa" stroke-width="4"/>
+  <circle cx="296" cy="192" r="4" fill="#60a5fa" opacity="0.6"/>
+  <!-- Side buttons -->
+  <rect x="398" y="220" width="8" height="46" rx="4" fill="#3b82f6" opacity="0.7"/>
+  <rect x="398" y="284" width="8" height="30" rx="4" fill="#3b82f6" opacity="0.5"/>
+  <text x="300" y="540" text-anchor="middle" fill="#445070" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="bold" letter-spacing="8">MOBILUX</text>
+</svg>

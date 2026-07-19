@@ -101,7 +101,7 @@ export default async function ProductPage({
           ) : (
             // eslint-disable-next-line @next/next/no-img-element -- static SVG placeholder
             <img
-              src={productPlaceholder(product.category)}
+              src={productPlaceholder(product)}
               alt=""
               className="size-full object-cover"
             />

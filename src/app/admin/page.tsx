@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { CountUp } from "@/components/count-up";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
 import { STATUS_META, STATUS_PIPELINE } from "@/lib/status";
@@ -146,7 +147,7 @@ export default async function AdminOverviewPage() {
   const financeStats = [
     {
       label: "Total revenue",
-      value: formatLKR(revenue),
+      value: <CountUp value={revenue} format="lkr" />,
       sub: `${formatLKR(revenueThisMonth)} this month`,
       icon: Banknote,
       className: "text-success",
@@ -154,7 +155,7 @@ export default async function AdminOverviewPage() {
     },
     {
       label: "Parts & costs",
-      value: formatLKR(costs),
+      value: <CountUp value={costs} format="lkr" />,
       sub: `${formatLKR(costsThisMonth)} this month`,
       icon: Wallet,
       className: "text-warning",
@@ -162,7 +163,7 @@ export default async function AdminOverviewPage() {
     },
     {
       label: "Net profit",
-      value: formatLKR(profit),
+      value: <CountUp value={profit} format="lkr" />,
       sub: `${formatLKR(profitThisMonth)} this month`,
       icon: TrendingUp,
       className: profitTone,
@@ -170,7 +171,7 @@ export default async function AdminOverviewPage() {
     },
     {
       label: "Profit margin",
-      value: `${profitMargin.toFixed(1)}%`,
+      value: <CountUp value={profitMargin} format="percent1" />,
       sub: "of revenue kept as profit",
       icon: Percent,
       className: profitTone,
@@ -181,7 +182,7 @@ export default async function AdminOverviewPage() {
   const repairStats = [
     {
       label: "Total repairs",
-      value: String(totalTickets),
+      value: <CountUp value={totalTickets} />,
       sub: `${completedThisMonth} completed this month`,
       icon: Smartphone,
       className: "text-primary",
@@ -189,7 +190,7 @@ export default async function AdminOverviewPage() {
     },
     {
       label: "Repaired successfully",
-      value: String(succeeded),
+      value: <CountUp value={succeeded} />,
       sub: cancelled > 0 ? `${cancelled} cancelled` : "no cancellations",
       icon: CheckCircle2,
       className: "text-success",
@@ -197,7 +198,12 @@ export default async function AdminOverviewPage() {
     },
     {
       label: "Success rate",
-      value: successRate === null ? "—" : `${successRate.toFixed(1)}%`,
+      value:
+        successRate === null ? (
+          "—"
+        ) : (
+          <CountUp value={successRate} format="percent1" />
+        ),
       sub: "of finished repairs succeeded",
       icon: Target,
       className: "text-success",
@@ -205,7 +211,7 @@ export default async function AdminOverviewPage() {
     },
     {
       label: "Avg. per repair",
-      value: formatLKR(avgPerRepair),
+      value: <CountUp value={avgPerRepair} format="lkr" />,
       sub: `across ${paidRepairs} paid repair${paidRepairs === 1 ? "" : "s"}`,
       icon: Banknote,
       className: "text-primary",
@@ -214,10 +220,10 @@ export default async function AdminOverviewPage() {
   ];
 
   const opsStats = [
-    { label: "Active repairs", value: String(activeCount), icon: Wrench, className: "text-primary" },
-    { label: "Awaiting pickup", value: String(readyCount), icon: Clock, className: "text-warning" },
-    { label: "Completed this month", value: String(completedThisMonth), icon: CheckCircle2, className: "text-success" },
-    { label: "Customers", value: String(customerCount), icon: Users, className: "text-info" },
+    { label: "Active repairs", value: <CountUp value={activeCount} />, icon: Wrench, className: "text-primary" },
+    { label: "Awaiting pickup", value: <CountUp value={readyCount} />, icon: Clock, className: "text-warning" },
+    { label: "Completed this month", value: <CountUp value={completedThisMonth} />, icon: CheckCircle2, className: "text-success" },
+    { label: "Customers", value: <CountUp value={customerCount} />, icon: Users, className: "text-info" },
   ];
 
   return (
