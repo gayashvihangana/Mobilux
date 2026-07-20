@@ -16,6 +16,7 @@ export type BillTicket = {
   paidAmount: string | null;
   discountPercent: string | null;
   partsUsed: string | null;
+  billNotes: string | null;
   customerName: string | null;
   customer: { name: string; email: string; phone: string | null } | null;
   paidPayment: { amount: string; createdAt: Date } | null;

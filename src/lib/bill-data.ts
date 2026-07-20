@@ -37,6 +37,7 @@ export async function fetchBillTicket(
       paidAmount: ticket.paidAmount?.toString() ?? null,
       discountPercent: ticket.discountPercent?.toString() ?? null,
       partsUsed: ticket.partsUsed,
+      billNotes: ticket.billNotes,
       customerName: ticket.customerName,
       customer: ticket.customer,
       paidPayment: ticket.payments[0]

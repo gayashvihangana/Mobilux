@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
-import { STATUS_META } from "@/lib/status";
+import { doneLabel, milestoneDescription } from "@/lib/status";
 import {
   DONE_TICKET_STATUSES,
   syncCompletedRepairs,
@@ -344,6 +344,37 @@ export async function updateTicketDetails(
   return { success: true };
 }
 
+// ── Admin: bill notes (customer-facing, shown on the invoice) ────
+
+export async function updateBillNotes(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const ticketId = formData.get("ticketId");
+  if (typeof ticketId !== "string") return { error: "Invalid ticket." };
+
+  const parsed = z
+    .string()
+    .trim()
+    .max(2000)
+    .optional()
+    .or(z.literal(""))
+    .safeParse(formData.get("billNotes") ?? "");
+  if (!parsed.success) return { error: "Notes are too long (max 2000)." };
+
+  await prisma.repairTicket.update({
+    where: { id: ticketId },
+    data: { billNotes: parsed.data || null },
+  });
+
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath(`/bill/${ticketId}`);
+  return { success: true };
+}
+
 // ── Admin: link / unlink a customer account ──────────────────────
 
 export async function linkTicketCustomer(
@@ -542,8 +573,8 @@ export async function updateTicketStatus(
       await tx.notification.create({
         data: {
           userId: ticket.customerId,
-          title: `${ticket.ticketNumber} — ${STATUS_META[status as TicketStatus].label}`,
-          body: note || STATUS_META[status as TicketStatus].description,
+          title: `${ticket.ticketNumber} — ${doneLabel(status as TicketStatus)}`,
+          body: note || milestoneDescription(status as TicketStatus),
           href: `/repairs/${ticketId}`,
         },
       });
@@ -553,15 +584,15 @@ export async function updateTicketStatus(
   // Email is best-effort — sendEmail never throws and no-ops when
   // RESEND_API_KEY isn't configured.
   if (ticket.customer?.email) {
-    const meta = STATUS_META[status as TicketStatus];
+    const label = doneLabel(status as TicketStatus);
     const device = [ticket.brand, ticket.model].filter(Boolean).join(" ");
     await sendEmail({
       to: ticket.customer.email,
-      subject: `${ticket.ticketNumber} — ${meta.label}`,
-      heading: `Your repair is now: ${meta.label}`,
+      subject: `${ticket.ticketNumber} — ${label}`,
+      heading: `Your repair is now: ${label}`,
       lines: [
         `Hi ${ticket.customer.name},`,
-        note || meta.description,
+        note || milestoneDescription(status as TicketStatus),
         `Ticket ${ticket.ticketNumber}${device ? ` · ${device}` : ""}`,
       ],
       cta: {

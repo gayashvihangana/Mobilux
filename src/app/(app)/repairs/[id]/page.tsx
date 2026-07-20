@@ -111,7 +111,10 @@ export default async function RepairDetailPage({
             <CardTitle className="font-display text-lg">Repair timeline</CardTitle>
           </CardHeader>
           <CardContent>
-            <StatusHistory updates={ticket.statusUpdates} />
+            <StatusHistory
+              updates={ticket.statusUpdates}
+              status={ticket.status}
+            />
           </CardContent>
         </Card>
 

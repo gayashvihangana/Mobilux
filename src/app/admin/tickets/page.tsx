@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
-import { STATUS_META } from "@/lib/status";
+import { doneLabel, STATUS_META } from "@/lib/status";
 import {
   Table,
   TableBody,
@@ -26,9 +26,9 @@ const FILTERS: { value: string; label: string }[] = [
   { value: "SUBMITTED", label: "Needs confirmation" },
   { value: "CONFIRMED", label: "Confirmed" },
   { value: "RECEIVED", label: "Received" },
-  { value: "DIAGNOSING", label: "Diagnosing" },
-  { value: "AWAITING_PARTS", label: "Awaiting parts" },
-  { value: "IN_PROGRESS", label: "In progress" },
+  { value: "DIAGNOSING", label: "Diagnosed" },
+  { value: "AWAITING_PARTS", label: "Parts arrived" },
+  { value: "IN_PROGRESS", label: "Repair started" },
   { value: "COMPLETED", label: "Completed" },
   { value: "READY_FOR_PICKUP", label: "Ready" },
   { value: "PICKED_UP", label: "Picked up" },
@@ -61,7 +61,7 @@ export default async function AdminTicketsPage({
           </h1>
           <p className="mt-1 text-muted-foreground">
             {tickets.length} repair{tickets.length === 1 ? "" : "s"}
-            {filter ? ` · ${STATUS_META[filter].label}` : ""}
+            {filter ? ` · ${doneLabel(filter)}` : ""}
           </p>
         </div>
         <Button asChild>

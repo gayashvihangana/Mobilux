@@ -18,7 +18,7 @@ import { prisma } from "@/lib/prisma";
 import { CountUp } from "@/components/count-up";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
-import { STATUS_META, STATUS_PIPELINE } from "@/lib/status";
+import { doneLabel, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
 import {
   Table,
   TableBody,
@@ -324,7 +324,7 @@ export default async function AdminOverviewPage() {
                   key={status}
                   className={cn("h-full", STATUS_META[status].dotClassName)}
                   style={{ width: `${(count / pipelineTotal) * 100}%` }}
-                  title={`${STATUS_META[status].label}: ${count}`}
+                  title={`${doneLabel(status)}: ${count}`}
                 />
               );
             })}
@@ -336,7 +336,7 @@ export default async function AdminOverviewPage() {
               return (
                 <span key={status} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <span className={cn("size-2 rounded-full", STATUS_META[status].dotClassName)} />
-                  {STATUS_META[status].label} · {count}
+                  {doneLabel(status)} · {count}
                 </span>
               );
             })}

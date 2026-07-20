@@ -140,7 +140,10 @@ export default async function TrackPage({
               Progress updates
             </h3>
             <div className="mt-5">
-              <StatusHistory updates={ticket.statusUpdates} />
+              <StatusHistory
+                updates={ticket.statusUpdates}
+                status={ticket.status}
+              />
             </div>
           </div>
 

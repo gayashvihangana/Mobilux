@@ -3,10 +3,12 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  Ban,
   CheckCircle2,
   ChevronDown,
   Link2,
   Loader2,
+  Plus,
   Trash2,
   TriangleAlert,
   Undo2,
@@ -35,11 +37,18 @@ import {
 import {
   deleteTicket,
   linkTicketCustomer,
+  updateBillNotes,
   updateTicketDetails,
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
-import { DEVICE_TYPES, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
+import {
+  DEVICE_TYPES,
+  doneLabel,
+  nextStatus,
+  prevStatus,
+  STATUS_PIPELINE,
+} from "@/lib/status";
 
 function useSuccessToast(state: TicketFormState, message: string) {
   const last = useRef<TicketFormState>(null);
@@ -62,62 +71,32 @@ function FormError({ state }: { state: TicketFormState }) {
   );
 }
 
-const STATUS_OPTIONS = Object.entries(STATUS_META).map(([value, meta]) => ({
-  value: value as TicketStatus,
-  label: meta.label,
+// Every status option for the advanced "set any status" override, labelled
+// with its milestone (completed) name so it reads the same as everywhere
+// else. CANCELLED is reached via the dedicated Cancel button instead.
+const STATUS_OPTIONS = STATUS_PIPELINE.map((value) => ({
+  value,
+  label: doneLabel(value),
 }));
 
-// The next/previous status in the normal pipeline. SUBMITTED is excluded
-// from "next" — that transition is handled by the dedicated Accept card
-// with its own wording. CANCELLED isn't part of the pipeline at all, so
-// it has neither.
-function nextStatusOf(status: TicketStatus): TicketStatus | undefined {
-  if (status === "SUBMITTED") return undefined;
-  const index = STATUS_PIPELINE.indexOf(status);
-  if (index === -1 || index === STATUS_PIPELINE.length - 1) return undefined;
-  return STATUS_PIPELINE[index + 1];
-}
-function prevStatusOf(status: TicketStatus): TicketStatus | undefined {
-  const index = STATUS_PIPELINE.indexOf(status);
-  if (index <= 0) return undefined;
-  return STATUS_PIPELINE[index - 1];
-}
+// Description shown under each forward button, keyed by the status the
+// ticket is leaving. The button's TITLE is derived from the milestone it
+// creates — doneLabel(next) — so "click X → an X entry appears" always
+// holds. These lines just say plainly what the click does.
+const STEP_DESCRIPTION: Partial<Record<TicketStatus, string>> = {
+  CONFIRMED: "The device has arrived at the shop.",
+  RECEIVED: "You've identified the fault.",
+  DIAGNOSING: "Replacement parts are in.",
+  AWAITING_PARTS: "Repair work is starting.",
+  IN_PROGRESS: "Repair finished and tested.",
+  COMPLETED: "The customer can come and collect it.",
+  READY_FOR_PICKUP: "Device handed back to the customer.",
+};
 
-// Title + description for each forward transition, keyed by the status
-// the ticket is leaving. Hand-written as matched pairs: the title names
-// what's completing now ("Mark as Diagnosed"), and the description says
-// plainly what that does — so the two never disagree. Derived text broke
-// this: destinations like AWAITING_PARTS carried "parts have arrived",
-// which read as nonsense under a "Mark as Diagnosed" button.
-const STEP_ACTION: Partial<Record<TicketStatus, { title: string; description: string }>> = {
-  CONFIRMED: {
-    title: "Mark as Received",
-    description: "The device is now physically at the shop.",
-  },
-  RECEIVED: {
-    title: "Start Diagnosing",
-    description: "Begin inspecting the device to find the fault.",
-  },
-  DIAGNOSING: {
-    title: "Mark as Diagnosed",
-    description: "The fault is identified — next, source any parts.",
-  },
-  AWAITING_PARTS: {
-    title: "Mark as Parts Arrived",
-    description: "Parts are in — the repair can begin.",
-  },
-  IN_PROGRESS: {
-    title: "Mark as Completed",
-    description: "Repair finished and tested.",
-  },
-  COMPLETED: {
-    title: "Mark as Ready for Pickup",
-    description: "The customer can come and collect it.",
-  },
-  READY_FOR_PICKUP: {
-    title: "Mark as Picked Up",
-    description: "Device handed back to the customer.",
-  },
+// A nicer verb for the one transition where "Mark as Repair Started"
+// would read awkwardly.
+const STEP_TITLE_OVERRIDE: Partial<Record<TicketStatus, string>> = {
+  AWAITING_PARTS: "Start Repair",
 };
 
 export function StatusUpdateForm({
@@ -133,115 +112,191 @@ export function StatusUpdateForm({
   const [showOverride, setShowOverride] = useState(false);
   useEffect(() => setSelected(currentStatus), [currentStatus]);
 
-  const next = nextStatusOf(currentStatus);
-  const prev = prevStatusOf(currentStatus);
+  // SUBMITTED is handled by the dedicated Accept card, so no forward
+  // button here for it.
+  const next = currentStatus === "SUBMITTED" ? null : nextStatus(currentStatus);
+  const prev = prevStatus(currentStatus);
+  const terminal = currentStatus === "PICKED_UP" || currentStatus === "CANCELLED";
 
-  // Whichever submit button is clicked supplies the "status" field, so
-  // the next-step button, the go-back button, and the manual override
-  // all share one form (and one note).
   return (
-    <form action={formAction} className="space-y-3">
+    <div className="space-y-3">
+      {/* Forward / back / override — all one form, one shared note */}
+      <form action={formAction} className="space-y-3">
+        <input type="hidden" name="ticketId" value={ticketId} />
+        <FormError state={state} />
+        <div className="space-y-2">
+          <Label htmlFor="note">
+            Note for customer{" "}
+            <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <Textarea
+            id="note"
+            name="note"
+            rows={3}
+            placeholder="e.g. Replacement display fitted, running final tests."
+            className="resize-none"
+          />
+        </div>
+
+        {next ? (
+          <Button
+            type="submit"
+            name="status"
+            value={next}
+            className="h-auto w-full flex-col items-start gap-0.5 py-3 text-left whitespace-normal"
+            disabled={pending}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-4" />
+              )}
+              {STEP_TITLE_OVERRIDE[currentStatus] ?? `Mark as ${doneLabel(next)}`}
+            </span>
+            {STEP_DESCRIPTION[currentStatus] ? (
+              <span className="text-xs font-normal opacity-80">
+                {STEP_DESCRIPTION[currentStatus]}
+              </span>
+            ) : null}
+          </Button>
+        ) : (
+          <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+            {currentStatus === "CANCELLED"
+              ? "This repair is cancelled — use the override below to reopen it."
+              : "This is the last step — nothing further to mark."}
+          </p>
+        )}
+
+        {prev ? (
+          <Button
+            type="submit"
+            name="status"
+            value={prev}
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground"
+            disabled={pending}
+          >
+            <Undo2 className="size-3.5" />
+            Go back to {doneLabel(prev)}
+          </Button>
+        ) : null}
+
+        {!showOverride ? (
+          <button
+            type="button"
+            onClick={() => setShowOverride(true)}
+            className="flex w-full items-center justify-center gap-1 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Need to skip a step?
+            <ChevronDown className="size-3.5" />
+          </button>
+        ) : (
+          <div className="space-y-2 rounded-xl border border-dashed border-border p-3">
+            <Label htmlFor="status" className="text-xs text-muted-foreground">
+              Set any status directly
+            </Label>
+            <div className="flex gap-2">
+              <Select
+                value={selected}
+                onValueChange={(value) => setSelected(value as TicketStatus)}
+              >
+                <SelectTrigger id="status" className="flex-1" aria-label="New status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="submit"
+                name="status"
+                value={selected}
+                variant="secondary"
+                disabled={pending || selected === currentStatus}
+              >
+                {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                Set
+              </Button>
+            </div>
+          </div>
+        )}
+      </form>
+
+      {/* Cancel — available at any live step, with a required reason */}
+      {!terminal ? <CancelRepairForm ticketId={ticketId} /> : null}
+    </div>
+  );
+}
+
+// Cancel is its own form (separate note) so its reason never mixes with
+// the forward-step note. A repair can be cancelled at any point before
+// pickup — customer changed their mind, unrepairable, too costly, etc.
+function CancelRepairForm({ ticketId }: { ticketId: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(updateTicketStatus, null);
+  useSuccessToast(state, "Repair cancelled — customer notified.");
+
+  useEffect(() => {
+    if (state?.success) setOpen(false);
+  }, [state]);
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+      >
+        <Ban className="size-3.5" /> Cancel this repair
+      </Button>
+    );
+  }
+
+  return (
+    <form
+      action={formAction}
+      className="space-y-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3"
+    >
       <input type="hidden" name="ticketId" value={ticketId} />
+      <input type="hidden" name="status" value="CANCELLED" />
       <FormError state={state} />
-      <div className="space-y-2">
-        <Label htmlFor="note">
-          Note for customer <span className="text-muted-foreground">(optional)</span>
-        </Label>
-        <Textarea
-          id="note"
-          name="note"
-          rows={3}
-          placeholder="e.g. Replacement display fitted, running final tests."
-          className="resize-none"
-        />
-      </div>
-
-      {next ? (
-        <Button
-          type="submit"
-          name="status"
-          value={next}
-          className="h-auto w-full flex-col items-start gap-0.5 py-3 text-left whitespace-normal"
-          disabled={pending}
-        >
-          <span className="flex items-center gap-1.5 text-sm font-semibold">
-            {pending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="size-4" />
-            )}
-            {STEP_ACTION[currentStatus]?.title ?? `Mark as ${STATUS_META[next].label}`}
-          </span>
-          <span className="text-xs font-normal opacity-80">
-            {STEP_ACTION[currentStatus]?.description ?? STATUS_META[next].description}
-          </span>
+      <Label htmlFor="cancel-note" className="text-sm font-medium text-destructive">
+        Reason for cancellation
+      </Label>
+      <Textarea
+        id="cancel-note"
+        name="note"
+        rows={3}
+        required
+        placeholder="e.g. Customer decided not to proceed — repair cost too high. Shown to the customer and on the bill."
+        className="resize-none bg-background"
+      />
+      <div className="flex gap-2">
+        <Button type="submit" variant="destructive" size="sm" disabled={pending}>
+          {pending ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Ban className="size-3.5" />
+          )}
+          Confirm cancellation
         </Button>
-      ) : (
-        <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
-          {currentStatus === "CANCELLED"
-            ? "This repair is cancelled — reopen it below if needed."
-            : "This is the last step — nothing further to mark."}
-        </p>
-      )}
-
-      {prev ? (
         <Button
-          type="submit"
-          name="status"
-          value={prev}
+          type="button"
           variant="ghost"
           size="sm"
-          className="w-full text-muted-foreground"
-          disabled={pending}
+          onClick={() => setOpen(false)}
         >
-          <Undo2 className="size-3.5" />
-          Go back to {STATUS_META[prev].label}
+          Keep repair
         </Button>
-      ) : null}
-
-      {!showOverride ? (
-        <button
-          type="button"
-          onClick={() => setShowOverride(true)}
-          className="flex w-full items-center justify-center gap-1 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          Need to skip a step or cancel this repair?
-          <ChevronDown className="size-3.5" />
-        </button>
-      ) : (
-        <div className="space-y-2 rounded-xl border border-dashed border-border p-3">
-          <Label htmlFor="status" className="text-xs text-muted-foreground">
-            Set any status directly
-          </Label>
-          <div className="flex gap-2">
-            <Select
-              value={selected}
-              onValueChange={(value) => setSelected(value as TicketStatus)}
-            >
-              <SelectTrigger id="status" className="flex-1" aria-label="New status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="submit"
-              name="status"
-              value={selected}
-              variant="secondary"
-              disabled={pending || selected === currentStatus}
-            >
-              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              Set
-            </Button>
-          </div>
-        </div>
-      )}
+      </div>
     </form>
   );
 }
@@ -279,6 +334,65 @@ export function AcceptTicketForm({ ticketId }: { ticketId: string }) {
           <CheckCircle2 className="size-4" />
         )}
         {pending ? "Accepting…" : "Accept request"}
+      </Button>
+    </form>
+  );
+}
+
+// Curate the notes that print on the customer's bill. Pre-seeded with the
+// diagnosis and cancellation notes (the two the shop almost always wants),
+// with one-tap chips to drop in any other timeline note, plus free typing.
+export function BillNotesForm({
+  ticketId,
+  billNotes,
+  suggestions,
+}: {
+  ticketId: string;
+  billNotes: string | null;
+  suggestions: { label: string; text: string }[];
+}) {
+  const [state, formAction, pending] = useActionState(updateBillNotes, null);
+  const [value, setValue] = useState(billNotes ?? "");
+  useSuccessToast(state, "Bill notes saved.");
+
+  const insert = (text: string) => {
+    setValue((cur) => (cur.trim() ? `${cur.trim()}\n${text}` : text));
+  };
+
+  return (
+    <form action={formAction} className="space-y-3">
+      <input type="hidden" name="ticketId" value={ticketId} />
+      <FormError state={state} />
+      {suggestions.length > 0 ? (
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">
+            Tap to add to the bill:
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => insert(s.text)}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              >
+                <Plus className="size-3" /> {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <Textarea
+        name="billNotes"
+        rows={4}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Notes shown to the customer on the bill — e.g. the diagnosis, or why the repair was cancelled. Leave empty to show none."
+        className="resize-none"
+      />
+      <Button type="submit" variant="secondary" disabled={pending}>
+        {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+        Save bill notes
       </Button>
     </form>
   );

@@ -2,7 +2,8 @@ import type { StatusUpdate, TicketStatus } from "@prisma/client";
 import { Check } from "lucide-react";
 import {
   doneLabel,
-  ONGOING_TICKET_STATUSES,
+  milestoneDescription,
+  pendingLabel,
   STATUS_META,
   STATUS_PIPELINE,
 } from "@/lib/status";
@@ -20,19 +21,13 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
 
   const currentIndex = STATUS_PIPELINE.indexOf(status);
   const lastIndex = STATUS_PIPELINE.length - 1;
-  const isOngoing = ONGOING_TICKET_STATUSES.includes(status);
 
-  // Ongoing statuses ("Diagnosing") describe work actively happening —
-  // that node itself is the active one, not yet done. Milestone
-  // statuses ("Received") describe a checkpoint just reached, so it's
-  // already done and the node after it is what's coming up next. Once
-  // the final milestone is reached there's no "next" left at all.
-  const activeIndex = isOngoing
-    ? currentIndex
-    : currentIndex < lastIndex
-      ? currentIndex + 1
-      : -1;
-  const isDone = (index: number) => activeIndex === -1 || index < activeIndex;
+  // status = last COMPLETED milestone, so every node up to and including
+  // it is done (ticked), and the very next node is what's being worked
+  // toward now (the active blue node, shown with its ongoing name). Once
+  // the final milestone is reached there's no active node left.
+  const activeIndex = currentIndex < lastIndex ? currentIndex + 1 : -1;
+  const isDone = (index: number) => index <= currentIndex;
 
   // Color of the connector segment joining index and index+1.
   const segmentClass = (index: number) => {
@@ -95,14 +90,51 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   );
 }
 
-// Vertical history of actual status updates with notes. Each entry marks
-// the moment a status was ENTERED (its timestamp is that moment), so it
-// reads in the live form — "Diagnosing" at the time diagnosis began, not
-// "Diagnosed". The stepper, which shows overall progress, is what flips a
-// passed step to its done form.
-export function StatusHistory({ updates }: { updates: StatusUpdate[] }) {
+// The note-less "what's next" row shown at the very top of the timeline
+// while a ticket is still in progress. Derived from the current status —
+// it has no note and no timestamp, and turns into a real entry once the
+// shop completes that step.
+export function PendingRow({ status }: { status: TicketStatus }) {
+  const label = pendingLabel(status);
+  if (!label) return null;
+  return (
+    <li className="relative flex gap-4 pb-6">
+      <span
+        className="absolute top-5 left-[7px] h-full w-0.5 bg-border"
+        aria-hidden
+      />
+      <span className="relative mt-1 grid size-4 shrink-0 place-items-center">
+        <span className="absolute inline-flex size-4 animate-ping rounded-full bg-primary/40" />
+        <span className="relative size-3 rounded-full border-2 border-primary bg-background" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-sm font-semibold text-primary">{label}</p>
+          <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+            In progress
+          </span>
+        </div>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          We&apos;ll update this as soon as it&apos;s done.
+        </p>
+      </div>
+    </li>
+  );
+}
+
+// Vertical history for the customer. Each finished step is an entry with
+// its completed (milestone) name + note; the current step rides on top as
+// the note-less pending row. `status` is the ticket's current status.
+export function StatusHistory({
+  updates,
+  status,
+}: {
+  updates: StatusUpdate[];
+  status?: TicketStatus;
+}) {
   return (
     <ol className="space-y-0">
+      {status ? <PendingRow status={status} /> : null}
       {updates.map((update, index) => {
         const meta = STATUS_META[update.status];
         const latest = index === 0;
@@ -124,14 +156,14 @@ export function StatusHistory({ updates }: { updates: StatusUpdate[] }) {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className={cn("text-sm font-semibold", latest && "text-foreground")}>
-                  {meta.label}
+                  {doneLabel(update.status)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTime(update.createdAt)}
                 </p>
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                {update.note ?? meta.description}
+                {update.note ?? milestoneDescription(update.status)}
               </p>
             </div>
           </li>

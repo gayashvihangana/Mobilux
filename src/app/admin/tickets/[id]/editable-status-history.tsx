@@ -7,7 +7,9 @@ import type { StatusUpdate } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteStatusUpdate, updateStatusNote } from "@/lib/actions/tickets";
-import { STATUS_META } from "@/lib/status";
+import { PendingRow } from "@/components/status-timeline";
+import { doneLabel, milestoneDescription, STATUS_META } from "@/lib/status";
+import type { TicketStatus } from "@prisma/client";
 import { cn, formatDateTime } from "@/lib/utils";
 
 function NoteEditor({
@@ -35,7 +37,7 @@ function NoteEditor({
         name="note"
         rows={2}
         defaultValue={update.note ?? ""}
-        placeholder={STATUS_META[update.status].description}
+        placeholder={milestoneDescription(update.status)}
         className="resize-none text-sm"
         autoFocus
       />
@@ -102,7 +104,13 @@ function DeleteConfirm({
 // the shop can fix or remove what the customer sees on the timeline.
 // Clearing the text reverts the entry to its default status description;
 // deleting removes only the history entry, never the ticket's status.
-export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) {
+export function EditableStatusHistory({
+  updates,
+  status,
+}: {
+  updates: StatusUpdate[];
+  status?: TicketStatus;
+}) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -113,6 +121,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
 
   return (
     <ol className="space-y-0">
+      {status ? <PendingRow status={status} /> : null}
       {updates.map((update, index) => {
         const meta = STATUS_META[update.status];
         const latest = index === 0;
@@ -136,7 +145,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className={cn("text-sm font-semibold", latest && "text-foreground")}>
-                  {meta.label}
+                  {doneLabel(update.status)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTime(update.createdAt)}
@@ -150,7 +159,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
                         setEditingId(update.id);
                       }}
                       className="rounded-md p-1 text-muted-foreground opacity-60 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                      aria-label={`Edit note for ${meta.label}`}
+                      aria-label={`Edit note for ${doneLabel(update.status)}`}
                     >
                       <Pencil className="size-3.5" />
                     </button>
@@ -161,7 +170,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
                         setDeletingId(update.id);
                       }}
                       className="rounded-md p-1 text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                      aria-label={`Delete ${meta.label} entry`}
+                      aria-label={`Delete ${doneLabel(update.status)} entry`}
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -174,7 +183,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
                 <DeleteConfirm update={update} onClose={closeAll} />
               ) : (
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  {update.note ?? meta.description}
+                  {update.note ?? milestoneDescription(update.status)}
                 </p>
               )}
             </div>

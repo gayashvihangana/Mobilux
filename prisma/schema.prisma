@@ -107,6 +107,7 @@ model RepairTicket {
   partsSupplier    String? // e.g. "Trans Asia Cellular"
   forgottenParts   String? // QA tracking, e.g. "3 Screws"
   adminNotes       String?
+  billNotes        String? // customer-facing notes shown on the bill (diagnosis, cancellation reason, etc.)
   statusUpdates    StatusUpdate[]
   payments         Payment[]
   createdAt        DateTime       @default(now())

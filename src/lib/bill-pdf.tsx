@@ -11,7 +11,7 @@ import {
 import { SHOP, WARRANTY_DAYS } from "@/lib/config";
 import { trackQrDataUrl } from "@/lib/track-qr";
 import { computeBill, type BillTicket } from "@/lib/bill";
-import { STATUS_META } from "@/lib/status";
+import { doneLabel } from "@/lib/status";
 import { formatDate, formatLKR } from "@/lib/utils";
 
 // Mirrors the on-screen BillDocument palette (Tailwind blue/neutral hexes).
@@ -128,6 +128,15 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+  notesBox: {
+    marginTop: 24,
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    padding: 14,
+  },
+  notesText: { fontSize: 9.5, color: C.gray500, marginTop: 5, lineHeight: 1.5 },
   trackBox: {
     marginTop: 28,
     backgroundColor: C.panel,
@@ -215,7 +224,7 @@ function BillPdf({ ticket, trackQr }: { ticket: BillTicket; trackQr: string }) {
             </View>
             <View style={s.deviceCol}>
               <Text style={s.deviceLabel}>Status</Text>
-              <Text style={s.deviceValue}>{STATUS_META[ticket.status].label}</Text>
+              <Text style={s.deviceValue}>{doneLabel(ticket.status)}</Text>
             </View>
           </View>
 
@@ -272,6 +281,13 @@ function BillPdf({ ticket, trackQr }: { ticket: BillTicket; trackQr: string }) {
               {formatLKR(total)}
             </Text>
           </View>
+
+          {ticket.billNotes ? (
+            <View style={s.notesBox}>
+              <Text style={s.sectionLabel}>Notes</Text>
+              <Text style={s.notesText}>{ticket.billNotes}</Text>
+            </View>
+          ) : null}
 
           <View style={s.trackBox}>
             <Image style={s.trackQr} src={trackQr} />

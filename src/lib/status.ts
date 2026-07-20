@@ -80,30 +80,77 @@ export const STATUS_META: Record<
   },
 };
 
-// A few statuses name an ongoing activity ("Diagnosing") rather than a
-// point-in-time checkpoint ("Received"). On the progress stepper, once
-// such a step is behind us, its ongoing name would read as if it were
-// still happening — so a passed node shows this completed form instead.
-// (The timeline log is an event history and keeps the live names, since
-// each entry marks when that phase began.)
+// ─── Milestone model ─────────────────────────────────────────────────
+// A ticket's `status` = the last COMPLETED milestone. `STATUS_META.label`
+// above is the ONGOING/activity name of each step (used for the stepper's
+// active blue node and nowhere else that implies completion). The three
+// helpers below give the other two forms:
+//
+//   doneLabel        — the completed name of a milestone. This is what the
+//                      customer sees once a step is done: the badge, the
+//                      finished stepper nodes, and the timeline entries.
+//                      Clicking "Mark as Diagnosed" records DIAGNOSING,
+//                      which reads "Diagnosed" everywhere it's shown.
+//   pendingLabel     — what the shop is doing / waiting for while the
+//                      ticket sits at a status (the note-less top row of
+//                      the timeline). null once terminal.
+//   milestoneDescription — default body text for a timeline entry that has
+//                      no custom note.
+
 const DONE_LABELS: Partial<Record<TicketStatus, string>> = {
   DIAGNOSING: "Diagnosed",
   AWAITING_PARTS: "Parts Arrived",
-  IN_PROGRESS: "Repaired",
+  IN_PROGRESS: "Repair Started",
 };
 
-// Statuses that describe something actively happening, as opposed to a
-// checkpoint just reached. Being "at" one of these means the work is
-// still underway, not finished — the stepper treats them differently
-// from milestone statuses when deciding what counts as done.
-export const ONGOING_TICKET_STATUSES: TicketStatus[] = [
-  "DIAGNOSING",
-  "AWAITING_PARTS",
-  "IN_PROGRESS",
-];
+const PENDING_LABELS: Partial<Record<TicketStatus, string>> = {
+  SUBMITTED: "Waiting for confirmation",
+  CONFIRMED: "Waiting to receive the device",
+  RECEIVED: "Diagnosing the device",
+  DIAGNOSING: "Waiting for parts",
+  AWAITING_PARTS: "Waiting to start the repair",
+  IN_PROGRESS: "Repair in progress",
+  COMPLETED: "Getting ready for pickup",
+  READY_FOR_PICKUP: "Waiting for pickup",
+  // PICKED_UP / CANCELLED are terminal — nothing pending.
+};
+
+const MILESTONE_DESCRIPTIONS: Record<TicketStatus, string> = {
+  SUBMITTED: "Repair request submitted.",
+  CONFIRMED: "Request accepted by the shop.",
+  RECEIVED: "Device received at the shop.",
+  DIAGNOSING: "Diagnosis complete.",
+  AWAITING_PARTS: "Replacement parts received.",
+  IN_PROGRESS: "Repair work started.",
+  COMPLETED: "Repair completed and tested.",
+  READY_FOR_PICKUP: "Ready to collect.",
+  PICKED_UP: "Device collected. Thank you!",
+  CANCELLED: "This repair was cancelled.",
+};
 
 export function doneLabel(status: TicketStatus): string {
   return DONE_LABELS[status] ?? STATUS_META[status].label;
+}
+
+export function pendingLabel(status: TicketStatus): string | null {
+  return PENDING_LABELS[status] ?? null;
+}
+
+export function milestoneDescription(status: TicketStatus): string {
+  return MILESTONE_DESCRIPTIONS[status];
+}
+
+// Forward/back neighbours in the pipeline (CANCELLED sits outside it).
+export function nextStatus(status: TicketStatus): TicketStatus | null {
+  const i = STATUS_PIPELINE.indexOf(status);
+  if (i === -1 || i === STATUS_PIPELINE.length - 1) return null;
+  return STATUS_PIPELINE[i + 1];
+}
+
+export function prevStatus(status: TicketStatus): TicketStatus | null {
+  const i = STATUS_PIPELINE.indexOf(status);
+  if (i <= 0) return null;
+  return STATUS_PIPELINE[i - 1];
 }
 
 export const ORDER_STATUS_META: Record<

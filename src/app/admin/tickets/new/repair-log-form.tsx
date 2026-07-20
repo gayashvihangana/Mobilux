@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { FieldError } from "@/components/forms/field-error";
 import { adminCreateTicket } from "@/lib/actions/tickets";
-import { DEVICE_TYPES, STATUS_META } from "@/lib/status";
+import { DEVICE_TYPES, doneLabel, STATUS_PIPELINE } from "@/lib/status";
 
 export type CustomerOption = { id: string; name: string; email: string };
 
@@ -152,14 +152,14 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(STATUS_META)
+              {STATUS_PIPELINE
                 // Submitted/Confirmed only apply to online requests that
                 // haven't physically arrived — a manual shop log starts
                 // from the device being in hand.
-                .filter(([value]) => value !== "SUBMITTED" && value !== "CONFIRMED")
-                .map(([value, meta]) => (
+                .filter((value) => value !== "SUBMITTED" && value !== "CONFIRMED")
+                .map((value) => (
                   <SelectItem key={value} value={value}>
-                    {meta.label}
+                    {doneLabel(value)}
                   </SelectItem>
                 ))}
             </SelectContent>

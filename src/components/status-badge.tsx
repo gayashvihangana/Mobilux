@@ -1,6 +1,6 @@
 import type { TicketStatus } from "@prisma/client";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { STATUS_META } from "@/lib/status";
+import { doneLabel, STATUS_META } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 // Statuses where the work is done — shown with a check so they're
@@ -35,7 +35,7 @@ export function StatusBadge({
       ) : cancelled ? (
         <XCircle className="size-3.5 shrink-0" />
       ) : null}
-      {meta.label}
+      {doneLabel(status)}
     </span>
   );
 }

@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock, Smartphone } from "lucide-react";
 import { SHOP, WARRANTY_DAYS } from "@/lib/config";
 import { computeBill, type BillTicket } from "@/lib/bill";
-import { STATUS_META } from "@/lib/status";
+import { doneLabel } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 
 export type { BillTicket };
@@ -92,9 +92,7 @@ export function BillDocument({
             </div>
             <div>
               <p className="text-[11px] text-neutral-400 uppercase">Status</p>
-              <p className="mt-0.5 font-medium">
-                {STATUS_META[ticket.status].label}
-              </p>
+              <p className="mt-0.5 font-medium">{doneLabel(ticket.status)}</p>
             </div>
           </div>
         </div>
@@ -184,6 +182,18 @@ export function BillDocument({
             {formatLKR(total)}
           </p>
         </div>
+
+        {/* Notes (diagnosis, cancellation reason, etc.) */}
+        {ticket.billNotes ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+              Notes
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
+              {ticket.billNotes}
+            </p>
+          </div>
+        ) : null}
 
         {/* Scan-to-track */}
         {trackQr ? (

@@ -28,10 +28,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DEVICE_TYPES } from "@/lib/status";
+import { DEVICE_TYPES, doneLabel } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
   AcceptTicketForm,
+  BillNotesForm,
   DeleteTicketDialog,
   LinkCustomerForm,
   StatusUpdateForm,
@@ -85,6 +86,23 @@ export default async function AdminTicketDetailPage({
     [ticket.brand, ticket.model].filter(Boolean).join(" ") ||
     `Unknown ${deviceLabel.toLowerCase()}`;
   const ownerName = ticket.customer?.name ?? ticket.customerName ?? "Unknown";
+
+  // Quick-insert chips for the bill-notes editor: the diagnosis and
+  // cancellation notes first (the two most-wanted), then any other note
+  // the shop left on the timeline.
+  const billNoteSuggestions = [
+    ...ticket.statusUpdates
+      .filter((u) => u.status === "DIAGNOSING" && u.note)
+      .map((u) => ({ label: "Diagnosis", text: u.note as string })),
+    ...ticket.statusUpdates
+      .filter((u) => u.status === "CANCELLED" && u.note)
+      .map((u) => ({ label: "Cancellation reason", text: u.note as string })),
+    ...ticket.statusUpdates
+      .filter(
+        (u) => u.note && u.status !== "DIAGNOSING" && u.status !== "CANCELLED",
+      )
+      .map((u) => ({ label: doneLabel(u.status), text: u.note as string })),
+  ];
 
   const paid = ticket.paidAmount ? Number(ticket.paidAmount) : null;
   const parts = ticket.partsCost ? Number(ticket.partsCost) : null;
@@ -290,7 +308,10 @@ export default async function AdminTicketDetailPage({
                   </p>
                 </CardHeader>
                 <CardContent>
-                  <EditableStatusHistory updates={ticket.statusUpdates} />
+                  <EditableStatusHistory
+                    updates={ticket.statusUpdates}
+                    status={ticket.status}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -441,6 +462,23 @@ export default async function AdminTicketDetailPage({
               <StatusUpdateForm
                 ticketId={ticket.id}
                 currentStatus={ticket.status}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Bill notes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Bill notes</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Shown to the customer on the bill and PDF.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <BillNotesForm
+                ticketId={ticket.id}
+                billNotes={ticket.billNotes}
+                suggestions={billNoteSuggestions}
               />
             </CardContent>
           </Card>
