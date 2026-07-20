@@ -80,19 +80,16 @@ export const STATUS_META: Record<
   },
 };
 
-// A few statuses describe an ongoing activity ("Diagnosing") rather than
-// a point-in-time checkpoint ("Received"). Once that activity is behind
-// us — a ticked step on the stepper, or a past entry in the timeline —
-// showing the ongoing form reads as if it's still happening. These are
-// the completed-form overrides for those cases; anything not listed
-// here already reads correctly in both tenses.
-const DONE_OVERRIDES: Partial<Record<TicketStatus, { label: string; description: string }>> = {
-  DIAGNOSING: { label: "Diagnosed", description: "Diagnosis complete." },
-  AWAITING_PARTS: {
-    label: "Parts Arrived",
-    description: "Replacement parts have arrived.",
-  },
-  IN_PROGRESS: { label: "Repaired", description: "Repair work is complete." },
+// A few statuses name an ongoing activity ("Diagnosing") rather than a
+// point-in-time checkpoint ("Received"). On the progress stepper, once
+// such a step is behind us, its ongoing name would read as if it were
+// still happening — so a passed node shows this completed form instead.
+// (The timeline log is an event history and keeps the live names, since
+// each entry marks when that phase began.)
+const DONE_LABELS: Partial<Record<TicketStatus, string>> = {
+  DIAGNOSING: "Diagnosed",
+  AWAITING_PARTS: "Parts Arrived",
+  IN_PROGRESS: "Repaired",
 };
 
 // Statuses that describe something actively happening, as opposed to a
@@ -106,11 +103,7 @@ export const ONGOING_TICKET_STATUSES: TicketStatus[] = [
 ];
 
 export function doneLabel(status: TicketStatus): string {
-  return DONE_OVERRIDES[status]?.label ?? STATUS_META[status].label;
-}
-
-export function doneDescription(status: TicketStatus): string {
-  return DONE_OVERRIDES[status]?.description ?? STATUS_META[status].description;
+  return DONE_LABELS[status] ?? STATUS_META[status].label;
 }
 
 export const ORDER_STATUS_META: Record<

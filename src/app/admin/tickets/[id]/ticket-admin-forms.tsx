@@ -39,12 +39,7 @@ import {
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
-import {
-  DEVICE_TYPES,
-  doneDescription,
-  STATUS_META,
-  STATUS_PIPELINE,
-} from "@/lib/status";
+import { DEVICE_TYPES, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
 
 function useSuccessToast(state: TicketFormState, message: string) {
   const last = useRef<TicketFormState>(null);
@@ -88,19 +83,41 @@ function prevStatusOf(status: TicketStatus): TicketStatus | undefined {
   return STATUS_PIPELINE[index - 1];
 }
 
-// Button text for each forward transition. Deliberately hand-written
-// rather than derived from the destination's label: a few destinations
-// (DIAGNOSING, AWAITING_PARTS) name an ongoing activity, so "Mark as
-// Diagnosing" reads as if diagnosis were already finished. These name
-// what's actually completing at the current step instead.
-const STEP_ACTION: Partial<Record<TicketStatus, string>> = {
-  CONFIRMED: "Mark as Received",
-  RECEIVED: "Start Diagnosing",
-  DIAGNOSING: "Mark as Diagnosed",
-  AWAITING_PARTS: "Mark as Parts Arrived",
-  IN_PROGRESS: "Mark as Completed",
-  COMPLETED: "Mark as Ready for Pickup",
-  READY_FOR_PICKUP: "Mark as Picked Up",
+// Title + description for each forward transition, keyed by the status
+// the ticket is leaving. Hand-written as matched pairs: the title names
+// what's completing now ("Mark as Diagnosed"), and the description says
+// plainly what that does — so the two never disagree. Derived text broke
+// this: destinations like AWAITING_PARTS carried "parts have arrived",
+// which read as nonsense under a "Mark as Diagnosed" button.
+const STEP_ACTION: Partial<Record<TicketStatus, { title: string; description: string }>> = {
+  CONFIRMED: {
+    title: "Mark as Received",
+    description: "The device is now physically at the shop.",
+  },
+  RECEIVED: {
+    title: "Start Diagnosing",
+    description: "Begin inspecting the device to find the fault.",
+  },
+  DIAGNOSING: {
+    title: "Mark as Diagnosed",
+    description: "The fault is identified — next, source any parts.",
+  },
+  AWAITING_PARTS: {
+    title: "Mark as Parts Arrived",
+    description: "Parts are in — the repair can begin.",
+  },
+  IN_PROGRESS: {
+    title: "Mark as Completed",
+    description: "Repair finished and tested.",
+  },
+  COMPLETED: {
+    title: "Mark as Ready for Pickup",
+    description: "The customer can come and collect it.",
+  },
+  READY_FOR_PICKUP: {
+    title: "Mark as Picked Up",
+    description: "Device handed back to the customer.",
+  },
 };
 
 export function StatusUpdateForm({
@@ -153,10 +170,10 @@ export function StatusUpdateForm({
             ) : (
               <CheckCircle2 className="size-4" />
             )}
-            {STEP_ACTION[currentStatus] ?? `Mark as ${STATUS_META[next].label}`}
+            {STEP_ACTION[currentStatus]?.title ?? `Mark as ${STATUS_META[next].label}`}
           </span>
           <span className="text-xs font-normal opacity-80">
-            {doneDescription(next)}
+            {STEP_ACTION[currentStatus]?.description ?? STATUS_META[next].description}
           </span>
         </Button>
       ) : (

@@ -1,7 +1,6 @@
 import type { StatusUpdate, TicketStatus } from "@prisma/client";
 import { Check } from "lucide-react";
 import {
-  doneDescription,
   doneLabel,
   ONGOING_TICKET_STATUSES,
   STATUS_META,
@@ -96,9 +95,11 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   );
 }
 
-// Vertical history of actual status updates with notes — every entry is
-// a past event, so it always reads in the completed form ("Diagnosed",
-// not "Diagnosing").
+// Vertical history of actual status updates with notes. Each entry marks
+// the moment a status was ENTERED (its timestamp is that moment), so it
+// reads in the live form — "Diagnosing" at the time diagnosis began, not
+// "Diagnosed". The stepper, which shows overall progress, is what flips a
+// passed step to its done form.
 export function StatusHistory({ updates }: { updates: StatusUpdate[] }) {
   return (
     <ol className="space-y-0">
@@ -123,14 +124,14 @@ export function StatusHistory({ updates }: { updates: StatusUpdate[] }) {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className={cn("text-sm font-semibold", latest && "text-foreground")}>
-                  {doneLabel(update.status)}
+                  {meta.label}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTime(update.createdAt)}
                 </p>
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                {update.note ?? doneDescription(update.status)}
+                {update.note ?? meta.description}
               </p>
             </div>
           </li>
