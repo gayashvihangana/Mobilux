@@ -1,6 +1,12 @@
 import type { StatusUpdate, TicketStatus } from "@prisma/client";
 import { Check } from "lucide-react";
-import { STATUS_META, STATUS_PIPELINE } from "@/lib/status";
+import {
+  doneDescription,
+  doneLabel,
+  ONGOING_TICKET_STATUSES,
+  STATUS_META,
+  STATUS_PIPELINE,
+} from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 
 // Horizontal pipeline stepper (customer-facing "where is my device")
@@ -15,24 +21,32 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
 
   const currentIndex = STATUS_PIPELINE.indexOf(status);
   const lastIndex = STATUS_PIPELINE.length - 1;
-  // The status just reached is a completed checkpoint — ticked like the
-  // ones before it. The node right after it is what's up next, shown as
-  // the active blue step. Once the final status is reached there's no
-  // "next" left, so everything is simply ticked.
-  const nextIndex = currentIndex < lastIndex ? currentIndex + 1 : -1;
+  const isOngoing = ONGOING_TICKET_STATUSES.includes(status);
+
+  // Ongoing statuses ("Diagnosing") describe work actively happening —
+  // that node itself is the active one, not yet done. Milestone
+  // statuses ("Received") describe a checkpoint just reached, so it's
+  // already done and the node after it is what's coming up next. Once
+  // the final milestone is reached there's no "next" left at all.
+  const activeIndex = isOngoing
+    ? currentIndex
+    : currentIndex < lastIndex
+      ? currentIndex + 1
+      : -1;
+  const isDone = (index: number) => activeIndex === -1 || index < activeIndex;
 
   // Color of the connector segment joining index and index+1.
   const segmentClass = (index: number) => {
-    if (index + 1 <= currentIndex) return "bg-success";
-    if (index + 1 === nextIndex) return "bg-primary";
+    if (isDone(index + 1)) return "bg-success";
+    if (index + 1 === activeIndex) return "bg-primary";
     return "bg-border";
   };
 
   return (
     <ol className="flex items-start">
       {STATUS_PIPELINE.map((step, index) => {
-        const done = index <= currentIndex;
-        const current = index === nextIndex;
+        const done = isDone(index);
+        const current = index === activeIndex;
         return (
           <li key={step} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
@@ -70,7 +84,10 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                     : "text-muted-foreground",
               )}
             >
-              {STATUS_META[step].label}
+              {/* Ticked steps are behind us — "Diagnosed", not
+                  "Diagnosing". Current/pending steps haven't happened
+                  yet, so they keep the ongoing/activity name. */}
+              {done ? doneLabel(step) : STATUS_META[step].label}
             </span>
           </li>
         );
@@ -79,7 +96,9 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   );
 }
 
-// Vertical history of actual status updates with notes
+// Vertical history of actual status updates with notes — every entry is
+// a past event, so it always reads in the completed form ("Diagnosed",
+// not "Diagnosing").
 export function StatusHistory({ updates }: { updates: StatusUpdate[] }) {
   return (
     <ol className="space-y-0">
@@ -104,14 +123,14 @@ export function StatusHistory({ updates }: { updates: StatusUpdate[] }) {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className={cn("text-sm font-semibold", latest && "text-foreground")}>
-                  {meta.label}
+                  {doneLabel(update.status)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTime(update.createdAt)}
                 </p>
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                {update.note ?? meta.description}
+                {update.note ?? doneDescription(update.status)}
               </p>
             </div>
           </li>

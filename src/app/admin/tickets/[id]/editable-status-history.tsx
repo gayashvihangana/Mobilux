@@ -7,7 +7,7 @@ import type { StatusUpdate } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteStatusUpdate, updateStatusNote } from "@/lib/actions/tickets";
-import { STATUS_META } from "@/lib/status";
+import { doneDescription, doneLabel, STATUS_META } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 
 function NoteEditor({
@@ -35,7 +35,7 @@ function NoteEditor({
         name="note"
         rows={2}
         defaultValue={update.note ?? ""}
-        placeholder={STATUS_META[update.status].description}
+        placeholder={doneDescription(update.status)}
         className="resize-none text-sm"
         autoFocus
       />
@@ -136,7 +136,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className={cn("text-sm font-semibold", latest && "text-foreground")}>
-                  {meta.label}
+                  {doneLabel(update.status)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTime(update.createdAt)}
@@ -150,7 +150,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
                         setEditingId(update.id);
                       }}
                       className="rounded-md p-1 text-muted-foreground opacity-60 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                      aria-label={`Edit note for ${meta.label}`}
+                      aria-label={`Edit note for ${doneLabel(update.status)}`}
                     >
                       <Pencil className="size-3.5" />
                     </button>
@@ -161,7 +161,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
                         setDeletingId(update.id);
                       }}
                       className="rounded-md p-1 text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                      aria-label={`Delete ${meta.label} entry`}
+                      aria-label={`Delete ${doneLabel(update.status)} entry`}
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -174,7 +174,7 @@ export function EditableStatusHistory({ updates }: { updates: StatusUpdate[] }) 
                 <DeleteConfirm update={update} onClose={closeAll} />
               ) : (
                 <p className="mt-0.5 text-sm text-muted-foreground">
-                  {update.note ?? meta.description}
+                  {update.note ?? doneDescription(update.status)}
                 </p>
               )}
             </div>

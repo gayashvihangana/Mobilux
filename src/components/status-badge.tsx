@@ -34,9 +34,7 @@ export function StatusBadge({
         <CheckCircle2 className="size-3.5 shrink-0" />
       ) : cancelled ? (
         <XCircle className="size-3.5 shrink-0" />
-      ) : (
-        <span className={cn("size-1.5 rounded-full", meta.dotClassName)} />
-      )}
+      ) : null}
       {meta.label}
     </span>
   );

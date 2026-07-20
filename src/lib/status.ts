@@ -80,6 +80,39 @@ export const STATUS_META: Record<
   },
 };
 
+// A few statuses describe an ongoing activity ("Diagnosing") rather than
+// a point-in-time checkpoint ("Received"). Once that activity is behind
+// us — a ticked step on the stepper, or a past entry in the timeline —
+// showing the ongoing form reads as if it's still happening. These are
+// the completed-form overrides for those cases; anything not listed
+// here already reads correctly in both tenses.
+const DONE_OVERRIDES: Partial<Record<TicketStatus, { label: string; description: string }>> = {
+  DIAGNOSING: { label: "Diagnosed", description: "Diagnosis complete." },
+  AWAITING_PARTS: {
+    label: "Parts Arrived",
+    description: "Replacement parts have arrived.",
+  },
+  IN_PROGRESS: { label: "Repaired", description: "Repair work is complete." },
+};
+
+// Statuses that describe something actively happening, as opposed to a
+// checkpoint just reached. Being "at" one of these means the work is
+// still underway, not finished — the stepper treats them differently
+// from milestone statuses when deciding what counts as done.
+export const ONGOING_TICKET_STATUSES: TicketStatus[] = [
+  "DIAGNOSING",
+  "AWAITING_PARTS",
+  "IN_PROGRESS",
+];
+
+export function doneLabel(status: TicketStatus): string {
+  return DONE_OVERRIDES[status]?.label ?? STATUS_META[status].label;
+}
+
+export function doneDescription(status: TicketStatus): string {
+  return DONE_OVERRIDES[status]?.description ?? STATUS_META[status].description;
+}
+
 export const ORDER_STATUS_META: Record<
   OrderStatus,
   { label: string; className: string; dotClassName: string }

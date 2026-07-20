@@ -39,7 +39,12 @@ import {
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
-import { DEVICE_TYPES, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
+import {
+  DEVICE_TYPES,
+  doneDescription,
+  STATUS_META,
+  STATUS_PIPELINE,
+} from "@/lib/status";
 
 function useSuccessToast(state: TicketFormState, message: string) {
   const last = useRef<TicketFormState>(null);
@@ -82,6 +87,21 @@ function prevStatusOf(status: TicketStatus): TicketStatus | undefined {
   if (index <= 0) return undefined;
   return STATUS_PIPELINE[index - 1];
 }
+
+// Button text for each forward transition. Deliberately hand-written
+// rather than derived from the destination's label: a few destinations
+// (DIAGNOSING, AWAITING_PARTS) name an ongoing activity, so "Mark as
+// Diagnosing" reads as if diagnosis were already finished. These name
+// what's actually completing at the current step instead.
+const STEP_ACTION: Partial<Record<TicketStatus, string>> = {
+  CONFIRMED: "Mark as Received",
+  RECEIVED: "Start Diagnosing",
+  DIAGNOSING: "Mark as Diagnosed",
+  AWAITING_PARTS: "Mark as Parts Arrived",
+  IN_PROGRESS: "Mark as Completed",
+  COMPLETED: "Mark as Ready for Pickup",
+  READY_FOR_PICKUP: "Mark as Picked Up",
+};
 
 export function StatusUpdateForm({
   ticketId,
@@ -133,10 +153,10 @@ export function StatusUpdateForm({
             ) : (
               <CheckCircle2 className="size-4" />
             )}
-            Mark as {STATUS_META[next].label}
+            {STEP_ACTION[currentStatus] ?? `Mark as ${STATUS_META[next].label}`}
           </span>
           <span className="text-xs font-normal opacity-80">
-            {STATUS_META[next].description}
+            {doneDescription(next)}
           </span>
         </Button>
       ) : (
