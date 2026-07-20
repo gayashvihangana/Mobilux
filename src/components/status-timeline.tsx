@@ -14,28 +14,32 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   }
 
   const currentIndex = STATUS_PIPELINE.indexOf(status);
-  // The last pipeline step is terminal — once reached, the whole journey
-  // is finished, so it renders filled with a check instead of "current".
-  const finished = currentIndex === STATUS_PIPELINE.length - 1;
+  const lastIndex = STATUS_PIPELINE.length - 1;
+  // The status just reached is a completed checkpoint — ticked like the
+  // ones before it. The node right after it is what's up next, shown as
+  // the active blue step. Once the final status is reached there's no
+  // "next" left, so everything is simply ticked.
+  const nextIndex = currentIndex < lastIndex ? currentIndex + 1 : -1;
+
+  // Color of the connector segment joining index and index+1.
+  const segmentClass = (index: number) => {
+    if (index + 1 <= currentIndex) return "bg-success";
+    if (index + 1 === nextIndex) return "bg-primary";
+    return "bg-border";
+  };
 
   return (
     <ol className="flex items-start">
       {STATUS_PIPELINE.map((step, index) => {
-        const done = index < currentIndex || (finished && index === currentIndex);
-        const current = !done && index === currentIndex;
+        const done = index <= currentIndex;
+        const current = index === nextIndex;
         return (
           <li key={step} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
               <div
                 className={cn(
                   "h-0.5 flex-1",
-                  index === 0
-                    ? "bg-transparent"
-                    : done
-                      ? "bg-success"
-                      : current
-                        ? "bg-primary"
-                        : "bg-border",
+                  index === 0 ? "bg-transparent" : segmentClass(index - 1),
                 )}
               />
               <span
@@ -52,11 +56,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
               <div
                 className={cn(
                   "h-0.5 flex-1",
-                  index === STATUS_PIPELINE.length - 1
-                    ? "bg-transparent"
-                    : done && index < currentIndex
-                      ? "bg-success"
-                      : "bg-border",
+                  index === lastIndex ? "bg-transparent" : segmentClass(index),
                 )}
               />
             </div>

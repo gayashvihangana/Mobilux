@@ -3,12 +3,13 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  ArrowRight,
   CheckCircle2,
+  ChevronDown,
   Link2,
   Loader2,
   Trash2,
   TriangleAlert,
+  Undo2,
 } from "lucide-react";
 import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -38,7 +39,7 @@ import {
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
-import { DEVICE_TYPES, STATUS_META } from "@/lib/status";
+import { DEVICE_TYPES, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
 
 function useSuccessToast(state: TicketFormState, message: string) {
   const last = useRef<TicketFormState>(null);
@@ -66,19 +67,21 @@ const STATUS_OPTIONS = Object.entries(STATUS_META).map(([value, meta]) => ({
   label: meta.label,
 }));
 
-// One-click advance through the normal pipeline. The prompt is the
-// question the admin answers; the target is the status it moves to.
-// SUBMITTED is handled by the dedicated Accept card, and dead ends
-// (PICKED_UP, CANCELLED) fall back to the manual dropdown only.
-const NEXT_STEP: Partial<Record<TicketStatus, { prompt: string; next: TicketStatus }>> = {
-  CONFIRMED: { prompt: "Device received?", next: "RECEIVED" },
-  RECEIVED: { prompt: "Start diagnosing?", next: "DIAGNOSING" },
-  DIAGNOSING: { prompt: "Diagnosed?", next: "AWAITING_PARTS" },
-  AWAITING_PARTS: { prompt: "Parts arrived?", next: "IN_PROGRESS" },
-  IN_PROGRESS: { prompt: "Repair done?", next: "COMPLETED" },
-  COMPLETED: { prompt: "Ready for pickup?", next: "READY_FOR_PICKUP" },
-  READY_FOR_PICKUP: { prompt: "Picked up?", next: "PICKED_UP" },
-};
+// The next/previous status in the normal pipeline. SUBMITTED is excluded
+// from "next" — that transition is handled by the dedicated Accept card
+// with its own wording. CANCELLED isn't part of the pipeline at all, so
+// it has neither.
+function nextStatusOf(status: TicketStatus): TicketStatus | undefined {
+  if (status === "SUBMITTED") return undefined;
+  const index = STATUS_PIPELINE.indexOf(status);
+  if (index === -1 || index === STATUS_PIPELINE.length - 1) return undefined;
+  return STATUS_PIPELINE[index + 1];
+}
+function prevStatusOf(status: TicketStatus): TicketStatus | undefined {
+  const index = STATUS_PIPELINE.indexOf(status);
+  if (index <= 0) return undefined;
+  return STATUS_PIPELINE[index - 1];
+}
 
 export function StatusUpdateForm({
   ticketId,
@@ -90,14 +93,17 @@ export function StatusUpdateForm({
   const [state, formAction, pending] = useActionState(updateTicketStatus, null);
   useSuccessToast(state, "Status updated.");
   const [selected, setSelected] = useState<TicketStatus>(currentStatus);
+  const [showOverride, setShowOverride] = useState(false);
   useEffect(() => setSelected(currentStatus), [currentStatus]);
 
-  const step = currentStatus === "SUBMITTED" ? undefined : NEXT_STEP[currentStatus];
+  const next = nextStatusOf(currentStatus);
+  const prev = prevStatusOf(currentStatus);
 
-  // The clicked submit button supplies the "status" field, so the quick
-  // next-step button and the manual dropdown share one form (and note).
+  // Whichever submit button is clicked supplies the "status" field, so
+  // the next-step button, the go-back button, and the manual override
+  // all share one form (and one note).
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-3">
       <input type="hidden" name="ticketId" value={ticketId} />
       <FormError state={state} />
       <div className="space-y-2">
@@ -113,55 +119,92 @@ export function StatusUpdateForm({
         />
       </div>
 
-      {step ? (
-        <>
-          <Button
-            type="submit"
-            name="status"
-            value={step.next}
-            className="w-full"
-            disabled={pending}
-          >
-            {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-            {step.prompt}
-            <ArrowRight className="size-4" />
-            {STATUS_META[step.next].label}
-          </Button>
-          <div className="flex items-center gap-3">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">or set any status</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
-        </>
-      ) : null}
-
-      <div className="flex gap-2">
-        <Select
-          value={selected}
-          onValueChange={(value) => setSelected(value as TicketStatus)}
-        >
-          <SelectTrigger id="status" className="flex-1" aria-label="New status">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {next ? (
         <Button
           type="submit"
           name="status"
-          value={selected}
-          variant={step ? "secondary" : "default"}
-          disabled={pending || selected === currentStatus}
+          value={next}
+          className="h-auto w-full flex-col items-start gap-0.5 py-3 text-left whitespace-normal"
+          disabled={pending}
         >
-          {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-          Update
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )}
+            Mark as {STATUS_META[next].label}
+          </span>
+          <span className="text-xs font-normal opacity-80">
+            {STATUS_META[next].description}
+          </span>
         </Button>
-      </div>
+      ) : (
+        <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+          {currentStatus === "CANCELLED"
+            ? "This repair is cancelled — reopen it below if needed."
+            : "This is the last step — nothing further to mark."}
+        </p>
+      )}
+
+      {prev ? (
+        <Button
+          type="submit"
+          name="status"
+          value={prev}
+          variant="ghost"
+          size="sm"
+          className="w-full text-muted-foreground"
+          disabled={pending}
+        >
+          <Undo2 className="size-3.5" />
+          Go back to {STATUS_META[prev].label}
+        </Button>
+      ) : null}
+
+      {!showOverride ? (
+        <button
+          type="button"
+          onClick={() => setShowOverride(true)}
+          className="flex w-full items-center justify-center gap-1 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Need to skip a step or cancel this repair?
+          <ChevronDown className="size-3.5" />
+        </button>
+      ) : (
+        <div className="space-y-2 rounded-xl border border-dashed border-border p-3">
+          <Label htmlFor="status" className="text-xs text-muted-foreground">
+            Set any status directly
+          </Label>
+          <div className="flex gap-2">
+            <Select
+              value={selected}
+              onValueChange={(value) => setSelected(value as TicketStatus)}
+            >
+              <SelectTrigger id="status" className="flex-1" aria-label="New status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="submit"
+              name="status"
+              value={selected}
+              variant="secondary"
+              disabled={pending || selected === currentStatus}
+            >
+              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Set
+            </Button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
