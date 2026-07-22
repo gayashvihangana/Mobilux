@@ -32,6 +32,7 @@ export default async function AdminLayout({
                 { href: "/admin/products", label: "Products" },
                 { href: "/admin/orders", label: "Orders" },
                 { href: "/admin/loyalty", label: "Loyalty" },
+                { href: "/admin/settings", label: "Settings" },
               ]}
               homeHref="/admin"
               triggerClassName="-ml-2 shrink-0 sm:hidden"
@@ -52,6 +53,7 @@ export default async function AdminLayout({
                 { href: "/admin/products", label: "Products" },
                 { href: "/admin/orders", label: "Orders" },
                 { href: "/admin/loyalty", label: "Loyalty" },
+                { href: "/admin/settings", label: "Settings" },
               ]}
             />
           </div>

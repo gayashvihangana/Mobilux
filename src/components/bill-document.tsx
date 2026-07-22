@@ -1,5 +1,5 @@
-import { Building2, CheckCircle2, Clock, Smartphone } from "lucide-react";
-import { SHOP, WARRANTY_DAYS } from "@/lib/config";
+import { Building2, ShieldCheck, Smartphone } from "lucide-react";
+import { SHOP } from "@/lib/config";
 import { computeBill, type BillTicket } from "@/lib/bill";
 import { doneLabel } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
@@ -30,22 +30,21 @@ export function BillDocument({
     paidDate,
     paidMethod,
     payTo,
-    warrantyExpiry,
+    show,
   } = computeBill(ticket);
 
   const showSubtotal = isItemized && (items.length > 1 || discountAmount > 0);
+  const showTechnician = show.technician && !!technician;
+  const showDeviceBox = show.device || show.status || showTechnician;
+  const showIssue = show.issue && !!ticket.issueTitle;
+  const showSolution = show.solution && !!ticket.solution;
+  const showWarranty = show.warranty && !!ticket.warrantyPeriod;
+  const paidMeta = [paidMethod, paidDate ? formatDate(paidDate) : null]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="relative mx-auto max-w-3xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-xl print:rounded-none print:border-0 print:shadow-none">
-      {/* PAID seal — stamped diagonally once the bill is settled */}
-      {isSettled ? (
-        <div className="pointer-events-none absolute top-36 right-6 z-10 -rotate-12 select-none sm:top-40 sm:right-10">
-          <div className="rounded-lg border-[3px] border-green-600/70 px-5 py-1.5 text-3xl font-black tracking-[0.2em] text-green-600/70 uppercase">
-            Paid
-          </div>
-        </div>
-      ) : null}
-
+    <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-xl print:rounded-none print:border-0 print:shadow-none">
       {/* Header band */}
       <div className="flex items-start justify-between gap-6 bg-blue-600 px-8 py-7 text-white sm:px-10">
         <div className="flex items-center gap-3">
@@ -97,35 +96,58 @@ export function BillDocument({
         </div>
 
         {/* Device summary */}
-        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-          <div
-            className={cn(
-              "grid gap-3 text-sm",
-              technician ? "sm:grid-cols-4" : "sm:grid-cols-3",
-            )}
-          >
-            <div>
-              <p className="text-[11px] text-neutral-400 uppercase">Device</p>
-              <p className="mt-0.5 font-medium">{deviceName}</p>
+        {showDeviceBox ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <div className="grid gap-3 text-sm sm:grid-cols-3">
+              {show.device ? (
+                <div>
+                  <p className="text-[11px] text-neutral-400 uppercase">Device</p>
+                  <p className="mt-0.5 font-medium">{deviceName}</p>
+                </div>
+              ) : null}
+              {show.status ? (
+                <div>
+                  <p className="text-[11px] text-neutral-400 uppercase">Status</p>
+                  <p className="mt-0.5 font-medium">{doneLabel(ticket.status)}</p>
+                </div>
+              ) : null}
+              {showTechnician ? (
+                <div>
+                  <p className="text-[11px] text-neutral-400 uppercase">
+                    Technician
+                  </p>
+                  <p className="mt-0.5 font-medium">{technician}</p>
+                </div>
+              ) : null}
             </div>
-            <div>
-              <p className="text-[11px] text-neutral-400 uppercase">Issue</p>
-              <p className="mt-0.5 font-medium">{ticket.issueTitle}</p>
-            </div>
-            <div>
-              <p className="text-[11px] text-neutral-400 uppercase">Status</p>
-              <p className="mt-0.5 font-medium">{doneLabel(ticket.status)}</p>
-            </div>
-            {technician ? (
+          </div>
+        ) : null}
+
+        {/* Repair details — issue & what we did */}
+        {showIssue || showSolution ? (
+          <div className="grid gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4 sm:grid-cols-2">
+            {showIssue ? (
               <div>
-                <p className="text-[11px] text-neutral-400 uppercase">
-                  Technician
+                <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+                  Issue
                 </p>
-                <p className="mt-0.5 font-medium">{technician}</p>
+                <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
+                  {ticket.issueTitle}
+                </p>
+              </div>
+            ) : null}
+            {showSolution ? (
+              <div>
+                <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+                  What we did
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
+                  {ticket.solution}
+                </p>
               </div>
             ) : null}
           </div>
-        </div>
+        ) : null}
 
         {/* Line items */}
         <table className="w-full text-sm">
@@ -191,50 +213,31 @@ export function BillDocument({
           </tfoot>
         </table>
 
-        {/* Payment status */}
-        <div
-          className={cn(
-            "flex items-center justify-between rounded-xl border p-4",
-            isSettled
-              ? "border-green-200 bg-green-50"
-              : "border-amber-200 bg-amber-50",
-          )}
-        >
-          <div className="flex items-center gap-2.5">
-            {isSettled ? (
-              <CheckCircle2 className="size-5 text-green-600" />
-            ) : (
-              <Clock className="size-5 text-amber-600" />
-            )}
-            <div>
-              <p
-                className={cn(
-                  "text-sm font-semibold",
-                  isSettled ? "text-green-700" : "text-amber-700",
-                )}
-              >
-                {isSettled ? "Paid in full" : "Balance due"}
+        {/* PAID seal — horizontal, straight after the total */}
+        {isSettled ? (
+          <div className="flex justify-center">
+            <div className="rounded-md border-[3px] border-green-600/70 px-8 py-2 text-center">
+              <p className="text-2xl leading-none font-black tracking-[0.25em] text-green-600/80 uppercase">
+                Paid
               </p>
-              {isSettled && paidDate ? (
-                <p className="text-xs text-neutral-500">
-                  {paidMethod ? `${paidMethod} · ` : ""}
-                  {formatDate(paidDate)}
+              {paidMeta ? (
+                <p className="mt-1 text-[10px] font-medium tracking-widest text-green-700/70 uppercase">
+                  {paidMeta}
                 </p>
               ) : null}
             </div>
           </div>
-          <p
-            className={cn(
-              "font-display text-lg font-bold",
-              isSettled ? "text-green-700" : "text-amber-700",
-            )}
-          >
-            {formatLKR(total)}
-          </p>
-        </div>
+        ) : (
+          <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-700">Balance due</p>
+            <p className="font-display text-lg font-bold text-amber-700">
+              {formatLKR(total)}
+            </p>
+          </div>
+        )}
 
         {/* How to pay — only while there's a balance due */}
-        {!isSettled && total > 0 ? (
+        {!isSettled && show.payment && total > 0 ? (
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
             <div className="flex items-center gap-2">
               <Building2 className="size-4 text-neutral-500" />
@@ -277,8 +280,28 @@ export function BillDocument({
           </div>
         ) : null}
 
+        {/* Warranty — only when enabled and a period is set */}
+        {showWarranty ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-neutral-500" />
+              <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+                Warranty
+              </p>
+            </div>
+            <p className="mt-2 text-sm text-neutral-700">
+              <span className="font-medium">{ticket.warrantyPeriod}</span>{" "}
+              warranty
+              {ticket.warrantyParts ? (
+                <> on {ticket.warrantyParts}</>
+              ) : null}
+              .
+            </p>
+          </div>
+        ) : null}
+
         {/* Notes (diagnosis, cancellation reason, etc.) */}
-        {ticket.billNotes ? (
+        {show.notes && ticket.billNotes ? (
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
               Notes
@@ -290,7 +313,7 @@ export function BillDocument({
         ) : null}
 
         {/* Scan-to-track */}
-        {trackQr ? (
+        {show.track && trackQr ? (
           <div className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
             {/* eslint-disable-next-line @next/next/no-img-element -- static data URL */}
             <img
@@ -311,14 +334,6 @@ export function BillDocument({
 
         {/* Footer */}
         <div className="space-y-1 border-t border-neutral-200 pt-6 text-center text-xs text-neutral-400">
-          {warrantyExpiry ? (
-            <p>
-              Covered by a {WARRANTY_DAYS}-day service warranty, valid until{" "}
-              {formatDate(warrantyExpiry)}.
-            </p>
-          ) : (
-            <p>Covered by a {WARRANTY_DAYS}-day service warranty from completion.</p>
-          )}
           <p>Thank you for trusting {SHOP.name} with your device.</p>
         </div>
       </div>

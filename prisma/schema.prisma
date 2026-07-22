@@ -117,6 +117,9 @@ model RepairTicket {
   billPayTo           Json? // { bankName, branch, accountName, accountNumber } — where to pay, shown on unpaid invoices
   paidAt              DateTime? // when the shop manually marked the bill paid (drives the receipt/PAID stamp)
   paidMethod          String? // e.g. "Cash", "Bank transfer" — printed on the paid receipt
+  warrantyPeriod      String? // e.g. "3 months" — only shown when the warranty field is enabled
+  warrantyParts       String? // e.g. "Display, Battery" — what the warranty covers
+  billShow            Json? // BillShow — per-field visibility toggles for the bill
   statusUpdates    StatusUpdate[]
   payments         Payment[]
   createdAt        DateTime       @default(now())

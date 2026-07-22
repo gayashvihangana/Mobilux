@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { TicketStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { computeBill } from "@/lib/bill";
+import { computeBill, resolveBillShow } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
@@ -387,6 +387,10 @@ const billItemSchema = z.object({
 const generateBillSchema = z.object({
   ticketId: z.string().min(1),
   technician: optionalText(120),
+  issueTitle: optionalText(200),
+  solution: optionalText(2000),
+  warrantyPeriod: optionalText(60),
+  warrantyParts: optionalText(200),
   discountMode: z.enum(["none", "percent", "amount"]),
   discountValue: optionalMoney(),
   payBankName: optionalText(120),
@@ -405,6 +409,10 @@ export async function generateBill(
   const parsed = generateBillSchema.safeParse({
     ticketId: formData.get("ticketId"),
     technician: formData.get("technician"),
+    issueTitle: formData.get("issueTitle"),
+    solution: formData.get("solution"),
+    warrantyPeriod: formData.get("warrantyPeriod"),
+    warrantyParts: formData.get("warrantyParts"),
     discountMode: formData.get("discountMode"),
     discountValue: formData.get("discountValue") ?? "",
     payBankName: formData.get("payBankName"),
@@ -416,6 +424,15 @@ export async function generateBill(
     return { error: "Some bill fields are invalid — please check and retry." };
   }
   const data = parsed.data;
+
+  // Field-visibility toggles arrive as a JSON object of booleans.
+  let showRaw: unknown = {};
+  try {
+    showRaw = JSON.parse((formData.get("billShowJson") as string) || "{}");
+  } catch {
+    showRaw = {};
+  }
+  const billShow = resolveBillShow(showRaw);
 
   // Line items arrive as a JSON string from the client builder.
   let rawItems: unknown;
@@ -470,6 +487,13 @@ export async function generateBill(
       billDiscountAmount: discountAmount ?? null,
       billPayTo: hasPayTo ? payTo : undefined,
       finalCost: total,
+      // Only overwrite the ticket's issue when a value is supplied (it's a
+      // required field); solution/warranty clear to null when blank.
+      ...(data.issueTitle ? { issueTitle: data.issueTitle } : {}),
+      solution: data.solution ?? null,
+      warrantyPeriod: data.warrantyPeriod ?? null,
+      warrantyParts: data.warrantyParts ?? null,
+      billShow,
     },
   });
 

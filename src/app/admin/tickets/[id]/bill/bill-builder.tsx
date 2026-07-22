@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   Download,
   Eye,
+  EyeOff,
   Loader2,
   Plus,
   Receipt,
@@ -16,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -31,9 +33,13 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { BillDocument } from "@/components/bill-document";
-import type { BillTicket } from "@/lib/bill";
+import {
+  DEFAULT_BILL_SHOW,
+  type BillShow,
+  type BillTicket,
+} from "@/lib/bill";
 import { BANK_DETAILS } from "@/lib/config";
-import { formatDate, formatLKR } from "@/lib/utils";
+import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
   generateBill,
   markBillPaid,
@@ -42,6 +48,12 @@ import {
 } from "@/lib/actions/tickets";
 
 type Row = { id: string; label: string; amount: string };
+type PayTo = {
+  bankName: string;
+  branch: string;
+  accountName: string;
+  accountNumber: string;
+};
 
 const PRESETS = [
   "Parts",
@@ -53,6 +65,18 @@ const PRESETS = [
   "Other",
 ];
 
+const TOGGLES: { key: keyof BillShow; label: string }[] = [
+  { key: "device", label: "Device" },
+  { key: "status", label: "Status" },
+  { key: "technician", label: "Technician" },
+  { key: "issue", label: "Issue" },
+  { key: "solution", label: "What we did" },
+  { key: "warranty", label: "Warranty" },
+  { key: "notes", label: "Notes" },
+  { key: "payment", label: "How to pay" },
+  { key: "track", label: "Track QR" },
+];
+
 let rowSeq = 0;
 const newRow = (label = "", amount = ""): Row => ({
   id: `r${rowSeq++}`,
@@ -60,8 +84,6 @@ const newRow = (label = "", amount = ""): Row => ({
   amount,
 });
 
-// Seed the builder from whatever the ticket already has: a saved bill wins;
-// otherwise fall back to the quoted price + any recorded parts.
 function seedRows(bill: BillTicket): Row[] {
   if (bill.billItems && bill.billItems.length > 0) {
     return bill.billItems.map((i) => newRow(i.label, String(i.amount)));
@@ -88,10 +110,38 @@ function useSuccessToast(state: TicketFormState, message: string) {
   }, [state, message]);
 }
 
+function FieldToggle({
+  on,
+  label,
+  onClick,
+}: {
+  on: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+        on
+          ? "border-primary/40 bg-primary/10 text-foreground"
+          : "border-border bg-card text-muted-foreground line-through",
+      )}
+    >
+      {on ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+      {label}
+    </button>
+  );
+}
+
 export function BillBuilder({
   ticketId,
   bill,
   trackQr,
+  defaultPayTo,
   isSettled,
   currentTotal,
   paidDate,
@@ -101,14 +151,29 @@ export function BillBuilder({
   ticketId: string;
   bill: BillTicket;
   trackQr?: string;
+  defaultPayTo?: PayTo;
   isSettled: boolean;
   currentTotal: number;
   paidDate: string | null;
   paidMethod: string | null;
   hasOnlinePayment: boolean;
 }) {
+  const fallbackPayTo: PayTo = defaultPayTo ?? {
+    bankName: BANK_DETAILS.bankName,
+    branch: BANK_DETAILS.branch,
+    accountName: BANK_DETAILS.accountName,
+    accountNumber: BANK_DETAILS.accountNumber,
+  };
+
   const [rows, setRows] = useState<Row[]>(() => seedRows(bill));
   const [technician, setTechnician] = useState(bill.technician ?? "");
+  const [issueTitle, setIssueTitle] = useState(bill.issueTitle ?? "");
+  const [solution, setSolution] = useState(bill.solution ?? "");
+  const [warrantyPeriod, setWarrantyPeriod] = useState(
+    bill.warrantyPeriod ?? "",
+  );
+  const [warrantyParts, setWarrantyParts] = useState(bill.warrantyParts ?? "");
+  const [show, setShow] = useState<BillShow>(bill.billShow ?? DEFAULT_BILL_SHOW);
   const [discountMode, setDiscountMode] = useState<
     "none" | "percent" | "amount"
   >(
@@ -121,11 +186,11 @@ export function BillBuilder({
   const [discountValue, setDiscountValue] = useState(
     bill.billDiscountAmount ?? bill.billDiscountPercent ?? "",
   );
-  const [payTo, setPayTo] = useState({
-    bankName: bill.billPayTo?.bankName ?? BANK_DETAILS.bankName,
-    branch: bill.billPayTo?.branch ?? BANK_DETAILS.branch,
-    accountName: bill.billPayTo?.accountName ?? BANK_DETAILS.accountName,
-    accountNumber: bill.billPayTo?.accountNumber ?? BANK_DETAILS.accountNumber,
+  const [payTo, setPayTo] = useState<PayTo>({
+    bankName: bill.billPayTo?.bankName ?? fallbackPayTo.bankName,
+    branch: bill.billPayTo?.branch ?? fallbackPayTo.branch,
+    accountName: bill.billPayTo?.accountName ?? fallbackPayTo.accountName,
+    accountNumber: bill.billPayTo?.accountNumber ?? fallbackPayTo.accountNumber,
   });
 
   const [state, formAction, pending] = useActionState(generateBill, null);
@@ -135,10 +200,10 @@ export function BillBuilder({
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const removeRow = (id: string) =>
     setRows((rs) => rs.filter((r) => r.id !== id));
-  const addRow = (label = "") =>
-    setRows((rs) => [...rs, newRow(label)]);
+  const addRow = (label = "") => setRows((rs) => [...rs, newRow(label)]);
+  const toggle = (key: keyof BillShow) =>
+    setShow((s) => ({ ...s, [key]: !s[key] }));
 
-  // Cleaned items used for both the preview and the submitted payload.
   const cleanItems = useMemo(
     () =>
       rows
@@ -160,9 +225,10 @@ export function BillBuilder({
         : 0;
   const total = Math.max(0, subtotal - discountAmount);
 
-  // Build a live preview ticket from the current form state.
   const previewTicket: BillTicket = {
     ...bill,
+    issueTitle: issueTitle.trim() || bill.issueTitle,
+    solution: solution.trim() || null,
     technician: technician.trim() || null,
     billItems: cleanItems.length > 0 ? cleanItems : null,
     billDiscountPercent:
@@ -170,6 +236,9 @@ export function BillBuilder({
     billDiscountAmount:
       discountMode === "amount" && discountValue ? String(discountValue) : null,
     billPayTo: payTo,
+    warrantyPeriod: warrantyPeriod.trim() || null,
+    warrantyParts: warrantyParts.trim() || null,
+    billShow: show,
   };
 
   const hasGenerated = !!(bill.billItems && bill.billItems.length > 0);
@@ -185,6 +254,12 @@ export function BillBuilder({
             name="itemsJson"
             value={JSON.stringify(cleanItems)}
           />
+          <input type="hidden" name="billShowJson" value={JSON.stringify(show)} />
+          <input type="hidden" name="technician" value={technician} />
+          <input type="hidden" name="issueTitle" value={issueTitle} />
+          <input type="hidden" name="solution" value={solution} />
+          <input type="hidden" name="warrantyPeriod" value={warrantyPeriod} />
+          <input type="hidden" name="warrantyParts" value={warrantyParts} />
           <input type="hidden" name="discountMode" value={discountMode} />
           <input type="hidden" name="discountValue" value={discountValue} />
           <input type="hidden" name="payBankName" value={payTo.bankName} />
@@ -305,18 +380,66 @@ export function BillBuilder({
                 ) : null}
               </div>
 
+              <Separator />
+
+              {/* Repair details */}
+              <div className="space-y-2">
+                <Label htmlFor="issueTitle">Issue</Label>
+                <Textarea
+                  id="issueTitle"
+                  value={issueTitle}
+                  onChange={(e) => setIssueTitle(e.target.value)}
+                  rows={2}
+                  placeholder="The reported problem"
+                  className="resize-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="solution">What we did</Label>
+                <Textarea
+                  id="solution"
+                  value={solution}
+                  onChange={(e) => setSolution(e.target.value)}
+                  rows={2}
+                  placeholder="What was done to fix it"
+                  className="resize-none"
+                />
+              </div>
+
               {/* Technician */}
               <div className="space-y-2">
-                <Label htmlFor="technician">
-                  Technician{" "}
-                  <span className="text-muted-foreground">(optional)</span>
-                </Label>
+                <Label htmlFor="technician">Technician</Label>
                 <Input
                   id="technician"
                   value={technician}
                   onChange={(e) => setTechnician(e.target.value)}
                   placeholder="Who did the repair"
                 />
+              </div>
+
+              {/* Warranty */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="warrantyPeriod">Warranty period</Label>
+                  <Input
+                    id="warrantyPeriod"
+                    value={warrantyPeriod}
+                    onChange={(e) => setWarrantyPeriod(e.target.value)}
+                    placeholder="e.g. 3 months"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="warrantyParts">Warranty covers</Label>
+                  <Input
+                    id="warrantyParts"
+                    value={warrantyParts}
+                    onChange={(e) => setWarrantyParts(e.target.value)}
+                    placeholder="e.g. Display, Battery"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground sm:col-span-2">
+                  Shown on the bill only when the “Warranty” toggle below is on.
+                </p>
               </div>
 
               <Separator />
@@ -326,7 +449,8 @@ export function BillBuilder({
                 <Label>Payment details (shown while unpaid)</Label>
                 <p className="text-xs text-muted-foreground">
                   Where the customer pays. Prefilled from your shop defaults —
-                  edit for this bill if needed.
+                  edit for this bill if needed, or set the shop default under
+                  Admin → Settings.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
@@ -361,6 +485,26 @@ export function BillBuilder({
                     }
                     placeholder="Account number"
                   />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Field visibility toggles */}
+              <div className="space-y-2">
+                <Label>Show on bill</Label>
+                <p className="text-xs text-muted-foreground">
+                  Tap to show or hide each field on the printed bill.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {TOGGLES.map((t) => (
+                    <FieldToggle
+                      key={t.key}
+                      on={show[t.key]}
+                      label={t.label}
+                      onClick={() => toggle(t.key)}
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -483,7 +627,7 @@ function BillPaymentCard({
               {paidDate ? ` · ${formatDate(paidDate)}` : ""}
             </p>
             <p className="text-xs text-muted-foreground">
-              The bill now shows a PAID stamp and reads as a receipt. Download it
+              The bill now shows a PAID seal and reads as a receipt. Download it
               again to send the paid copy.
             </p>
             {hasOnlinePayment ? (

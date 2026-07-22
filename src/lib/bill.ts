@@ -1,5 +1,5 @@
 import type { TicketStatus } from "@prisma/client";
-import { BANK_DETAILS, WARRANTY_DAYS } from "@/lib/config";
+import { BANK_DETAILS } from "@/lib/config";
 
 // One line on the itemised bill, e.g. { label: "Battery", amount: 4500 }.
 export type BillLineItem = { label: string; amount: number };
@@ -12,6 +12,41 @@ export type BillPayTo = {
   accountName?: string;
   accountNumber?: string;
 };
+
+// Per-field visibility toggles — the admin decides what prints on the bill.
+export type BillShow = {
+  device: boolean;
+  status: boolean;
+  issue: boolean;
+  solution: boolean;
+  technician: boolean;
+  warranty: boolean;
+  notes: boolean;
+  payment: boolean;
+  track: boolean;
+};
+
+export const DEFAULT_BILL_SHOW: BillShow = {
+  device: true,
+  status: true,
+  issue: true,
+  solution: true,
+  technician: true,
+  warranty: false,
+  notes: true,
+  payment: true,
+  track: true,
+};
+
+export function resolveBillShow(raw: unknown): BillShow {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_BILL_SHOW };
+  const r = raw as Record<string, unknown>;
+  const out = { ...DEFAULT_BILL_SHOW };
+  for (const key of Object.keys(DEFAULT_BILL_SHOW) as (keyof BillShow)[]) {
+    if (typeof r[key] === "boolean") out[key] = r[key] as boolean;
+  }
+  return out;
+}
 
 export type BillTicket = {
   id: string;
@@ -39,6 +74,9 @@ export type BillTicket = {
   billPayTo: BillPayTo | null;
   paidAt: Date | null;
   paidMethod: string | null;
+  warrantyPeriod: string | null;
+  warrantyParts: string | null;
+  billShow: BillShow | null;
   customer: { name: string; email: string; phone: string | null } | null;
   paidPayment: { amount: string; createdAt: Date } | null;
 };
@@ -61,7 +99,8 @@ export type BillTotals = {
   paidMethod: string | null;
   // Resolved bank details to print in the "How to pay" block (unpaid only).
   payTo: Required<BillPayTo>;
-  warrantyExpiry: Date | null;
+  // Per-field visibility toggles.
+  show: BillShow;
 };
 
 // Normalises whatever is stored in the billItems JSON column into a clean
@@ -113,12 +152,7 @@ export function computeBill(ticket: BillTicket): BillTotals {
     ? (ticket.paidMethod ?? (ticket.paidPayment ? "Bank transfer" : null))
     : null;
   const payTo = resolvePayTo(ticket.billPayTo);
-
-  const warrantyExpiry = ticket.completedAt
-    ? new Date(
-        ticket.completedAt.getTime() + WARRANTY_DAYS * 24 * 60 * 60 * 1000,
-      )
-    : null;
+  const show = resolveBillShow(ticket.billShow);
 
   const items = normaliseItems(ticket.billItems);
 
@@ -161,7 +195,7 @@ export function computeBill(ticket: BillTicket): BillTotals {
       paidDate,
       paidMethod,
       payTo,
-      warrantyExpiry,
+      show,
     };
   }
 
@@ -195,6 +229,6 @@ export function computeBill(ticket: BillTicket): BillTotals {
     paidDate,
     paidMethod,
     payTo,
-    warrantyExpiry,
+    show,
   };
 }
