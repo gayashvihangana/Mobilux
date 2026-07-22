@@ -6,6 +6,8 @@ import { z } from "zod";
 import type { TicketStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { computeBill } from "@/lib/bill";
+import { fetchBillTicket } from "@/lib/bill-data";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
@@ -372,6 +374,177 @@ export async function updateBillNotes(
 
   revalidatePath(`/admin/tickets/${ticketId}`);
   revalidatePath(`/bill/${ticketId}`);
+  return { success: true };
+}
+
+// ── Admin: build & generate the itemised bill ────────────────────
+
+const billItemSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+  amount: z.coerce.number().min(0).max(100_000_000),
+});
+
+const generateBillSchema = z.object({
+  ticketId: z.string().min(1),
+  technician: optionalText(120),
+  discountMode: z.enum(["none", "percent", "amount"]),
+  discountValue: optionalMoney(),
+  payBankName: optionalText(120),
+  payBranch: optionalText(120),
+  payAccountName: optionalText(120),
+  payAccountNumber: optionalText(60),
+});
+
+export async function generateBill(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const parsed = generateBillSchema.safeParse({
+    ticketId: formData.get("ticketId"),
+    technician: formData.get("technician"),
+    discountMode: formData.get("discountMode"),
+    discountValue: formData.get("discountValue") ?? "",
+    payBankName: formData.get("payBankName"),
+    payBranch: formData.get("payBranch"),
+    payAccountName: formData.get("payAccountName"),
+    payAccountNumber: formData.get("payAccountNumber"),
+  });
+  if (!parsed.success) {
+    return { error: "Some bill fields are invalid — please check and retry." };
+  }
+  const data = parsed.data;
+
+  // Line items arrive as a JSON string from the client builder.
+  let rawItems: unknown;
+  try {
+    rawItems = JSON.parse((formData.get("itemsJson") as string) || "[]");
+  } catch {
+    return { error: "Couldn't read the bill items." };
+  }
+  const itemsParsed = z.array(billItemSchema).max(40).safeParse(rawItems);
+  if (!itemsParsed.success) {
+    return { error: "One or more line items are invalid." };
+  }
+  const items = itemsParsed.data.filter((i) => i.label.length > 0);
+  if (items.length === 0) {
+    return { error: "Add at least one line item before generating the bill." };
+  }
+
+  const discountPercent =
+    data.discountMode === "percent" ? (data.discountValue ?? null) : null;
+  const discountAmount =
+    data.discountMode === "amount" ? (data.discountValue ?? null) : null;
+
+  // Mirror the bill total into finalCost so the online-payment amount
+  // (repairs/[id] payment card) matches the itemised bill exactly. This
+  // uses the same rounding as computeBill's itemised branch.
+  const subtotal =
+    Math.round(items.reduce((s, i) => s + i.amount, 0) * 100) / 100;
+  const disc =
+    discountAmount != null
+      ? Math.min(discountAmount, subtotal)
+      : discountPercent != null
+        ? Math.round(subtotal * (discountPercent / 100) * 100) / 100
+        : 0;
+  const total = Math.round((subtotal - disc) * 100) / 100;
+
+  // Only persist bank details that differ from blank — computeBill falls
+  // back to the shop default (config) for any field left empty.
+  const payTo = {
+    bankName: data.payBankName ?? "",
+    branch: data.payBranch ?? "",
+    accountName: data.payAccountName ?? "",
+    accountNumber: data.payAccountNumber ?? "",
+  };
+  const hasPayTo = Object.values(payTo).some((v) => v !== "");
+
+  await prisma.repairTicket.update({
+    where: { id: data.ticketId },
+    data: {
+      technician: data.technician ?? null,
+      billItems: items,
+      billDiscountPercent: discountPercent ?? null,
+      billDiscountAmount: discountAmount ?? null,
+      billPayTo: hasPayTo ? payTo : undefined,
+      finalCost: total,
+    },
+  });
+
+  revalidatePath(`/admin/tickets/${data.ticketId}/bill`);
+  revalidatePath(`/admin/tickets/${data.ticketId}`);
+  revalidatePath(`/bill/${data.ticketId}`);
+  revalidatePath(`/repairs/${data.ticketId}`);
+  return { success: true };
+}
+
+// ── Admin: mark the bill paid / unpaid (the receipt step) ────────
+
+const markPaidSchema = z.object({
+  ticketId: z.string().min(1),
+  method: z.enum(["Cash", "Bank transfer", "Card", "Other"]),
+});
+
+export async function markBillPaid(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const parsed = markPaidSchema.safeParse({
+    ticketId: formData.get("ticketId"),
+    method: formData.get("method"),
+  });
+  if (!parsed.success) return { error: "Invalid request." };
+
+  const result = await fetchBillTicket(parsed.data.ticketId);
+  if (!result) return { error: "Ticket not found." };
+
+  const { total } = computeBill(result.bill);
+  if (!(total > 0)) {
+    return { error: "Generate the bill (with a total) before marking it paid." };
+  }
+
+  await prisma.repairTicket.update({
+    where: { id: parsed.data.ticketId },
+    data: {
+      paidAmount: total,
+      paidAt: new Date(),
+      paidMethod: parsed.data.method,
+    },
+  });
+
+  revalidatePath(`/admin/tickets/${parsed.data.ticketId}/bill`);
+  revalidatePath(`/admin/tickets/${parsed.data.ticketId}`);
+  revalidatePath(`/bill/${parsed.data.ticketId}`);
+  revalidatePath(`/repairs/${parsed.data.ticketId}`);
+  return { success: true };
+}
+
+export async function markBillUnpaid(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const ticketId = formData.get("ticketId");
+  if (typeof ticketId !== "string") return { error: "Invalid ticket." };
+
+  // Clears only the manual paid record — a verified online payment (if any)
+  // still keeps the bill settled, by design.
+  await prisma.repairTicket.update({
+    where: { id: ticketId },
+    data: { paidAmount: null, paidAt: null, paidMethod: null },
+  });
+
+  revalidatePath(`/admin/tickets/${ticketId}/bill`);
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath(`/bill/${ticketId}`);
+  revalidatePath(`/repairs/${ticketId}`);
   return { success: true };
 }
 

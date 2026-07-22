@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, Smartphone } from "lucide-react";
+import { Building2, CheckCircle2, Clock, Smartphone } from "lucide-react";
 import { SHOP, WARRANTY_DAYS } from "@/lib/config";
 import { computeBill, type BillTicket } from "@/lib/bill";
 import { doneLabel } from "@/lib/status";
@@ -18,17 +18,34 @@ export function BillDocument({
   const {
     deviceName,
     owner,
+    technician,
     billDate,
+    isItemized,
+    items,
     subtotal,
-    discountPercent,
+    discountLabel,
     discountAmount,
     total,
     isSettled,
+    paidDate,
+    paidMethod,
+    payTo,
     warrantyExpiry,
   } = computeBill(ticket);
 
+  const showSubtotal = isItemized && (items.length > 1 || discountAmount > 0);
+
   return (
-    <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-xl print:rounded-none print:border-0 print:shadow-none">
+    <div className="relative mx-auto max-w-3xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-xl print:rounded-none print:border-0 print:shadow-none">
+      {/* PAID seal — stamped diagonally once the bill is settled */}
+      {isSettled ? (
+        <div className="pointer-events-none absolute top-36 right-6 z-10 -rotate-12 select-none sm:top-40 sm:right-10">
+          <div className="rounded-lg border-[3px] border-green-600/70 px-5 py-1.5 text-3xl font-black tracking-[0.2em] text-green-600/70 uppercase">
+            Paid
+          </div>
+        </div>
+      ) : null}
+
       {/* Header band */}
       <div className="flex items-start justify-between gap-6 bg-blue-600 px-8 py-7 text-white sm:px-10">
         <div className="flex items-center gap-3">
@@ -81,7 +98,12 @@ export function BillDocument({
 
         {/* Device summary */}
         <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-          <div className="grid gap-3 text-sm sm:grid-cols-3">
+          <div
+            className={cn(
+              "grid gap-3 text-sm",
+              technician ? "sm:grid-cols-4" : "sm:grid-cols-3",
+            )}
+          >
             <div>
               <p className="text-[11px] text-neutral-400 uppercase">Device</p>
               <p className="mt-0.5 font-medium">{deviceName}</p>
@@ -94,6 +116,14 @@ export function BillDocument({
               <p className="text-[11px] text-neutral-400 uppercase">Status</p>
               <p className="mt-0.5 font-medium">{doneLabel(ticket.status)}</p>
             </div>
+            {technician ? (
+              <div>
+                <p className="text-[11px] text-neutral-400 uppercase">
+                  Technician
+                </p>
+                <p className="mt-0.5 font-medium">{technician}</p>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -106,27 +136,46 @@ export function BillDocument({
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-neutral-100">
-              <td className="py-3.5 align-top">
-                <p className="font-medium">
-                  {ticket.solution || ticket.issueTitle}
-                </p>
-                {ticket.partsUsed ? (
-                  <p className="mt-0.5 text-xs text-neutral-500">
-                    Parts: {ticket.partsUsed}
-                  </p>
-                ) : null}
-              </td>
-              <td className="py-3.5 text-right align-top font-medium whitespace-nowrap">
-                {formatLKR(subtotal)}
-              </td>
-            </tr>
-            {discountAmount > 0 ? (
+            {isItemized ? (
+              items.map((item, i) => (
+                <tr key={`${item.label}-${i}`} className="border-b border-neutral-100">
+                  <td className="py-3 align-top font-medium">{item.label}</td>
+                  <td className="py-3 text-right align-top font-medium whitespace-nowrap">
+                    {formatLKR(item.amount)}
+                  </td>
+                </tr>
+              ))
+            ) : (
               <tr className="border-b border-neutral-100">
-                <td className="py-2.5 text-blue-600">
-                  Loyalty discount ({discountPercent}%)
+                <td className="py-3.5 align-top">
+                  <p className="font-medium">
+                    {ticket.solution || ticket.issueTitle}
+                  </p>
+                  {ticket.partsUsed ? (
+                    <p className="mt-0.5 text-xs text-neutral-500">
+                      Parts: {ticket.partsUsed}
+                    </p>
+                  ) : null}
                 </td>
-                <td className="py-2.5 text-right whitespace-nowrap text-blue-600">
+                <td className="py-3.5 text-right align-top font-medium whitespace-nowrap">
+                  {formatLKR(subtotal)}
+                </td>
+              </tr>
+            )}
+            {showSubtotal ? (
+              <tr>
+                <td className="pt-3 text-right text-neutral-500">Subtotal</td>
+                <td className="pt-3 text-right whitespace-nowrap text-neutral-600">
+                  {formatLKR(subtotal)}
+                </td>
+              </tr>
+            ) : null}
+            {discountAmount > 0 ? (
+              <tr>
+                <td className="py-1.5 text-right text-blue-600">
+                  {discountLabel}
+                </td>
+                <td className="py-1.5 text-right whitespace-nowrap text-blue-600">
                   −{formatLKR(discountAmount)}
                 </td>
               </tr>
@@ -166,9 +215,10 @@ export function BillDocument({
               >
                 {isSettled ? "Paid in full" : "Balance due"}
               </p>
-              {ticket.paidPayment ? (
+              {isSettled && paidDate ? (
                 <p className="text-xs text-neutral-500">
-                  Confirmed {formatDate(ticket.paidPayment.createdAt)}
+                  {paidMethod ? `${paidMethod} · ` : ""}
+                  {formatDate(paidDate)}
                 </p>
               ) : null}
             </div>
@@ -182,6 +232,50 @@ export function BillDocument({
             {formatLKR(total)}
           </p>
         </div>
+
+        {/* How to pay — only while there's a balance due */}
+        {!isSettled && total > 0 ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="size-4 text-neutral-500" />
+              <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+                How to pay
+              </p>
+            </div>
+            <p className="mt-2 text-sm text-neutral-600">
+              Transfer to the account below and keep your receipt, or pay in
+              store. Quote{" "}
+              <span className="font-medium text-neutral-900">
+                {ticket.ticketNumber}
+              </span>{" "}
+              as the reference.
+            </p>
+            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] text-neutral-400 uppercase">Bank</p>
+                <p className="mt-0.5 font-medium">{payTo.bankName}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-neutral-400 uppercase">Branch</p>
+                <p className="mt-0.5 font-medium">{payTo.branch}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-neutral-400 uppercase">
+                  Account name
+                </p>
+                <p className="mt-0.5 font-medium">{payTo.accountName}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-neutral-400 uppercase">
+                  Account number
+                </p>
+                <p className="mt-0.5 font-mono font-medium">
+                  {payTo.accountNumber}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Notes (diagnosis, cancellation reason, etc.) */}
         {ticket.billNotes ? (

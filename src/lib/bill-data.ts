@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { BillTicket } from "@/lib/bill";
+import type { BillLineItem, BillPayTo, BillTicket } from "@/lib/bill";
 
 // Shared by the bill page and the PDF download route so both always
 // render from identical data.
@@ -39,6 +39,13 @@ export async function fetchBillTicket(
       partsUsed: ticket.partsUsed,
       billNotes: ticket.billNotes,
       customerName: ticket.customerName,
+      technician: ticket.technician,
+      billItems: (ticket.billItems as BillLineItem[] | null) ?? null,
+      billDiscountPercent: ticket.billDiscountPercent?.toString() ?? null,
+      billDiscountAmount: ticket.billDiscountAmount?.toString() ?? null,
+      billPayTo: (ticket.billPayTo as BillPayTo | null) ?? null,
+      paidAt: ticket.paidAt,
+      paidMethod: ticket.paidMethod,
       customer: ticket.customer,
       paidPayment: ticket.payments[0]
         ? {

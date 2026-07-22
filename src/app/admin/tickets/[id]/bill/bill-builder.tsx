@@ -1,0 +1,555 @@
+"use client";
+
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { toast } from "sonner";
+import {
+  BadgeCheck,
+  Download,
+  Eye,
+  Loader2,
+  Plus,
+  Receipt,
+  Trash2,
+  Undo2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { BillDocument } from "@/components/bill-document";
+import type { BillTicket } from "@/lib/bill";
+import { BANK_DETAILS } from "@/lib/config";
+import { formatDate, formatLKR } from "@/lib/utils";
+import {
+  generateBill,
+  markBillPaid,
+  markBillUnpaid,
+  type TicketFormState,
+} from "@/lib/actions/tickets";
+
+type Row = { id: string; label: string; amount: string };
+
+const PRESETS = [
+  "Parts",
+  "Battery",
+  "Screen / Display",
+  "Service charge",
+  "Labour",
+  "Diagnostics",
+  "Other",
+];
+
+let rowSeq = 0;
+const newRow = (label = "", amount = ""): Row => ({
+  id: `r${rowSeq++}`,
+  label,
+  amount,
+});
+
+// Seed the builder from whatever the ticket already has: a saved bill wins;
+// otherwise fall back to the quoted price + any recorded parts.
+function seedRows(bill: BillTicket): Row[] {
+  if (bill.billItems && bill.billItems.length > 0) {
+    return bill.billItems.map((i) => newRow(i.label, String(i.amount)));
+  }
+  const rows: Row[] = [
+    newRow("Service charge", bill.finalCost ?? bill.estimatedCost ?? ""),
+  ];
+  if (bill.partsUsed) {
+    for (const part of bill.partsUsed.split(",").map((p) => p.trim())) {
+      if (part) rows.push(newRow(part, ""));
+    }
+  }
+  return rows;
+}
+
+function useSuccessToast(state: TicketFormState, message: string) {
+  const last = useRef<TicketFormState>(null);
+  useEffect(() => {
+    if (state !== last.current) {
+      if (state?.success) toast.success(message);
+      else if (state?.error) toast.error(state.error);
+    }
+    last.current = state;
+  }, [state, message]);
+}
+
+export function BillBuilder({
+  ticketId,
+  bill,
+  trackQr,
+  isSettled,
+  currentTotal,
+  paidDate,
+  paidMethod,
+  hasOnlinePayment,
+}: {
+  ticketId: string;
+  bill: BillTicket;
+  trackQr?: string;
+  isSettled: boolean;
+  currentTotal: number;
+  paidDate: string | null;
+  paidMethod: string | null;
+  hasOnlinePayment: boolean;
+}) {
+  const [rows, setRows] = useState<Row[]>(() => seedRows(bill));
+  const [technician, setTechnician] = useState(bill.technician ?? "");
+  const [discountMode, setDiscountMode] = useState<
+    "none" | "percent" | "amount"
+  >(
+    bill.billDiscountAmount
+      ? "amount"
+      : bill.billDiscountPercent
+        ? "percent"
+        : "none",
+  );
+  const [discountValue, setDiscountValue] = useState(
+    bill.billDiscountAmount ?? bill.billDiscountPercent ?? "",
+  );
+  const [payTo, setPayTo] = useState({
+    bankName: bill.billPayTo?.bankName ?? BANK_DETAILS.bankName,
+    branch: bill.billPayTo?.branch ?? BANK_DETAILS.branch,
+    accountName: bill.billPayTo?.accountName ?? BANK_DETAILS.accountName,
+    accountNumber: bill.billPayTo?.accountNumber ?? BANK_DETAILS.accountNumber,
+  });
+
+  const [state, formAction, pending] = useActionState(generateBill, null);
+  useSuccessToast(state, "Bill generated. You can download it now.");
+
+  const setRow = (id: string, patch: Partial<Row>) =>
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const removeRow = (id: string) =>
+    setRows((rs) => rs.filter((r) => r.id !== id));
+  const addRow = (label = "") =>
+    setRows((rs) => [...rs, newRow(label)]);
+
+  // Cleaned items used for both the preview and the submitted payload.
+  const cleanItems = useMemo(
+    () =>
+      rows
+        .map((r) => ({ label: r.label.trim(), amount: Number(r.amount) || 0 }))
+        .filter((r) => r.label.length > 0),
+    [rows],
+  );
+
+  const subtotal = useMemo(
+    () => cleanItems.reduce((s, i) => s + i.amount, 0),
+    [cleanItems],
+  );
+  const discountNum = Number(discountValue) || 0;
+  const discountAmount =
+    discountMode === "amount"
+      ? Math.min(discountNum, subtotal)
+      : discountMode === "percent"
+        ? Math.round(subtotal * (discountNum / 100) * 100) / 100
+        : 0;
+  const total = Math.max(0, subtotal - discountAmount);
+
+  // Build a live preview ticket from the current form state.
+  const previewTicket: BillTicket = {
+    ...bill,
+    technician: technician.trim() || null,
+    billItems: cleanItems.length > 0 ? cleanItems : null,
+    billDiscountPercent:
+      discountMode === "percent" && discountValue ? String(discountValue) : null,
+    billDiscountAmount:
+      discountMode === "amount" && discountValue ? String(discountValue) : null,
+    billPayTo: payTo,
+  };
+
+  const hasGenerated = !!(bill.billItems && bill.billItems.length > 0);
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* ── Builder ─────────────────────────────────────────── */}
+      <div className="space-y-6">
+        <form action={formAction}>
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <input
+            type="hidden"
+            name="itemsJson"
+            value={JSON.stringify(cleanItems)}
+          />
+          <input type="hidden" name="discountMode" value={discountMode} />
+          <input type="hidden" name="discountValue" value={discountValue} />
+          <input type="hidden" name="payBankName" value={payTo.bankName} />
+          <input type="hidden" name="payBranch" value={payTo.branch} />
+          <input type="hidden" name="payAccountName" value={payTo.accountName} />
+          <input
+            type="hidden"
+            name="payAccountNumber"
+            value={payTo.accountNumber}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-display flex items-center gap-2 text-lg">
+                <Receipt className="size-5 text-primary" /> Bill details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Line items */}
+              <div className="space-y-2">
+                <Label>Line items</Label>
+                <p className="text-xs text-muted-foreground">
+                  Add a row per charge — parts, battery, service, etc. Remove any
+                  you don&apos;t need. These are the prices the customer sees;
+                  your internal part cost and private notes never appear on the
+                  bill.
+                </p>
+                <div className="space-y-2">
+                  {rows.map((row) => (
+                    <div key={row.id} className="flex items-center gap-2">
+                      <Input
+                        aria-label="Item"
+                        value={row.label}
+                        onChange={(e) =>
+                          setRow(row.id, { label: e.target.value })
+                        }
+                        placeholder="e.g. Screen replacement"
+                        className="flex-1"
+                      />
+                      <Input
+                        aria-label="Amount"
+                        value={row.amount}
+                        onChange={(e) =>
+                          setRow(row.id, { amount: e.target.value })
+                        }
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0"
+                        className="w-32"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeRow(row.id)}
+                        aria-label="Remove item"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => addRow(p)}
+                      className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                    >
+                      <Plus className="size-3" /> {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Discount */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="discountMode">Discount</Label>
+                  <Select
+                    value={discountMode}
+                    onValueChange={(v) =>
+                      setDiscountMode(v as "none" | "percent" | "amount")
+                    }
+                  >
+                    <SelectTrigger id="discountMode" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No discount</SelectItem>
+                      <SelectItem value="percent">Percentage (%)</SelectItem>
+                      <SelectItem value="amount">Fixed amount (LKR)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {discountMode !== "none" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="discountValue">
+                      {discountMode === "percent"
+                        ? "Percent off"
+                        : "Amount off (LKR)"}
+                    </Label>
+                    <Input
+                      id="discountValue"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Technician */}
+              <div className="space-y-2">
+                <Label htmlFor="technician">
+                  Technician{" "}
+                  <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id="technician"
+                  value={technician}
+                  onChange={(e) => setTechnician(e.target.value)}
+                  placeholder="Who did the repair"
+                />
+              </div>
+
+              <Separator />
+
+              {/* Pay-to (bank details) */}
+              <div className="space-y-2">
+                <Label>Payment details (shown while unpaid)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Where the customer pays. Prefilled from your shop defaults —
+                  edit for this bill if needed.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    aria-label="Bank name"
+                    value={payTo.bankName}
+                    onChange={(e) =>
+                      setPayTo((p) => ({ ...p, bankName: e.target.value }))
+                    }
+                    placeholder="Bank name"
+                  />
+                  <Input
+                    aria-label="Branch"
+                    value={payTo.branch}
+                    onChange={(e) =>
+                      setPayTo((p) => ({ ...p, branch: e.target.value }))
+                    }
+                    placeholder="Branch"
+                  />
+                  <Input
+                    aria-label="Account name"
+                    value={payTo.accountName}
+                    onChange={(e) =>
+                      setPayTo((p) => ({ ...p, accountName: e.target.value }))
+                    }
+                    placeholder="Account name"
+                  />
+                  <Input
+                    aria-label="Account number"
+                    value={payTo.accountNumber}
+                    onChange={(e) =>
+                      setPayTo((p) => ({ ...p, accountNumber: e.target.value }))
+                    }
+                    placeholder="Account number"
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Live totals */}
+              <div className="space-y-1.5 text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>{formatLKR(subtotal)}</span>
+                </div>
+                {discountAmount > 0 ? (
+                  <div className="flex justify-between text-primary">
+                    <span>Discount</span>
+                    <span>−{formatLKR(discountAmount)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between text-base font-bold">
+                  <span>Total</span>
+                  <span className="font-display">{formatLKR(total)}</span>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={pending || cleanItems.length === 0}
+              >
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Receipt className="size-4" />
+                )}
+                {hasGenerated ? "Update & regenerate bill" : "Generate bill"}
+              </Button>
+
+              {(hasGenerated || state?.success) && (
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="secondary" size="sm">
+                    <a href={`/bill/${ticketId}/pdf`} target="_blank" rel="noreferrer">
+                      <Download className="size-4" /> Download bill
+                    </a>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/bill/${ticketId}`} target="_blank">
+                      <Eye className="size-4" /> View bill
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </form>
+
+        {/* Payment / receipt step */}
+        <BillPaymentCard
+          ticketId={ticketId}
+          isSettled={isSettled}
+          currentTotal={currentTotal}
+          paidDate={paidDate}
+          paidMethod={paidMethod}
+          hasOnlinePayment={hasOnlinePayment}
+        />
+      </div>
+
+      {/* ── Live preview ────────────────────────────────────── */}
+      <div className="space-y-2">
+        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Eye className="size-4" /> Live preview — updates as you type. Download
+          uses the last generated version.
+        </p>
+        <div className="lg:sticky lg:top-6">
+          <BillDocument ticket={previewTicket} trackQr={trackQr} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BillPaymentCard({
+  ticketId,
+  isSettled,
+  currentTotal,
+  paidDate,
+  paidMethod,
+  hasOnlinePayment,
+}: {
+  ticketId: string;
+  isSettled: boolean;
+  currentTotal: number;
+  paidDate: string | null;
+  paidMethod: string | null;
+  hasOnlinePayment: boolean;
+}) {
+  const [method, setMethod] = useState("Cash");
+  const [paidState, paidAction, paying] = useActionState(markBillPaid, null);
+  const [unpaidState, unpaidAction, unpaying] = useActionState(
+    markBillUnpaid,
+    null,
+  );
+  useSuccessToast(paidState, "Marked as paid — the bill is now a receipt.");
+  useSuccessToast(unpaidState, "Reverted to unpaid.");
+
+  return (
+    <Card className={isSettled ? "border-success/40 bg-success/5" : undefined}>
+      <CardHeader>
+        <CardTitle className="font-display flex items-center gap-2 text-lg">
+          <BadgeCheck
+            className={isSettled ? "size-5 text-success" : "size-5 text-primary"}
+          />
+          Payment
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isSettled ? (
+          <>
+            <p className="text-sm">
+              <span className="font-semibold text-success">Paid in full</span>
+              {paidMethod ? ` · ${paidMethod}` : ""}
+              {paidDate ? ` · ${formatDate(paidDate)}` : ""}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The bill now shows a PAID stamp and reads as a receipt. Download it
+              again to send the paid copy.
+            </p>
+            {hasOnlinePayment ? (
+              <p className="text-xs text-muted-foreground">
+                Settled by a verified online payment — manage it under Payments.
+              </p>
+            ) : (
+              <form action={unpaidAction}>
+                <input type="hidden" name="ticketId" value={ticketId} />
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground"
+                  disabled={unpaying}
+                >
+                  {unpaying ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Undo2 className="size-4" />
+                  )}
+                  Mark as unpaid
+                </Button>
+              </form>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Once the customer has paid, record it here to stamp the bill PAID.
+            </p>
+            <form action={paidAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="ticketId" value={ticketId} />
+              <div className="space-y-1.5">
+                <Label htmlFor="method" className="text-xs">
+                  Method
+                </Label>
+                <Select name="method" value={method} onValueChange={setMethod}>
+                  <SelectTrigger id="method" className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Bank transfer">Bank transfer</SelectItem>
+                    <SelectItem value="Card">Card</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" disabled={paying || !(currentTotal > 0)}>
+                {paying ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <BadgeCheck className="size-4" />
+                )}
+                Mark as paid
+              </Button>
+            </form>
+            {!(currentTotal > 0) ? (
+              <p className="text-xs text-muted-foreground">
+                Generate the bill first, then you can mark it paid.
+              </p>
+            ) : null}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

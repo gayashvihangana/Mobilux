@@ -87,12 +87,23 @@ export async function submitReceipt(
     if (ticket.payments.length > 0) {
       return { error: "A payment for this repair is already submitted or paid." };
     }
-    const rules = await prisma.discountRule.findMany({ where: { active: true } });
-    discountPercent = discountForCount(
-      rules,
-      ticket.customer?.completedRepairs ?? 0,
-    );
-    amount = applyDiscount(Number(ticket.finalCost), discountPercent);
+    // An admin-built itemised bill already has its discount baked into
+    // finalCost — pay it as-is, without re-applying the loyalty discount.
+    const isItemized =
+      Array.isArray(ticket.billItems) && ticket.billItems.length > 0;
+    if (isItemized) {
+      discountPercent = 0;
+      amount = Number(ticket.finalCost);
+    } else {
+      const rules = await prisma.discountRule.findMany({
+        where: { active: true },
+      });
+      discountPercent = discountForCount(
+        rules,
+        ticket.customer?.completedRepairs ?? 0,
+      );
+      amount = applyDiscount(Number(ticket.finalCost), discountPercent);
+    }
     label = ticket.ticketNumber;
   } else {
     const order = await prisma.order.findUnique({

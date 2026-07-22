@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   Banknote,
+  Eye,
   Inbox,
   Mail,
   NotebookPen,
@@ -133,9 +134,14 @@ export default async function AdminTicketDetailPage({
         <div className="flex flex-col items-end gap-2">
           <StatusBadge status={ticket.status} className="px-3 py-1.5 text-sm" />
           <div className="flex gap-2">
+            <Button asChild size="sm">
+              <Link href={`/admin/tickets/${ticket.id}/bill`}>
+                <Receipt className="size-4" /> Create bill
+              </Link>
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={`/bill/${ticket.id}`} target="_blank">
-                <Receipt className="size-4" /> View bill
+                <Eye className="size-4" /> View bill
               </Link>
             </Button>
             <DeleteTicketDialog

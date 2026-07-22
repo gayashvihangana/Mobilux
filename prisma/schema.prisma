@@ -108,6 +108,15 @@ model RepairTicket {
   forgottenParts   String? // QA tracking, e.g. "3 Screws"
   adminNotes       String?
   billNotes        String? // customer-facing notes shown on the bill (diagnosis, cancellation reason, etc.)
+  // Admin-built itemised bill — when set, drives the on-screen bill + PDF
+  // instead of the single auto-computed line. See src/lib/bill.ts.
+  technician          String? // who carried out the repair, printed on the bill
+  billItems           Json? // BillLineItem[] = [{ label, amount }] — bill line items
+  billDiscountPercent Decimal? @db.Decimal(5, 2) // bill discount as a % of the subtotal
+  billDiscountAmount  Decimal? @db.Decimal(10, 2) // bill discount as a flat LKR amount
+  billPayTo           Json? // { bankName, branch, accountName, accountNumber } — where to pay, shown on unpaid invoices
+  paidAt              DateTime? // when the shop manually marked the bill paid (drives the receipt/PAID stamp)
+  paidMethod          String? // e.g. "Cash", "Bank transfer" — printed on the paid receipt
   statusUpdates    StatusUpdate[]
   payments         Payment[]
   createdAt        DateTime       @default(now())

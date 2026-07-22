@@ -49,8 +49,13 @@ export default async function RepairDetailPage({
   const discountRules = await prisma.discountRule.findMany({
     where: { active: true },
   });
-  const discountPercent =
-    ticket.discountPercent !== null
+  // An admin-built itemised bill is the final word — its own discount is
+  // already baked into finalCost, so loyalty is not applied again.
+  const isItemized =
+    Array.isArray(ticket.billItems) && ticket.billItems.length > 0;
+  const discountPercent = isItemized
+    ? 0
+    : ticket.discountPercent !== null
       ? Number(ticket.discountPercent)
       : discountForCount(discountRules, ticket.customer?.completedRepairs ?? 0);
 
