@@ -49,6 +49,7 @@ import {
   prevStatus,
   STATUS_PIPELINE,
 } from "@/lib/status";
+import { FormAutosave } from "@/components/forms/form-autosave";
 
 function useSuccessToast(state: TicketFormState, message: string) {
   const last = useRef<TicketFormState>(null);
@@ -425,6 +426,10 @@ export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
 
   return (
     <form action={formAction} className="space-y-4">
+      <FormAutosave
+        storageKey={`ticket-details-${values.ticketId}`}
+        signal={state}
+      />
       <input type="hidden" name="ticketId" value={values.ticketId} />
       <input type="hidden" name="status" value={values.status} />
       <FormError state={state} />

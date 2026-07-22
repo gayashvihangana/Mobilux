@@ -196,6 +196,88 @@ export function BillBuilder({
   const [state, formAction, pending] = useActionState(generateBill, null);
   useSuccessToast(state, "Bill generated. You can download it now.");
 
+  // Draft persistence — keep an unsaved bill across reloads / errors, then
+  // drop it once the bill is generated. Restore runs once on mount; the
+  // first save (seeded values) is skipped so it never clobbers the draft.
+  const draftKey = `mbx-draft:bill-builder-${ticketId}`;
+  const restored = useRef(false);
+  const firstSave = useRef(true);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (Array.isArray(d.rows))
+        setRows(
+          d.rows.map((r: { label?: unknown; amount?: unknown }) =>
+            newRow(String(r.label ?? ""), String(r.amount ?? "")),
+          ),
+        );
+      if (typeof d.technician === "string") setTechnician(d.technician);
+      if (typeof d.issueTitle === "string") setIssueTitle(d.issueTitle);
+      if (typeof d.solution === "string") setSolution(d.solution);
+      if (typeof d.warrantyPeriod === "string")
+        setWarrantyPeriod(d.warrantyPeriod);
+      if (typeof d.warrantyParts === "string") setWarrantyParts(d.warrantyParts);
+      if (d.show) setShow((s) => ({ ...s, ...d.show }));
+      if (d.discountMode) setDiscountMode(d.discountMode);
+      if (typeof d.discountValue === "string") setDiscountValue(d.discountValue);
+      if (d.payTo) setPayTo((p) => ({ ...p, ...d.payTo }));
+    } catch {
+      /* ignore */
+    }
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (firstSave.current) {
+      firstSave.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          rows: rows.map((r) => ({ label: r.label, amount: r.amount })),
+          technician,
+          issueTitle,
+          solution,
+          warrantyPeriod,
+          warrantyParts,
+          show,
+          discountMode,
+          discountValue,
+          payTo,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [
+    rows,
+    technician,
+    issueTitle,
+    solution,
+    warrantyPeriod,
+    warrantyParts,
+    show,
+    discountMode,
+    discountValue,
+    payTo,
+    draftKey,
+  ]);
+
+  useEffect(() => {
+    if (state?.success) {
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [state, draftKey]);
+
   const setRow = (id: string, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   const removeRow = (id: string) =>

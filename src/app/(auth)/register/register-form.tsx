@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/forms/field-error";
+import { FormAutosave } from "@/components/forms/form-autosave";
 import { register } from "@/lib/actions/auth";
 
 export function RegisterForm() {
@@ -14,6 +15,7 @@ export function RegisterForm() {
 
   return (
     <form action={formAction} className="space-y-5">
+      <FormAutosave storageKey="register" signal={state} />
       {state?.error ? (
         <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <TriangleAlert className="size-4 shrink-0" />

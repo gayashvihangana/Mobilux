@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FieldError } from "@/components/forms/field-error";
+import { FormAutosave } from "@/components/forms/form-autosave";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { DEVICE_TYPES, doneLabel, STATUS_PIPELINE } from "@/lib/status";
 
@@ -26,6 +27,7 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
 
   return (
     <form action={formAction} className="space-y-6">
+      <FormAutosave storageKey="admin-new-ticket" signal={state} />
       {state?.error ? (
         <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <TriangleAlert className="size-4 shrink-0" />

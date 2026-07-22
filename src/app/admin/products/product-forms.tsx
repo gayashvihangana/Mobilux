@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FieldError } from "@/components/forms/field-error";
+import { FormAutosave } from "@/components/forms/form-autosave";
 import {
   createProduct,
   deleteProduct,
@@ -82,6 +83,10 @@ export function ProductDialog({ product }: { product?: Product }) {
       </DialogTrigger>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <form action={formAction} className="space-y-4">
+          <FormAutosave
+            storageKey={editing ? `product-${product.id}` : "product-new"}
+            signal={state}
+          />
           {editing ? <input type="hidden" name="id" value={product.id} /> : null}
           <DialogHeader>
             <DialogTitle>
