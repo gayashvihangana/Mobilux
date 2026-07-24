@@ -1,15 +1,36 @@
 import type { StatusUpdate, TicketStatus } from "@prisma/client";
 import { Check } from "lucide-react";
 import {
+  currentActivityLabel,
   doneLabel,
   milestoneDescription,
   pendingLabel,
   STATUS_META,
-  STATUS_PIPELINE,
 } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 
-// Horizontal pipeline stepper (customer-facing "where is my device")
+// The stepper's visual pipeline. "Picked Up" is deliberately NOT its own
+// node — the final "Ready for Pickup" node stands in for collection: it's
+// the blue "awaiting pickup" step while the device waits, then ticks green
+// as "Picked up" once collected. So there's one collection circle, not two.
+const STEPPER_PIPELINE: TicketStatus[] = [
+  "SUBMITTED",
+  "CONFIRMED",
+  "RECEIVED",
+  "DIAGNOSING",
+  "AWAITING_PARTS",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "READY_FOR_PICKUP",
+];
+
+// Horizontal pipeline stepper (customer-facing "where is my device").
+//
+// The blue circle is always the step happening RIGHT NOW — labelled with the
+// current activity ("Waiting to start the repair", "Repair in progress"). The
+// step is not ticked green until that work is actually finished, at which
+// point its label switches to the completed name. Everything ahead is a
+// greyed-out upcoming step.
 export function StatusStepper({ status }: { status: TicketStatus }) {
   if (status === "CANCELLED") {
     return (
@@ -19,28 +40,48 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
     );
   }
 
-  const currentIndex = STATUS_PIPELINE.indexOf(status);
-  const lastIndex = STATUS_PIPELINE.length - 1;
+  const lastIndex = STEPPER_PIPELINE.length - 1;
 
-  // status = last COMPLETED milestone, so every node up to and including
-  // it is done (ticked), and the very next node is what's being worked
-  // toward now (the active blue node, shown with its ongoing name). Once
-  // the final milestone is reached there's no active node left.
-  const activeIndex = currentIndex < lastIndex ? currentIndex + 1 : -1;
-  const isDone = (index: number) => index <= currentIndex;
+  // doneUpTo = index of the last green (finished) node; activeIndex = the
+  // blue "happening now" node. `status` is the last completed milestone, so
+  // the active node is normally the one after it. Collection is special: the
+  // final node stays blue ("awaiting pickup") until the device is collected.
+  let doneUpTo: number;
+  let activeIndex: number;
+  if (status === "PICKED_UP") {
+    doneUpTo = lastIndex;
+    activeIndex = -1;
+  } else if (status === "READY_FOR_PICKUP") {
+    doneUpTo = lastIndex - 1;
+    activeIndex = lastIndex;
+  } else {
+    const ci = STEPPER_PIPELINE.indexOf(status);
+    doneUpTo = ci;
+    activeIndex = ci < lastIndex ? ci + 1 : -1;
+  }
 
   // Color of the connector segment joining index and index+1.
   const segmentClass = (index: number) => {
-    if (isDone(index + 1)) return "bg-success";
+    if (index + 1 <= doneUpTo) return "bg-success";
     if (index + 1 === activeIndex) return "bg-primary";
     return "bg-border";
   };
 
   return (
     <ol className="flex items-start">
-      {STATUS_PIPELINE.map((step, index) => {
-        const done = isDone(index);
+      {STEPPER_PIPELINE.map((step, index) => {
+        const done = index <= doneUpTo;
         const current = index === activeIndex;
+        // Finished steps read as the completed milestone; the last node reads
+        // "Picked up" once collected. The blue node reads the live activity.
+        // Upcoming steps keep their neutral ongoing name.
+        const label = done
+          ? index === lastIndex && status === "PICKED_UP"
+            ? doneLabel("PICKED_UP")
+            : doneLabel(step)
+          : current
+            ? currentActivityLabel(status)
+            : STATUS_META[step].label;
         return (
           <li key={step} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
@@ -78,10 +119,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
                     : "text-muted-foreground",
               )}
             >
-              {/* Ticked steps are behind us — "Diagnosed", not
-                  "Diagnosing". Current/pending steps haven't happened
-                  yet, so they keep the ongoing/activity name. */}
-              {done ? doneLabel(step) : STATUS_META[step].label}
+              {label}
             </span>
           </li>
         );

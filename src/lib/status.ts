@@ -136,6 +136,14 @@ export function pendingLabel(status: TicketStatus): string | null {
   return PENDING_LABELS[status] ?? null;
 }
 
+// The single "what's happening right now" label for a status — the current
+// activity (what the shop is doing / waiting for). Falls back to the done
+// label for terminal statuses (Picked Up, Cancelled) that have no activity.
+// This is what the active blue node and the status pill both read from.
+export function currentActivityLabel(status: TicketStatus): string {
+  return pendingLabel(status) ?? doneLabel(status);
+}
+
 export function milestoneDescription(status: TicketStatus): string {
   return MILESTONE_DESCRIPTIONS[status];
 }

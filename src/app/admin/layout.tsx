@@ -21,7 +21,7 @@ export default async function AdminLayout({
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-6">
+          <div className="flex min-w-0 items-center gap-2 lg:gap-4">
             <MobileNav
               links={[
                 { href: "/admin", label: "Overview" },
@@ -36,15 +36,16 @@ export default async function AdminLayout({
                 { href: "/admin/settings", label: "Settings" },
               ]}
               homeHref="/admin"
-              triggerClassName="-ml-2 shrink-0 sm:hidden"
+              triggerClassName="-ml-2 shrink-0 lg:hidden"
             />
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <Logo href="/admin" />
-              <span className="hidden shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
+              <span className="hidden shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary xl:inline-flex">
                 <ShieldCheck className="size-3" /> Admin
               </span>
             </div>
             <AppNavLinks
+              breakpoint="lg"
               links={[
                 { href: "/admin", label: "Overview" },
                 { href: "/admin/tickets", label: "Repairs" },

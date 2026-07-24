@@ -132,7 +132,11 @@ export default async function AdminTicketDetailPage({
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <StatusBadge status={ticket.status} className="px-3 py-1.5 text-sm" />
+          <StatusBadge
+            status={ticket.status}
+            activity
+            className="px-3 py-1.5 text-sm"
+          />
           <div className="flex gap-2">
             <Button asChild size="sm">
               <Link href={`/admin/tickets/${ticket.id}/bill`}>

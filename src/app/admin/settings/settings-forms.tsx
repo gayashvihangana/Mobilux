@@ -1,67 +1,226 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, Save } from "lucide-react";
+import {
+  Loader2,
+  Pencil,
+  Plus,
+  Star,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/forms/field-error";
 import {
-  updateShopBankDetails,
+  addBankAccount,
+  deleteBankAccount,
+  makePrimaryBankAccount,
+  updateBankAccount,
   type SettingsFormState,
 } from "@/lib/actions/settings";
-import type { ShopPayTo } from "@/lib/settings";
+import type { BankAccount } from "@/lib/settings";
 
-export function ShopBankForm({ payTo }: { payTo: ShopPayTo }) {
-  const [state, formAction, pending] = useActionState(
-    updateShopBankDetails,
-    null,
-  );
+function useFormToast(
+  state: SettingsFormState,
+  message: string,
+  onSuccess?: () => void,
+) {
   const last = useRef<SettingsFormState>(null);
   useEffect(() => {
     if (state !== last.current) {
-      if (state?.success) toast.success("Account details saved.");
-      else if (state?.error) toast.error(state.error);
+      if (state?.success) {
+        toast.success(message);
+        onSuccess?.();
+      } else if (state?.error) {
+        toast.error(state.error);
+      }
     }
     last.current = state;
-  }, [state]);
+  }, [state, message, onSuccess]);
+}
+
+export function BankAccountDialog({ account }: { account?: BankAccount }) {
+  const [open, setOpen] = useState(false);
+  const editing = !!account;
+  const [state, formAction, pending] = useActionState(
+    editing ? updateBankAccount : addBankAccount,
+    null,
+  );
+  useFormToast(state, editing ? "Account updated." : "Account added.", () =>
+    setOpen(false),
+  );
 
   return (
-    <form action={formAction} className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="bankName">Bank name</Label>
-          <Input id="bankName" name="bankName" defaultValue={payTo.bankName} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="branch">Branch</Label>
-          <Input id="branch" name="branch" defaultValue={payTo.branch} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="accountName">Account name</Label>
-          <Input
-            id="accountName"
-            name="accountName"
-            defaultValue={payTo.accountName}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="accountNumber">Account number</Label>
-          <Input
-            id="accountNumber"
-            name="accountNumber"
-            defaultValue={payTo.accountNumber}
-          />
-        </div>
-      </div>
-      <Button type="submit" disabled={pending}>
-        {pending ? (
-          <Loader2 className="size-4 animate-spin" />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {editing ? (
+          <Button variant="ghost" size="icon" className="size-8">
+            <Pencil className="size-4" />
+            <span className="sr-only">Edit account</span>
+          </Button>
         ) : (
-          <Save className="size-4" />
+          <Button>
+            <Plus className="size-4" /> Add account
+          </Button>
         )}
-        Save account details
-      </Button>
-    </form>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <form action={formAction} className="space-y-4">
+          {editing ? <input type="hidden" name="id" value={account.id} /> : null}
+          <DialogHeader>
+            <DialogTitle>
+              {editing ? "Edit bank account" : "Add bank account"}
+            </DialogTitle>
+            <DialogDescription>
+              Accounts customers can pay into. The default account shows on
+              unpaid bills.
+            </DialogDescription>
+          </DialogHeader>
+
+          {state?.error ? (
+            <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <TriangleAlert className="size-4 shrink-0" />
+              {state.error}
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="bankName">Bank name</Label>
+              <Input
+                id="bankName"
+                name="bankName"
+                defaultValue={account?.bankName ?? ""}
+                placeholder="e.g. Commercial Bank"
+                required
+              />
+              <FieldError errors={state?.fieldErrors?.bankName} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branch">Branch</Label>
+              <Input
+                id="branch"
+                name="branch"
+                defaultValue={account?.branch ?? ""}
+                placeholder="e.g. Kandy"
+              />
+              <FieldError errors={state?.fieldErrors?.branch} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="accountName">Account name</Label>
+              <Input
+                id="accountName"
+                name="accountName"
+                defaultValue={account?.accountName ?? ""}
+                placeholder="e.g. Mobilux (Pvt) Ltd"
+                required
+              />
+              <FieldError errors={state?.fieldErrors?.accountName} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="accountNumber">Account number</Label>
+              <Input
+                id="accountNumber"
+                name="accountNumber"
+                defaultValue={account?.accountNumber ?? ""}
+                placeholder="e.g. 1000234567"
+                required
+              />
+              <FieldError errors={state?.fieldErrors?.accountNumber} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+              {editing ? "Save changes" : "Add account"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function MakePrimaryButton({ id }: { id: string }) {
+  const [pending, startTransition] = useTransition();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await makePrimaryBankAccount(id);
+          if (result?.error) toast.error(result.error);
+          else toast.success("Default account updated.");
+        })
+      }
+    >
+      {pending ? (
+        <Loader2 className="size-3.5 animate-spin" />
+      ) : (
+        <Star className="size-3.5" />
+      )}
+      Make default
+    </Button>
+  );
+}
+
+export function DeleteBankAccountButton({ account }: { account: BankAccount }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(deleteBankAccount, null);
+  useFormToast(state, "Account removed.", () => setOpen(false));
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-destructive hover:text-destructive"
+        >
+          <Trash2 className="size-4" />
+          <span className="sr-only">Delete account</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="id" value={account.id} />
+          <DialogHeader>
+            <DialogTitle>Remove this account?</DialogTitle>
+            <DialogDescription>
+              {account.bankName} · {account.accountNumber} will no longer be
+              available to pay into. This won&apos;t change bills already issued.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="destructive" disabled={pending}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Remove account
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
