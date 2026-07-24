@@ -1,6 +1,8 @@
 import * as React from "react";
+import path from "path";
 import {
   Document,
+  Font,
   Image,
   Page,
   renderToBuffer,
@@ -28,9 +30,28 @@ const C = {
   green: "#15803d",
 };
 
-const SERIF = "Times-Roman";
-const SERIF_BOLD = "Times-Bold";
-const SERIF_ITALIC = "Times-Italic";
+// Newsreader — a warm editorial serif (the free stand-in for Claude's serif),
+// registered from the bundled TTFs. Each variant is its own family name so the
+// existing `fontFamily: SERIF_*` styles keep selecting the right file.
+const fontsDir = path.join(process.cwd(), "public", "fonts");
+const SERIF = "Newsreader";
+const SERIF_BOLD = "Newsreader-Bold";
+const SERIF_ITALIC = "Newsreader-Italic";
+
+Font.register({
+  family: SERIF,
+  src: path.join(fontsDir, "newsreader-400-normal.ttf"),
+});
+Font.register({
+  family: SERIF_BOLD,
+  src: path.join(fontsDir, "newsreader-700-normal.ttf"),
+});
+Font.register({
+  family: SERIF_ITALIC,
+  src: path.join(fontsDir, "newsreader-400-italic.ttf"),
+});
+// Newsreader has no hyphenation dictionary; keep words intact like the web view.
+Font.registerHyphenationCallback((word) => [word]);
 
 const s = StyleSheet.create({
   page: {
