@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -30,6 +29,9 @@ const phoneSchema = z
   .optional()
   .or(z.literal(""));
 
+// Admins can CREATE a customer login (email + password). They deliberately
+// cannot edit a customer's name/phone/password afterwards, or delete the
+// account — the only ongoing management action is block / unblock below.
 const createSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters"),
   email: z.string().trim().email("Enter a valid email address"),
@@ -78,72 +80,16 @@ export async function createCustomer(
   return { success: true };
 }
 
-const updateSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().trim().min(2, "Name must be at least 2 characters"),
-  email: z.string().trim().email("Enter a valid email address"),
-  phone: phoneSchema,
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .optional()
-    .or(z.literal("")),
-});
-
-export async function updateCustomer(
-  _prev: CustomerFormState,
-  formData: FormData,
-): Promise<CustomerFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
-
-  const parsed = updateSchema.safeParse({
-    id: formData.get("id"),
-    name: formData.get("name"),
-    email: formData.get("email"),
-    phone: formData.get("phone"),
-    password: formData.get("password"),
-  });
-  if (!parsed.success) {
-    return { fieldErrors: parsed.error.flatten().fieldErrors };
-  }
-
-  const { id, name, email, phone, password } = parsed.data;
-
-  const target = await prisma.user.findUnique({ where: { id } });
-  if (!target || target.role !== "CUSTOMER") {
-    return { error: "Customer not found." };
-  }
-
-  const normalizedEmail = email.toLowerCase();
-  const data: Prisma.UserUpdateInput = {
-    name,
-    email: normalizedEmail,
-    phone: phone || null,
-  };
-  if (password) {
-    data.passwordHash = await bcrypt.hash(password, 12);
-  }
-
-  try {
-    await prisma.user.update({ where: { id }, data });
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return { error: "Another account already uses that email." };
-    }
-    throw e;
-  }
-
-  revalidateCustomers();
-  return { success: true };
-}
-
-export async function deleteCustomer(
+// Block or unblock a customer's login. Blocking stops them signing in;
+// unblocking also clears any pending unblock request.
+export async function setCustomerBlocked(
   _prev: CustomerFormState,
   formData: FormData,
 ): Promise<CustomerFormState> {
   if (!(await requireAdmin())) return { error: "Not authorized." };
 
   const id = formData.get("id");
+  const blocked = formData.get("blocked") === "true";
   if (typeof id !== "string" || !id) return { error: "Customer not found." };
 
   const target = await prisma.user.findUnique({ where: { id } });
@@ -151,9 +97,10 @@ export async function deleteCustomer(
     return { error: "Customer not found." };
   }
 
-  // Repair history is preserved — tickets keep their record and just detach
-  // from the deleted account (customerId → null via onDelete: SetNull).
-  await prisma.user.delete({ where: { id } });
+  await prisma.user.update({
+    where: { id },
+    data: { blocked, unblockRequested: false },
+  });
 
   revalidateCustomers();
   return { success: true };

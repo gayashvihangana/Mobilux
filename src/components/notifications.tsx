@@ -11,7 +11,7 @@ export async function Notifications({ userId }: { userId: string }) {
     prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: 12,
+      take: 50,
     }),
     prisma.notification.count({ where: { userId, read: false } }),
   ]);

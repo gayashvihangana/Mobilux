@@ -46,7 +46,7 @@ export function HeroVisual() {
             <div className="rounded-xl border border-border bg-card p-3">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] text-muted-foreground">
-                  MBX-0042
+                  REP-044
                 </span>
                 <span className="rounded-full border border-primary/30 bg-primary/15 px-2 py-0.5 text-[9px] font-semibold text-primary">
                   In progress
@@ -113,7 +113,7 @@ export function HeroVisual() {
           <CheckCircle2 className="size-3.5 text-success" /> Ready for pickup
         </p>
         <p className="mt-0.5 text-[9px] text-muted-foreground">
-          MBX-0042 · just now
+          REP-044 · just now
         </p>
       </div>
 

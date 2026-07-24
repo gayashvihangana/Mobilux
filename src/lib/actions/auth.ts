@@ -9,6 +9,11 @@ import { prisma } from "@/lib/prisma";
 export type AuthFormState = {
   error?: string;
   fieldErrors?: Record<string, string[]>;
+  // Set when a correct-credentials login is refused because the account is
+  // blocked — the form then offers a "request unblock" button.
+  blocked?: boolean;
+  blockedEmail?: string;
+  unblockRequested?: boolean;
 } | null;
 
 const registerSchema = z.object({
@@ -85,6 +90,21 @@ export async function login(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
+  const email = parsed.data.email.toLowerCase();
+
+  // If the account is blocked, tell the customer directly (only once we've
+  // confirmed the password, so we don't reveal which emails are blocked).
+  const account = await prisma.user.findUnique({ where: { email } });
+  if (account?.blocked) {
+    const ok = await bcrypt.compare(parsed.data.password, account.passwordHash);
+    if (!ok) return { error: "Invalid email or password." };
+    return {
+      blocked: true,
+      blockedEmail: email,
+      unblockRequested: account.unblockRequested,
+    };
+  }
+
   const callbackUrl = formData.get("callbackUrl");
   const redirectTo =
     typeof callbackUrl === "string" && callbackUrl.startsWith("/")
@@ -104,6 +124,42 @@ export async function login(
     }
     throw error;
   }
+}
+
+// A blocked customer asks to be unblocked — flags the account and notifies
+// every admin. Idempotent: only raises one request/notification until an
+// admin acts (block/unblock clears the flag).
+export async function requestUnblock(
+  email: string,
+): Promise<{ ok: boolean; already?: boolean }> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return { ok: false };
+
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
+  if (!user || !user.blocked) return { ok: false };
+  if (user.unblockRequested) return { ok: true, already: true };
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { unblockRequested: true },
+  });
+
+  const admins = await prisma.user.findMany({
+    where: { role: "ADMIN" },
+    select: { id: true },
+  });
+  if (admins.length > 0) {
+    await prisma.notification.createMany({
+      data: admins.map((a) => ({
+        userId: a.id,
+        title: `Unblock request from ${user.name}`,
+        body: `${user.name} (${user.email}) is blocked and asked to be unblocked.`,
+        href: "/admin/customers",
+      })),
+    });
+  }
+
+  return { ok: true };
 }
 
 export async function logout() {

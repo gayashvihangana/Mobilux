@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Pencil, Trash2, TriangleAlert, UserPlus } from "lucide-react";
+import { Ban, CircleCheck, Loader2, TriangleAlert, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,8 +18,7 @@ import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/forms/field-error";
 import {
   createCustomer,
-  deleteCustomer,
-  updateCustomer,
+  setCustomerBlocked,
   type CustomerFormState,
 } from "@/lib/actions/customers";
 
@@ -27,7 +26,7 @@ export type CustomerRow = {
   id: string;
   name: string;
   email: string;
-  phone: string | null;
+  blocked: boolean;
 };
 
 function useFormToast(
@@ -49,46 +48,26 @@ function useFormToast(
   }, [state, message, onSuccess]);
 }
 
-export function CustomerDialog({ customer }: { customer?: CustomerRow }) {
+export function CustomerDialog() {
   const [open, setOpen] = useState(false);
-  const editing = !!customer;
-  const [state, formAction, pending] = useActionState(
-    editing ? updateCustomer : createCustomer,
-    null,
-  );
-  useFormToast(
-    state,
-    editing ? "Customer updated." : "Customer account created.",
-    () => setOpen(false),
-  );
+  const [state, formAction, pending] = useActionState(createCustomer, null);
+  useFormToast(state, "Customer account created.", () => setOpen(false));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        {editing ? (
-          <Button variant="ghost" size="icon" className="size-8">
-            <Pencil className="size-4" />
-            <span className="sr-only">Edit customer</span>
-          </Button>
-        ) : (
-          <Button>
-            <UserPlus className="size-4" /> New customer
-          </Button>
-        )}
+        <Button>
+          <UserPlus className="size-4" /> New customer
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <form action={formAction} className="space-y-4">
-          {editing ? (
-            <input type="hidden" name="id" value={customer.id} />
-          ) : null}
           <DialogHeader>
-            <DialogTitle>
-              {editing ? "Edit customer" : "New customer account"}
-            </DialogTitle>
+            <DialogTitle>New customer account</DialogTitle>
             <DialogDescription>
-              {editing
-                ? "Update the customer's details. Leave the password blank to keep it unchanged."
-                : "Create a login for a customer with an email and password."}
+              Create a login for a customer with an email and password. Details
+              can&apos;t be edited afterwards — customers manage their own
+              profile.
             </DialogDescription>
           </DialogHeader>
 
@@ -104,7 +83,6 @@ export function CustomerDialog({ customer }: { customer?: CustomerRow }) {
             <Input
               id="name"
               name="name"
-              defaultValue={customer?.name ?? ""}
               placeholder="e.g. Nimal Perera"
               required
             />
@@ -118,7 +96,6 @@ export function CustomerDialog({ customer }: { customer?: CustomerRow }) {
                 id="email"
                 name="email"
                 type="email"
-                defaultValue={customer?.email ?? ""}
                 placeholder="name@example.com"
                 required
               />
@@ -126,29 +103,20 @@ export function CustomerDialog({ customer }: { customer?: CustomerRow }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone (optional)</Label>
-              <Input
-                id="phone"
-                name="phone"
-                defaultValue={customer?.phone ?? ""}
-                placeholder="07XXXXXXXX"
-              />
+              <Input id="phone" name="phone" placeholder="07XXXXXXXX" />
               <FieldError errors={state?.fieldErrors?.phone} />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">
-              {editing ? "New password" : "Password"}
-            </Label>
+            <Label htmlFor="password">Password</Label>
             <Input
               id="password"
               name="password"
               type="password"
               autoComplete="new-password"
-              placeholder={
-                editing ? "Leave blank to keep current" : "At least 8 characters"
-              }
-              required={!editing}
+              placeholder="At least 8 characters"
+              required
             />
             <FieldError errors={state?.fieldErrors?.password} />
           </div>
@@ -159,7 +127,7 @@ export function CustomerDialog({ customer }: { customer?: CustomerRow }) {
             </Button>
             <Button type="submit" disabled={pending}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              {editing ? "Save changes" : "Create customer"}
+              Create customer
             </Button>
           </DialogFooter>
         </form>
@@ -168,41 +136,58 @@ export function CustomerDialog({ customer }: { customer?: CustomerRow }) {
   );
 }
 
-export function DeleteCustomerButton({ customer }: { customer: CustomerRow }) {
+export function BlockToggle({ customer }: { customer: CustomerRow }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(deleteCustomer, null);
-  useFormToast(state, "Customer deleted.", () => setOpen(false));
+  const [state, formAction, pending] = useActionState(setCustomerBlocked, null);
+  const blocking = !customer.blocked;
+  useFormToast(
+    state,
+    blocking ? "Customer blocked." : "Customer unblocked.",
+    () => setOpen(false),
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 text-destructive hover:text-destructive"
-        >
-          <Trash2 className="size-4" />
-          <span className="sr-only">Delete customer</span>
-        </Button>
+        {blocking ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+          >
+            <Ban className="size-4" /> Block
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" className="text-success hover:text-success">
+            <CircleCheck className="size-4" /> Unblock
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="id" value={customer.id} />
+          <input type="hidden" name="blocked" value={blocking ? "true" : "false"} />
           <DialogHeader>
-            <DialogTitle>Delete {customer.name}?</DialogTitle>
+            <DialogTitle>
+              {blocking ? `Block ${customer.name}?` : `Unblock ${customer.name}?`}
+            </DialogTitle>
             <DialogDescription>
-              This removes the customer&apos;s login. Their past repairs are kept
-              on record but will no longer be linked to an account. This
-              can&apos;t be undone.
+              {blocking
+                ? "They won't be able to log in until you unblock them. Their repairs and history are kept."
+                : "They'll be able to log in again right away."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="destructive" disabled={pending}>
+            <Button
+              type="submit"
+              variant={blocking ? "destructive" : "default"}
+              disabled={pending}
+            >
               {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              Delete customer
+              {blocking ? "Block customer" : "Unblock customer"}
             </Button>
           </DialogFooter>
         </form>

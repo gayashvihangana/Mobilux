@@ -36,6 +36,10 @@ export const {
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!valid) return null;
 
+        // Blocked accounts can't sign in. The login action surfaces a clear
+        // "you're blocked" message before reaching here; this is the backstop.
+        if (user.blocked) return null;
+
         // Record the sign-in so the admin can see who's active. Fire-and-forget
         // wrapped so a write hiccup never blocks a valid login.
         await prisma.user

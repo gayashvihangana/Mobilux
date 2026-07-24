@@ -1,7 +1,7 @@
 import { SHOP, BILL_QUOTE, WARRANTY_TERMS } from "@/lib/config";
 import { computeBill, invoiceNumber, type BillTicket } from "@/lib/bill";
 import { doneLabel } from "@/lib/status";
-import { formatDate, formatLKR, formatTime } from "@/lib/utils";
+import { formatDate, formatLKR, formatPhoneIntl, formatTime } from "@/lib/utils";
 
 export type { BillTicket };
 
@@ -106,7 +106,11 @@ export function BillDocument({
             <p className="mt-1.5 text-base font-semibold text-neutral-900">
               {owner}
             </p>
-            {phone ? <p className="text-sm text-neutral-500">{phone}</p> : null}
+            {phone ? (
+              <p className="text-sm text-neutral-500">
+                {formatPhoneIntl(phone)}
+              </p>
+            ) : null}
             {ticket.customer?.email ? (
               <p className="text-sm text-neutral-500">{ticket.customer.email}</p>
             ) : null}

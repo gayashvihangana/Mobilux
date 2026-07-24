@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import {
+  Ban,
   CircleUserRound,
-  LogIn,
   Users,
   Wifi,
   XCircle,
@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { CustomerDialog, DeleteCustomerButton } from "./customer-forms";
+import { BlockToggle, CustomerDialog } from "./customer-forms";
 
 export const metadata: Metadata = {
   title: "Customers",
@@ -52,6 +52,8 @@ export default async function AdminCustomersPage() {
       phone: true,
       lastLoginAt: true,
       createdAt: true,
+      blocked: true,
+      unblockRequested: true,
       tickets: { select: { status: true } },
     },
   });
@@ -69,6 +71,8 @@ export default async function AdminCustomersPage() {
       email: c.email,
       phone: c.phone,
       lastLoginAt: c.lastLoginAt,
+      blocked: c.blocked,
+      unblockRequested: c.unblockRequested,
       repairs,
       cancellations,
       online: lastLoginMs !== null && now - lastLoginMs < ONLINE_MS,
@@ -77,9 +81,17 @@ export default async function AdminCustomersPage() {
     };
   });
 
+  // Unblock requests first, then blocked, so anything needing attention floats up.
+  rows.sort(
+    (a, b) =>
+      Number(b.unblockRequested) - Number(a.unblockRequested) ||
+      Number(b.blocked) - Number(a.blocked),
+  );
+
   const total = rows.length;
-  const signedIn = rows.filter((r) => r.hasSignedIn).length;
   const activeThisWeek = rows.filter((r) => r.activeThisWeek).length;
+  const blockedCount = rows.filter((r) => r.blocked).length;
+  const unblockRequests = rows.filter((r) => r.unblockRequested).length;
   const totalCancellations = rows.reduce((s, r) => s + r.cancellations, 0);
 
   const stats = [
@@ -97,11 +109,14 @@ export default async function AdminCustomersPage() {
       sub: "logged in within 7 days",
     },
     {
-      label: "Signed in ever",
-      value: signedIn,
-      icon: LogIn,
-      className: "text-info",
-      sub: `${total - signedIn} never logged in`,
+      label: "Blocked",
+      value: blockedCount,
+      icon: Ban,
+      className: "text-destructive",
+      sub:
+        unblockRequests > 0
+          ? `${unblockRequests} unblock request${unblockRequests > 1 ? "s" : ""}`
+          : "accounts blocked from login",
     },
     {
       label: "Cancellations",
@@ -183,7 +198,19 @@ export default async function AdminCustomersPage() {
                         ) : null}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate font-medium">{row.name}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="truncate font-medium">{row.name}</p>
+                          {row.blocked ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                              <Ban className="size-2.5" /> Blocked
+                            </span>
+                          ) : null}
+                          {row.unblockRequested ? (
+                            <span className="rounded-full border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                              Unblock requested
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="truncate text-xs text-muted-foreground">
                           {row.email}
                         </p>
@@ -224,20 +251,12 @@ export default async function AdminCustomersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
-                      <CustomerDialog
+                      <BlockToggle
                         customer={{
                           id: row.id,
                           name: row.name,
                           email: row.email,
-                          phone: row.phone,
-                        }}
-                      />
-                      <DeleteCustomerButton
-                        customer={{
-                          id: row.id,
-                          name: row.name,
-                          email: row.email,
-                          phone: row.phone,
+                          blocked: row.blocked,
                         }}
                       />
                     </div>

@@ -14,7 +14,7 @@ import { SHOP, BILL_QUOTE, WARRANTY_TERMS } from "@/lib/config";
 import { trackQrDataUrl } from "@/lib/track-qr";
 import { computeBill, invoiceNumber, type BillTicket } from "@/lib/bill";
 import { doneLabel } from "@/lib/status";
-import { formatDate, formatLKR, formatTime } from "@/lib/utils";
+import { formatDate, formatLKR, formatPhoneIntl, formatTime } from "@/lib/utils";
 
 // Mirrors the on-screen BillDocument — classic serif invoice, no colour band.
 const C = {
@@ -341,7 +341,9 @@ function BillPdf({ ticket, trackQr }: { ticket: BillTicket; trackQr: string }) {
           <View>
             <Text style={s.sectionLabel}>Bill to</Text>
             <Text style={s.partyName}>{owner}</Text>
-            {phone ? <Text style={s.partyDetail}>{phone}</Text> : null}
+            {phone ? (
+              <Text style={s.partyDetail}>{formatPhoneIntl(phone)}</Text>
+            ) : null}
             {ticket.customer?.email ? (
               <Text style={s.partyDetail}>{ticket.customer.email}</Text>
             ) : null}

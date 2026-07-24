@@ -70,7 +70,7 @@ export default async function TrackPage({
         </h1>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground">
           Enter the ticket number from your receipt (e.g.{" "}
-          <span className="font-mono text-foreground">MBX-0042</span>) — no
+          <span className="font-mono text-foreground">REP-044</span>) — no
           sign-in needed.
         </p>
       </div>
@@ -80,7 +80,7 @@ export default async function TrackPage({
           type="text"
           name="t"
           defaultValue={query}
-          placeholder="MBX-0042"
+          placeholder="REP-044"
           autoComplete="off"
           className="h-11 font-mono uppercase placeholder:normal-case"
           aria-label="Ticket number"

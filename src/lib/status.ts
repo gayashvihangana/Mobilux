@@ -148,6 +148,25 @@ export function doneLabel(status: TicketStatus): string {
   return DONE_LABELS[status] ?? STATUS_META[status].label;
 }
 
+// A natural phrase for a headline like "Your iPhone 13 is <phrase>" — used in
+// the notification title and email heading so they read like a sentence.
+const STATUS_HEADLINE: Record<TicketStatus, string> = {
+  SUBMITTED: "received — pending confirmation",
+  CONFIRMED: "confirmed",
+  RECEIVED: "received at the shop",
+  DIAGNOSING: "diagnosed",
+  AWAITING_PARTS: "awaiting parts",
+  IN_PROGRESS: "being repaired",
+  COMPLETED: "repaired",
+  READY_FOR_PICKUP: "ready for pickup",
+  PICKED_UP: "collected — thank you!",
+  CANCELLED: "cancelled",
+};
+
+export function statusHeadline(status: TicketStatus): string {
+  return STATUS_HEADLINE[status];
+}
+
 // Fuller current-activity line (timeline). Null once terminal.
 export function pendingLabel(status: TicketStatus): string | null {
   return ACTIVITY_DETAILED[status] ?? null;

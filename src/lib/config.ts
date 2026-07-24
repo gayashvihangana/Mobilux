@@ -31,9 +31,11 @@ export const BILL_QUOTE =
 export const WARRANTY_TERMS = `Unless a specific warranty period is stated above, repairs carry a ${WARRANTY_DAYS}-day warranty on the workmanship and parts listed on this bill. The warranty does not cover water or liquid damage, physical or accidental damage, misuse, tampering, or any fault unrelated to the original repair.`;
 
 // Canonical site URL (no trailing slash) for links in emails, QR codes,
-// sitemaps and Open Graph tags.
+// sitemaps and Open Graph tags. Defaults to production so printed bills and
+// emails always point at the live tracker, not localhost — override with
+// NEXT_PUBLIC_APP_URL for a different environment.
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://mobiluxlk.vercel.app"
 ).replace(/\/$/, "");
 
 export function whatsappLink(message?: string) {

@@ -24,6 +24,20 @@ export function formatDate(date: Date | string) {
   }).format(new Date(date));
 }
 
+// Normalise a Sri Lankan phone number to international +94 form for display
+// (e.g. "0771234567" → "+94 77 123 4567"). Used on the bill.
+export function formatPhoneIntl(phone: string): string {
+  const raw = phone.replace(/[\s\-()]/g, "");
+  let intl: string;
+  if (raw.startsWith("+94")) intl = raw;
+  else if (raw.startsWith("0")) intl = "+94" + raw.slice(1);
+  else if (raw.startsWith("94")) intl = "+" + raw;
+  else if (raw.startsWith("+")) return raw;
+  else intl = "+94" + raw;
+  const m = intl.match(/^\+94(\d{2})(\d{3})(\d{4})$/);
+  return m ? `+94 ${m[1]} ${m[2]} ${m[3]}` : intl;
+}
+
 export function formatTime(date: Date | string) {
   return new Intl.DateTimeFormat("en-GB", {
     hour: "numeric",

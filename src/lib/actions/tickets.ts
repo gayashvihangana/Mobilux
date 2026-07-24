@@ -11,7 +11,7 @@ import { fetchBillTicket } from "@/lib/bill-data";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
-import { doneLabel, milestoneDescription } from "@/lib/status";
+import { doneLabel, milestoneDescription, statusHeadline } from "@/lib/status";
 import { getShopInfo } from "@/lib/settings";
 import {
   DONE_TICKET_STATUSES,
@@ -741,6 +741,7 @@ export async function updateTicketStatus(
       completedAt: true,
       brand: true,
       model: true,
+      issueTitle: true,
       customer: { select: { name: true, email: true } },
     },
   });
@@ -750,11 +751,22 @@ export async function updateTicketStatus(
   // Context so the pickup note names the device and the shop's collection
   // details in the notification + email the customer receives.
   const shopInfo = await getShopInfo();
+  const joinedDevice = [ticket.brand, ticket.model].filter(Boolean).join(" ");
+  const hasDevice = joinedDevice.length > 0;
+  const deviceName = joinedDevice || "device";
   const milestoneCtx = {
-    deviceName: [ticket.brand, ticket.model].filter(Boolean).join(" ") || undefined,
+    deviceName: joinedDevice || undefined,
     location: shopInfo.address,
     hours: shopInfo.hours,
   };
+
+  // Human-readable copy shared by the in-app notification and the email:
+  // "Your iPhone 13 (REP-044) is diagnosed."
+  const headline = statusHeadline(status as TicketStatus);
+  const message = note || milestoneDescription(status as TicketStatus, milestoneCtx);
+  const notifTitle = `Your ${deviceName} (${ticket.ticketNumber}) is ${headline}`;
+  const notifBody =
+    !note && ticket.issueTitle ? `${message} · Issue: ${ticket.issueTitle}` : message;
 
   // Reaching any done status marks the repair completed — statuses often
   // jump straight to READY_FOR_PICKUP without passing through COMPLETED.
@@ -780,8 +792,8 @@ export async function updateTicketStatus(
       await tx.notification.create({
         data: {
           userId: ticket.customerId,
-          title: `${ticket.ticketNumber} — ${doneLabel(status as TicketStatus)}`,
-          body: note || milestoneDescription(status as TicketStatus, milestoneCtx),
+          title: notifTitle,
+          body: notifBody,
           href: `/repairs/${ticketId}`,
         },
       });
@@ -791,19 +803,19 @@ export async function updateTicketStatus(
   // Email is best-effort — sendEmail never throws and no-ops when
   // RESEND_API_KEY isn't configured.
   if (ticket.customer?.email) {
-    const label = doneLabel(status as TicketStatus);
-    const device = [ticket.brand, ticket.model].filter(Boolean).join(" ");
     await sendEmail({
       to: ticket.customer.email,
-      subject: `${ticket.ticketNumber} — ${label}`,
-      heading: `Your repair is now: ${label}`,
-      lines: [
-        `Hi ${ticket.customer.name},`,
-        note || milestoneDescription(status as TicketStatus, milestoneCtx),
-        `Ticket ${ticket.ticketNumber}${device ? ` · ${device}` : ""}`,
+      subject: notifTitle,
+      heading: `Your ${deviceName} is ${headline}.`,
+      details: [
+        { label: "Repair", value: ticket.ticketNumber },
+        { label: "Device", value: hasDevice ? deviceName : "" },
+        { label: "Issue", value: ticket.issueTitle },
+        { label: "Status", value: doneLabel(status as TicketStatus) },
       ],
+      lines: [`Hi ${ticket.customer.name},`, message],
       cta: {
-        label: "View repair status",
+        label: "Track your repair",
         url: `${SITE_URL}/repairs/${ticketId}`,
       },
     });

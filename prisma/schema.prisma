@@ -74,6 +74,8 @@ model User {
   avatarUrl        String?
   completedRepairs Int            @default(0)
   lastLoginAt      DateTime? // updated each time the account signs in
+  blocked          Boolean        @default(false) // admin can block a customer's login
+  unblockRequested Boolean        @default(false) // blocked customer asked to be unblocked
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   tickets          RepairTicket[]
