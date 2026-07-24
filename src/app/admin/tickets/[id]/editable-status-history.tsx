@@ -182,9 +182,26 @@ export function EditableStatusHistory({
               ) : deleting ? (
                 <DeleteConfirm update={update} onClose={closeAll} />
               ) : (
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {update.note ?? milestoneDescription(update.status)}
-                </p>
+                <>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {update.note ?? milestoneDescription(update.status)}
+                  </p>
+                  {update.photo ? (
+                    <a
+                      href={update.photo}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block w-fit overflow-hidden rounded-xl border border-border"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={update.photo}
+                        alt="Handover photo"
+                        className="h-32 w-auto object-cover transition-transform hover:scale-105"
+                      />
+                    </a>
+                  ) : null}
+                </>
               )}
             </div>
           </li>

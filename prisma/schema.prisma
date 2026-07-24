@@ -141,6 +141,7 @@ model StatusUpdate {
   ticket    RepairTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   status    TicketStatus
   note      String?
+  photo     String? // optional image attached to this entry (e.g. handover photo at pickup)
   createdAt DateTime     @default(now())
 
   @@index([ticketId])

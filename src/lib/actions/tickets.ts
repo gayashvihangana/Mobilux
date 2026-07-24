@@ -11,7 +11,12 @@ import { fetchBillTicket } from "@/lib/bill-data";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
-import { doneLabel, milestoneDescription, statusHeadline } from "@/lib/status";
+import {
+  doneLabel,
+  milestoneDescription,
+  pickupNote,
+  statusHeadline,
+} from "@/lib/status";
 import { receivedItemsNote, type ReceivedItem } from "@/lib/received-items";
 import { getShopInfo } from "@/lib/settings";
 import {
@@ -798,6 +803,16 @@ export async function updateTicketStatus(
   }
   const itemsNote = receivedItemsNote(receivedItems);
 
+  // Optional image attached to this entry — e.g. a handover photo when the
+  // device is collected. Best-effort: a failed/oversized upload is surfaced.
+  let photoUrl: string | null = null;
+  const photoFile = formData.get("photo");
+  if (photoFile instanceof File && photoFile.size > 0) {
+    const uploaded = await saveUploads([photoFile], "tickets", 1);
+    if (uploaded.error) return { error: uploaded.error };
+    photoUrl = uploaded.urls?.[0] ?? null;
+  }
+
   // Context so the pickup note names the device and the shop's collection
   // details in the notification + email the customer receives.
   const shopInfo = await getShopInfo();
@@ -811,10 +826,16 @@ export async function updateTicketStatus(
   };
 
   // Human-readable copy shared by the in-app notification and the email:
-  // "Your iPhone 13 (REP-044) is diagnosed."
+  // "Your iPhone 13 (REP-044) is diagnosed." Marking a repair COMPLETED means
+  // it's ready for pickup, so — absent a custom note — the customer gets the
+  // full "come and collect" message even though the timeline entry itself
+  // keeps a plain "repair done" note.
   const headline = statusHeadline(status as TicketStatus);
-  const message =
-    note || itemsNote || milestoneDescription(status as TicketStatus, milestoneCtx);
+  const defaultMessage =
+    status === "COMPLETED"
+      ? pickupNote(milestoneCtx)
+      : milestoneDescription(status as TicketStatus, milestoneCtx);
+  const message = note || itemsNote || defaultMessage;
   const notifTitle = `Your ${deviceName} (${ticket.ticketNumber}) is ${headline}`;
   const notifBody =
     !note && ticket.issueTitle ? `${message} · Issue: ${ticket.issueTitle}` : message;
@@ -841,6 +862,7 @@ export async function updateTicketStatus(
         ticketId,
         status: status as TicketStatus,
         note: note || itemsNote || null,
+        photo: photoUrl,
       },
     });
     if (ticket.customerId) {

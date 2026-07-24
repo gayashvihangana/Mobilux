@@ -142,6 +142,27 @@ export function StatusUpdateForm({
           />
         </div>
 
+        {/* Optional handover photo — offered on the pickup step. */}
+        {next === "PICKED_UP" ? (
+          <div className="space-y-2">
+            <Label htmlFor="photo">
+              Handover photo{" "}
+              <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="photo"
+              name="photo"
+              type="file"
+              accept="image/*"
+              className="cursor-pointer text-sm file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              A photo of the collected device or signed slip — shown on the
+              customer&apos;s timeline.
+            </p>
+          </div>
+        ) : null}
+
         {next === "RECEIVED" ? (
           // Receiving a device asks what came in with it, so it opens a
           // dialog (its own form) instead of submitting straight away.

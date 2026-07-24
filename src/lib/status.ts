@@ -141,7 +141,7 @@ const MILESTONE_DESCRIPTIONS: Record<TicketStatus, string> = {
   DIAGNOSING: "Diagnosis complete.",
   AWAITING_PARTS: "Replacement parts received.",
   IN_PROGRESS: "Repair work started.",
-  COMPLETED: "Ready to collect.",
+  COMPLETED: "Your repair is completed and tested.",
   READY_FOR_PICKUP: "Ready to collect.",
   PICKED_UP: "Device collected. Thank you!",
   CANCELLED: "This repair was cancelled.",
@@ -197,17 +197,26 @@ export function milestoneDescription(
   ctx: MilestoneContext = {},
 ): string {
   const device = ctx.deviceName?.trim() || "device";
-  if (status === "COMPLETED" || status === "READY_FOR_PICKUP") {
-    const where = ctx.location?.trim() ? ` at ${ctx.location.trim()}` : " at our shop";
-    const when = ctx.hours?.trim()
-      ? ` We're open ${ctx.hours.trim()} — please collect it during these hours.`
-      : "";
-    return `Your ${device} is ready to collect${where}.${when} Thank you for choosing ${SHOP.name}!`;
-  }
+  // Only the READY_FOR_PICKUP "happening now" row carries the full collect
+  // instructions — the COMPLETED milestone entry keeps a plain "repair done"
+  // note so the two don't repeat the same block of text.
+  if (status === "READY_FOR_PICKUP") return pickupNote(ctx);
   if (status === "PICKED_UP") {
-    return `Your ${device} has been collected. Thank you for choosing ${SHOP.name}!`;
+    return `Your ${device} has been collected — we hope it feels good as new. It was a pleasure serving you, and we look forward to seeing you again. Thank you for choosing ${SHOP.name}!`;
   }
   return MILESTONE_DESCRIPTIONS[status];
+}
+
+// The full "come and collect" message shown on the live pickup row and in
+// the completion notification/email — names the device and folds in the
+// shop's address and opening hours when available.
+export function pickupNote(ctx: MilestoneContext = {}): string {
+  const device = ctx.deviceName?.trim() || "device";
+  const where = ctx.location?.trim() ? ` at ${ctx.location.trim()}` : " at our shop";
+  const when = ctx.hours?.trim()
+    ? ` We're open ${ctx.hours.trim()} — please drop by to collect it during these hours.`
+    : "";
+  return `Your ${device} is ready to collect${where}.${when} Thank you for choosing ${SHOP.name}!`;
 }
 
 // Forward/back neighbours in the pipeline (CANCELLED sits outside it).

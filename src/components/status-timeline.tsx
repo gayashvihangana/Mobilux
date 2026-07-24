@@ -5,16 +5,17 @@ import {
   doneLabel,
   milestoneDescription,
   pendingLabel,
+  pickupNote,
   STATUS_META,
   type MilestoneContext,
 } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 
-// The stepper's visual pipeline. "Picked Up" is deliberately NOT its own
-// node — the final COMPLETED node stands in for collection: it's the blue
-// "Ready for pickup" step while the device waits at the shop, then ticks
-// green as "Picked up" once collected. So there's one collection circle,
-// not two. (Legacy READY_FOR_PICKUP tickets behave the same as COMPLETED.)
+// The stepper's visual pipeline. The final READY_FOR_PICKUP node is purely
+// visual — it's no longer a milestone the admin marks (COMPLETED goes
+// straight to PICKED_UP). It's the blue "Ready for pickup" circle while the
+// device waits at the shop after the Completed node ticks green, then ticks
+// green itself as "Picked up" once collected. One collection circle, not two.
 const STEPPER_PIPELINE: TicketStatus[] = [
   "SUBMITTED",
   "CONFIRMED",
@@ -23,6 +24,7 @@ const STEPPER_PIPELINE: TicketStatus[] = [
   "AWAITING_PARTS",
   "IN_PROGRESS",
   "COMPLETED",
+  "READY_FOR_PICKUP",
 ];
 
 // Horizontal pipeline stepper (customer-facing "where is my device").
@@ -52,7 +54,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   if (status === "PICKED_UP") {
     doneUpTo = lastIndex;
     activeIndex = -1;
-  } else if (status === "COMPLETED" || status === "READY_FOR_PICKUP") {
+  } else if (status === "READY_FOR_PICKUP") {
     doneUpTo = lastIndex - 1;
     activeIndex = lastIndex;
   } else {
@@ -75,17 +77,14 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
         const current = index === activeIndex;
         // Finished steps read as the completed milestone; the last node reads
         // "Picked up" once collected. The blue node reads the live activity.
-        // Upcoming steps keep their neutral ongoing name — the final node is
-        // the collection step, so it previews as "Ready for Pickup".
+        // Upcoming steps keep their neutral ongoing name.
         const label = done
           ? index === lastIndex && status === "PICKED_UP"
             ? doneLabel("PICKED_UP")
             : doneLabel(step)
           : current
             ? currentActivityLabel(status)
-            : index === lastIndex
-              ? STATUS_META.READY_FOR_PICKUP.label
-              : STATUS_META[step].label;
+            : STATUS_META[step].label;
         return (
           <li key={step} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
@@ -166,7 +165,7 @@ export function PendingRow({
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
           {awaitingPickup
-            ? milestoneDescription(status, ctx)
+            ? pickupNote(ctx)
             : "We'll update this as soon as it's done."}
         </p>
       </div>
@@ -258,6 +257,21 @@ export function StatusHistory({
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {update.note ?? milestoneDescription(update.status, ctx)}
               </p>
+              {update.photo ? (
+                <a
+                  href={update.photo}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block w-fit overflow-hidden rounded-xl border border-border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={update.photo}
+                    alt="Handover photo"
+                    className="h-32 w-auto object-cover transition-transform hover:scale-105"
+                  />
+                </a>
+              ) : null}
             </div>
           </li>
         );
