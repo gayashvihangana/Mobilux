@@ -24,6 +24,15 @@ export function formatDate(date: Date | string) {
   }).format(new Date(date));
 }
 
+export function formatTime(date: Date | string) {
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Colombo",
+  }).format(new Date(date));
+}
+
 export function formatDateTime(date: Date | string) {
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",

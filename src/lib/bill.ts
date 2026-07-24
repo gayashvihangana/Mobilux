@@ -4,6 +4,14 @@ import { BANK_DETAILS } from "@/lib/config";
 // One line on the itemised bill, e.g. { label: "Battery", amount: 4500 }.
 export type BillLineItem = { label: string; amount: number };
 
+// A human invoice number derived from the repair's ticket number, so the bill
+// can show both a distinct "Invoice No." and the underlying "Repair ID"
+// (the ticket number the shop already uses everywhere else).
+export function invoiceNumber(ticketNumber: string): string {
+  const digits = ticketNumber.replace(/\D/g, "");
+  return digits ? `INV-${digits}` : `INV-${ticketNumber}`;
+}
+
 // Where the customer should pay — shown on unpaid invoices. Any field left
 // blank falls back to the shop default in config (BANK_DETAILS).
 export type BillPayTo = {

@@ -1,13 +1,13 @@
-import { Building2, ShieldCheck, Smartphone } from "lucide-react";
-import { SHOP } from "@/lib/config";
-import { computeBill, type BillTicket } from "@/lib/bill";
+import { SHOP, BILL_QUOTE, WARRANTY_TERMS } from "@/lib/config";
+import { computeBill, invoiceNumber, type BillTicket } from "@/lib/bill";
 import { doneLabel } from "@/lib/status";
-import { cn, formatDate, formatLKR } from "@/lib/utils";
+import { formatDate, formatLKR, formatTime } from "@/lib/utils";
 
 export type { BillTicket };
 
-// Hardcoded light "paper" palette — a printed bill should look the
-// same regardless of the site's dark/light theme.
+// A classic, print-ready invoice on white "paper" — serif letterhead, a
+// meta block (invoice no. / repair id / date / time) top-right, and a
+// warranty + thank-you footer. Looks the same regardless of site theme.
 export function BillDocument({
   ticket,
   trackQr,
@@ -35,101 +35,124 @@ export function BillDocument({
 
   const showSubtotal = isItemized && (items.length > 1 || discountAmount > 0);
   const showTechnician = show.technician && !!technician;
-  const showDeviceBox = show.device || show.status || showTechnician;
+  const showDeviceBox = show.device || show.status;
   const showIssue = show.issue && !!ticket.issueTitle;
   const showSolution = show.solution && !!ticket.solution;
   const showWarranty = show.warranty && !!ticket.warrantyPeriod;
+  const phone = ticket.customer?.phone ?? null;
   const paidMeta = [paidMethod, paidDate ? formatDate(paidDate) : null]
     .filter(Boolean)
     .join(" · ");
 
+  const meta: { label: string; value: string }[] = [
+    { label: "Invoice No.", value: invoiceNumber(ticket.ticketNumber) },
+    { label: "Repair ID", value: ticket.ticketNumber },
+    { label: "Date", value: formatDate(billDate) },
+    { label: "Time", value: formatTime(billDate) },
+  ];
+
   return (
-    <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-xl print:rounded-none print:border-0 print:shadow-none">
-      {/* Header band */}
-      <div className="flex items-start justify-between gap-6 bg-blue-600 px-8 py-7 text-white sm:px-10">
-        <div className="flex items-center gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-white/25 bg-white/15">
-            <Smartphone className="size-5" />
-          </span>
+    <div
+      className="mx-auto max-w-3xl overflow-hidden rounded-sm border border-neutral-300 bg-white text-neutral-800 shadow-xl print:rounded-none print:border-0 print:shadow-none"
+      style={{
+        fontFamily:
+          "var(--font-newsreader), Georgia, 'Times New Roman', Times, serif",
+      }}
+    >
+      <div className="px-9 py-9 sm:px-12">
+        {/* ── Letterhead ─────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-6">
           <div>
-            <p className="font-display text-xl font-bold tracking-tight">
+            <p className="text-3xl font-bold tracking-tight text-neutral-900">
               {SHOP.name}
             </p>
-            <p className="text-xs text-blue-100">Fix. Track. Trust.</p>
+            <p className="mt-0.5 text-sm tracking-wide text-neutral-500 italic">
+              {SHOP.tagline}
+            </p>
+            <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+              {SHOP.city}
+              <br />
+              {SHOP.phone} · {SHOP.email}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-semibold tracking-[0.3em] text-neutral-900 uppercase">
+              Invoice
+            </p>
+            <dl className="mt-3 space-y-1 text-xs">
+              {meta.map((m) => (
+                <div
+                  key={m.label}
+                  className="flex items-baseline justify-end gap-3"
+                >
+                  <dt className="text-neutral-400 uppercase">{m.label}</dt>
+                  <dd className="min-w-24 text-right font-semibold text-neutral-800 tabular-nums">
+                    {m.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-[11px] font-medium tracking-widest text-blue-100 uppercase">
-            Invoice
-          </p>
-          <p className="font-display text-lg font-bold">
-            {ticket.ticketNumber}
-          </p>
-          <p className="text-xs text-blue-100">{formatDate(billDate)}</p>
-        </div>
-      </div>
 
-      <div className="space-y-8 px-8 py-8 sm:px-10">
-        {/* Billed to / From */}
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="my-7 border-t-2 border-neutral-800" />
+
+        {/* ── Parties: Bill to / Technician ─────────────────── */}
+        <div className="flex items-start justify-between gap-6">
           <div>
             <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-              Billed to
+              Bill to
             </p>
-            <p className="mt-1.5 font-semibold">{owner}</p>
+            <p className="mt-1.5 text-base font-semibold text-neutral-900">
+              {owner}
+            </p>
+            {phone ? <p className="text-sm text-neutral-500">{phone}</p> : null}
             {ticket.customer?.email ? (
               <p className="text-sm text-neutral-500">{ticket.customer.email}</p>
             ) : null}
-            {ticket.customer?.phone ? (
-              <p className="text-sm text-neutral-500">{ticket.customer.phone}</p>
-            ) : null}
           </div>
-          <div className="sm:text-right">
-            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-              From
-            </p>
-            <p className="mt-1.5 font-semibold">{SHOP.name}</p>
-            <p className="text-sm text-neutral-500">{SHOP.city}</p>
-            <p className="text-sm text-neutral-500">{SHOP.phone}</p>
-            <p className="text-sm text-neutral-500">{SHOP.email}</p>
-          </div>
+          {showTechnician ? (
+            <div className="text-right">
+              <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+                Served by
+              </p>
+              <p className="mt-1.5 text-base font-semibold text-neutral-900">
+                {technician}
+              </p>
+              <p className="text-sm text-neutral-500">Technician</p>
+            </div>
+          ) : null}
         </div>
 
-        {/* Device summary */}
+        {/* ── Device / status ───────────────────────────────── */}
         {showDeviceBox ? (
-          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-            <div className="grid gap-3 text-sm sm:grid-cols-3">
-              {show.device ? (
-                <div>
-                  <p className="text-[11px] text-neutral-400 uppercase">Device</p>
-                  <p className="mt-0.5 font-medium">{deviceName}</p>
-                </div>
-              ) : null}
-              {show.status ? (
-                <div>
-                  <p className="text-[11px] text-neutral-400 uppercase">Status</p>
-                  <p className="mt-0.5 font-medium">{doneLabel(ticket.status)}</p>
-                </div>
-              ) : null}
-              {showTechnician ? (
-                <div>
-                  <p className="text-[11px] text-neutral-400 uppercase">
-                    Technician
-                  </p>
-                  <p className="mt-0.5 font-medium">{technician}</p>
-                </div>
-              ) : null}
-            </div>
+          <div className="mt-7 grid gap-3 border-y border-neutral-200 py-4 text-sm sm:grid-cols-2">
+            {show.device ? (
+              <div className="flex gap-2">
+                <span className="text-neutral-400">Device:</span>
+                <span className="font-semibold text-neutral-800">
+                  {deviceName}
+                </span>
+              </div>
+            ) : null}
+            {show.status ? (
+              <div className="flex gap-2 sm:justify-end">
+                <span className="text-neutral-400">Status:</span>
+                <span className="font-semibold text-neutral-800">
+                  {doneLabel(ticket.status)}
+                </span>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        {/* Repair details — issue & what we did */}
+        {/* ── Repair details ────────────────────────────────── */}
         {showIssue || showSolution ? (
-          <div className="grid gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4 sm:grid-cols-2">
+          <div className="mt-6 grid gap-5 sm:grid-cols-2">
             {showIssue ? (
               <div>
                 <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-                  Issue
+                  Reported issue
                 </p>
                 <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
                   {ticket.issueTitle}
@@ -139,7 +162,7 @@ export function BillDocument({
             {showSolution ? (
               <div>
                 <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-                  What we did
+                  Work carried out
                 </p>
                 <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
                   {ticket.solution}
@@ -149,28 +172,33 @@ export function BillDocument({
           </div>
         ) : null}
 
-        {/* Line items */}
-        <table className="w-full text-sm">
+        {/* ── Line items ────────────────────────────────────── */}
+        <table className="mt-7 w-full text-sm">
           <thead>
-            <tr className="border-b border-neutral-200 text-left text-[11px] tracking-widest text-neutral-400 uppercase">
-              <th className="pb-2 font-medium">Description</th>
-              <th className="pb-2 text-right font-medium">Amount</th>
+            <tr className="border-b-2 border-neutral-800 text-left text-[11px] tracking-widest text-neutral-500 uppercase">
+              <th className="pb-2 font-semibold">Description</th>
+              <th className="pb-2 text-right font-semibold">Amount</th>
             </tr>
           </thead>
           <tbody>
             {isItemized ? (
               items.map((item, i) => (
-                <tr key={`${item.label}-${i}`} className="border-b border-neutral-100">
-                  <td className="py-3 align-top font-medium">{item.label}</td>
-                  <td className="py-3 text-right align-top font-medium whitespace-nowrap">
+                <tr
+                  key={`${item.label}-${i}`}
+                  className="border-b border-neutral-200"
+                >
+                  <td className="py-3 align-top text-neutral-800">
+                    {item.label}
+                  </td>
+                  <td className="py-3 text-right align-top whitespace-nowrap text-neutral-800 tabular-nums">
                     {formatLKR(item.amount)}
                   </td>
                 </tr>
               ))
             ) : (
-              <tr className="border-b border-neutral-100">
+              <tr className="border-b border-neutral-200">
                 <td className="py-3.5 align-top">
-                  <p className="font-medium">
+                  <p className="text-neutral-800">
                     {ticket.solution || ticket.issueTitle}
                   </p>
                   {ticket.partsUsed ? (
@@ -179,7 +207,7 @@ export function BillDocument({
                     </p>
                   ) : null}
                 </td>
-                <td className="py-3.5 text-right align-top font-medium whitespace-nowrap">
+                <td className="py-3.5 text-right align-top whitespace-nowrap text-neutral-800 tabular-nums">
                   {formatLKR(subtotal)}
                 </td>
               </tr>
@@ -187,122 +215,119 @@ export function BillDocument({
             {showSubtotal ? (
               <tr>
                 <td className="pt-3 text-right text-neutral-500">Subtotal</td>
-                <td className="pt-3 text-right whitespace-nowrap text-neutral-600">
+                <td className="pt-3 text-right whitespace-nowrap text-neutral-600 tabular-nums">
                   {formatLKR(subtotal)}
                 </td>
               </tr>
             ) : null}
             {discountAmount > 0 ? (
               <tr>
-                <td className="py-1.5 text-right text-blue-600">
+                <td className="py-1.5 text-right text-neutral-500">
                   {discountLabel}
                 </td>
-                <td className="py-1.5 text-right whitespace-nowrap text-blue-600">
+                <td className="py-1.5 text-right whitespace-nowrap text-neutral-600 tabular-nums">
                   −{formatLKR(discountAmount)}
                 </td>
               </tr>
             ) : null}
           </tbody>
           <tfoot>
-            <tr>
-              <td className="pt-4 text-right font-semibold">Total</td>
-              <td className="font-display pt-4 text-right text-xl font-bold whitespace-nowrap">
+            <tr className="border-t-2 border-neutral-800">
+              <td className="pt-3 text-right text-sm font-semibold tracking-widest text-neutral-500 uppercase">
+                Total
+              </td>
+              <td className="pt-3 text-right text-2xl font-bold whitespace-nowrap text-neutral-900 tabular-nums">
                 {formatLKR(total)}
               </td>
             </tr>
           </tfoot>
         </table>
 
-        {/* PAID seal — horizontal, straight after the total */}
+        {/* ── Paid seal / balance due ───────────────────────── */}
         {isSettled ? (
-          <div className="flex justify-center">
-            <div className="rounded-md border-[3px] border-green-600/70 px-8 py-2 text-center">
-              <p className="text-2xl leading-none font-black tracking-[0.25em] text-green-600/80 uppercase">
+          <div className="mt-8 flex justify-center">
+            <div className="rounded-sm border-2 border-green-700/60 px-8 py-2 text-center">
+              <p className="text-2xl leading-none font-black tracking-[0.3em] text-green-700/80 uppercase">
                 Paid
               </p>
               {paidMeta ? (
-                <p className="mt-1 text-[10px] font-medium tracking-widest text-green-700/70 uppercase">
+                <p className="mt-1 text-[10px] font-medium tracking-widest text-green-800/70 uppercase">
                   {paidMeta}
                 </p>
               ) : null}
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-700">Balance due</p>
-            <p className="font-display text-lg font-bold text-amber-700">
+          <div className="mt-8 flex items-center justify-between border border-neutral-300 bg-neutral-50 px-4 py-3">
+            <p className="text-sm font-semibold tracking-wide text-neutral-700 uppercase">
+              Balance due
+            </p>
+            <p className="text-lg font-bold text-neutral-900 tabular-nums">
               {formatLKR(total)}
             </p>
           </div>
         )}
 
-        {/* How to pay — only while there's a balance due */}
+        {/* ── How to pay ────────────────────────────────────── */}
         {!isSettled && show.payment && total > 0 ? (
-          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-            <div className="flex items-center gap-2">
-              <Building2 className="size-4 text-neutral-500" />
-              <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-                How to pay
-              </p>
-            </div>
+          <div className="mt-6 border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+              How to pay
+            </p>
             <p className="mt-2 text-sm text-neutral-600">
               Transfer to the account below and keep your receipt, or pay in
               store. Quote{" "}
-              <span className="font-medium text-neutral-900">
+              <span className="font-semibold text-neutral-900">
                 {ticket.ticketNumber}
               </span>{" "}
               as the reference.
             </p>
             <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <p className="text-[11px] text-neutral-400 uppercase">Bank</p>
-                <p className="mt-0.5 font-medium">{payTo.bankName}</p>
+              <div className="flex gap-2">
+                <span className="text-neutral-400">Bank:</span>
+                <span className="font-semibold text-neutral-800">
+                  {payTo.bankName}
+                </span>
               </div>
-              <div>
-                <p className="text-[11px] text-neutral-400 uppercase">Branch</p>
-                <p className="mt-0.5 font-medium">{payTo.branch}</p>
+              <div className="flex gap-2">
+                <span className="text-neutral-400">Branch:</span>
+                <span className="font-semibold text-neutral-800">
+                  {payTo.branch}
+                </span>
               </div>
-              <div>
-                <p className="text-[11px] text-neutral-400 uppercase">
-                  Account name
-                </p>
-                <p className="mt-0.5 font-medium">{payTo.accountName}</p>
+              <div className="flex gap-2">
+                <span className="text-neutral-400">Account name:</span>
+                <span className="font-semibold text-neutral-800">
+                  {payTo.accountName}
+                </span>
               </div>
-              <div>
-                <p className="text-[11px] text-neutral-400 uppercase">
-                  Account number
-                </p>
-                <p className="mt-0.5 font-mono font-medium">
+              <div className="flex gap-2">
+                <span className="text-neutral-400">Account no:</span>
+                <span className="font-semibold text-neutral-800 tabular-nums">
                   {payTo.accountNumber}
-                </p>
+                </span>
               </div>
             </div>
           </div>
         ) : null}
 
-        {/* Warranty — only when enabled and a period is set */}
+        {/* ── Specific warranty (when a period is set) ──────── */}
         {showWarranty ? (
-          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="size-4 text-neutral-500" />
-              <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-                Warranty
-              </p>
-            </div>
+          <div className="mt-6 border border-neutral-200 bg-neutral-50 p-4">
+            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+              Warranty
+            </p>
             <p className="mt-2 text-sm text-neutral-700">
-              <span className="font-medium">{ticket.warrantyPeriod}</span>{" "}
+              <span className="font-semibold">{ticket.warrantyPeriod}</span>{" "}
               warranty
-              {ticket.warrantyParts ? (
-                <> on {ticket.warrantyParts}</>
-              ) : null}
-              .
+              {ticket.warrantyParts ? <> on {ticket.warrantyParts}</> : null}.
             </p>
           </div>
         ) : null}
 
-        {/* Notes (diagnosis, cancellation reason, etc.) */}
+        {/* ── Notes ─────────────────────────────────────────── */}
         {show.notes && ticket.billNotes ? (
-          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+          <div className="mt-6 border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
               Notes
             </p>
@@ -312,29 +337,41 @@ export function BillDocument({
           </div>
         ) : null}
 
-        {/* Scan-to-track */}
+        {/* ── Scan to track ─────────────────────────────────── */}
         {show.track && trackQr ? (
-          <div className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+          <div className="mt-6 flex items-center gap-4 border border-neutral-200 bg-neutral-50 p-4">
             {/* eslint-disable-next-line @next/next/no-img-element -- static data URL */}
             <img
               src={trackQr}
               alt={`QR code to track repair ${ticket.ticketNumber}`}
-              className="size-20 shrink-0 rounded-md border border-neutral-200 bg-white p-1"
+              className="size-20 shrink-0 rounded-sm border border-neutral-200 bg-white p-1"
             />
             <div>
-              <p className="text-sm font-semibold">Track this repair anytime</p>
+              <p className="text-sm font-semibold text-neutral-900">
+                Track this repair anytime
+              </p>
               <p className="mt-0.5 text-xs text-neutral-500">
-                Scan the code or visit {SHOP.name.toLowerCase()} online and
-                enter ticket {ticket.ticketNumber} — live status, no sign-in
-                needed.
+                Scan the code or enter ticket {ticket.ticketNumber} on our
+                online tracker — live status, no sign-in needed.
               </p>
             </div>
           </div>
         ) : null}
 
-        {/* Footer */}
-        <div className="space-y-1 border-t border-neutral-200 pt-6 text-center text-xs text-neutral-400">
-          <p>Thank you for trusting {SHOP.name} with your device.</p>
+        {/* ── Footer ────────────────────────────────────────── */}
+        <div className="mt-9 border-t-2 border-neutral-800 pt-5">
+          <p className="text-center text-sm text-neutral-700 italic">
+            “{BILL_QUOTE}”
+          </p>
+          <p className="mt-4 text-[10.5px] leading-relaxed text-neutral-400">
+            <span className="font-semibold text-neutral-500 uppercase">
+              Warranty terms:{" "}
+            </span>
+            {WARRANTY_TERMS}
+          </p>
+          <p className="mt-4 text-center text-[11px] tracking-wide text-neutral-400">
+            {SHOP.name} · {SHOP.phone} · {SHOP.email}
+          </p>
         </div>
       </div>
     </div>
