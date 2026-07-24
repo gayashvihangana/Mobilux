@@ -86,6 +86,23 @@ const newRow = (label = "", amount = ""): Row => ({
   amount,
 });
 
+// Format an instant as an Asia/Colombo `datetime-local` value
+// ("YYYY-MM-DDTHH:MM"), so the date picker opens on the bill's own time zone
+// rather than the viewer's. h23 avoids Intl's "24:00" midnight quirk.
+function toColomboLocalInput(date: Date | null): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date ?? new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
 function seedRows(bill: BillTicket): Row[] {
   if (bill.billItems && bill.billItems.length > 0) {
     return bill.billItems.map((i) => newRow(i.label, String(i.amount)));
@@ -203,6 +220,12 @@ export function BillBuilder({
   // choice to keep the original invoice date or re-issue with today's.
   const [editing, setEditing] = useState(false);
   const [reissue, setReissue] = useState(false);
+  // Optional custom invoice date/time — back- or post-date the bill. When on,
+  // it overrides the keep-original / re-issue choice entirely.
+  const [customDate, setCustomDate] = useState(false);
+  const [billDateValue, setBillDateValue] = useState(() =>
+    toColomboLocalInput(bill.billGeneratedAt),
+  );
   useEffect(() => {
     // Leave edit mode after a successful (re)generate.
     if (state?.success) {
@@ -239,6 +262,8 @@ export function BillBuilder({
       if (d.show) setShow((s) => ({ ...s, ...d.show }));
       if (d.discountMode) setDiscountMode(d.discountMode);
       if (typeof d.discountValue === "string") setDiscountValue(d.discountValue);
+      if (typeof d.customDate === "boolean") setCustomDate(d.customDate);
+      if (typeof d.billDateValue === "string") setBillDateValue(d.billDateValue);
       if (d.payTo) setPayTo((p) => ({ ...p, ...d.payTo }));
     } catch {
       /* ignore */
@@ -263,6 +288,8 @@ export function BillBuilder({
           show,
           discountMode,
           discountValue,
+          customDate,
+          billDateValue,
           payTo,
         }),
       );
@@ -279,6 +306,8 @@ export function BillBuilder({
     show,
     discountMode,
     discountValue,
+    customDate,
+    billDateValue,
     payTo,
     draftKey,
   ]);
@@ -333,9 +362,15 @@ export function BillBuilder({
     billDiscountAmount:
       discountMode === "amount" && discountValue ? String(discountValue) : null,
     billPayTo: payTo,
-    // Preview the invoice date the save will use: today when re-issuing,
-    // otherwise the frozen original (fallbacks handle a never-generated bill).
-    billGeneratedAt: reissue ? new Date() : bill.billGeneratedAt,
+    // Preview the invoice date the save will use: a custom date if one is set,
+    // else today when re-issuing, else the frozen original (fallbacks handle a
+    // never-generated bill).
+    billGeneratedAt:
+      customDate && billDateValue
+        ? new Date(billDateValue)
+        : reissue
+          ? new Date()
+          : bill.billGeneratedAt,
     warrantyPeriod: warrantyPeriod.trim() || null,
     warrantyParts: warrantyParts.trim() || null,
     billShow: show,
@@ -363,6 +398,11 @@ export function BillBuilder({
           <input type="hidden" name="discountMode" value={discountMode} />
           <input type="hidden" name="discountValue" value={discountValue} />
           <input type="hidden" name="reissue" value={reissue ? "true" : "false"} />
+          <input
+            type="hidden"
+            name="billDate"
+            value={customDate ? billDateValue : ""}
+          />
           <input type="hidden" name="payBankName" value={payTo.bankName} />
           <input type="hidden" name="payBranch" value={payTo.branch} />
           <input type="hidden" name="payAccountName" value={payTo.accountName} />
@@ -629,8 +669,40 @@ export function BillBuilder({
                 </div>
               </div>
 
-              {/* Re-issue date choice — only while editing a generated bill */}
-              {hasGenerated && editing ? (
+              {/* Custom invoice date & time — back- or post-date the bill */}
+              <label className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={customDate}
+                  onChange={(e) => setCustomDate(e.target.checked)}
+                  className="mt-0.5 size-4 accent-primary"
+                />
+                <span className="flex-1">
+                  <span className="font-medium">
+                    Set a custom bill date &amp; time
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Choose exactly what date and time the invoice shows —
+                    handy for back-dating. Leave off to use{" "}
+                    {hasGenerated && !reissue
+                      ? "the current invoice date"
+                      : "today’s date & time"}
+                    .
+                  </span>
+                  {customDate ? (
+                    <Input
+                      type="datetime-local"
+                      value={billDateValue}
+                      onChange={(e) => setBillDateValue(e.target.value)}
+                      className="mt-2"
+                    />
+                  ) : null}
+                </span>
+              </label>
+
+              {/* Re-issue date choice — while editing a generated bill, unless
+                  a custom date is already in charge of the invoice date. */}
+              {hasGenerated && editing && !customDate ? (
                 <label className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 p-3 text-sm">
                   <input
                     type="checkbox"

@@ -222,6 +222,24 @@ function parseTicketDetailsForm(formData: FormData) {
   });
 }
 
+// Interpret a `datetime-local` value ("2026-07-24T15:30", no zone) as
+// Asia/Colombo wall-clock time and return the matching UTC instant. Colombo
+// is a fixed UTC+5:30 with no DST, so a plain offset subtraction is exact —
+// this keeps a custom bill date landing on the day/time the admin picked,
+// regardless of the server's own timezone (Vercel runs in UTC).
+const COLOMBO_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+function parseColomboLocal(input: string): Date | null {
+  const m = input.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi] = m;
+  const utcMs =
+    Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi)) -
+    COLOMBO_OFFSET_MS;
+  const date = new Date(utcMs);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function resolveCompletedAt(
   status: TicketStatus,
   completedAtInput: string | undefined,
@@ -400,6 +418,7 @@ const generateBillSchema = z.object({
   warrantyParts: optionalText(200),
   discountMode: z.enum(["none", "percent", "amount"]),
   discountValue: optionalMoney(),
+  billDate: optionalText(40),
   payBankName: optionalText(120),
   payBranch: optionalText(120),
   payAccountName: optionalText(120),
@@ -422,6 +441,7 @@ export async function generateBill(
     warrantyParts: formData.get("warrantyParts"),
     discountMode: formData.get("discountMode"),
     discountValue: formData.get("discountValue") ?? "",
+    billDate: formData.get("billDate"),
     payBankName: formData.get("payBankName"),
     payBranch: formData.get("payBranch"),
     payAccountName: formData.get("payAccountName"),
@@ -491,9 +511,17 @@ export async function generateBill(
     where: { id: data.ticketId },
     select: { billGeneratedAt: true },
   });
+  // A custom date the admin picked wins over everything. Otherwise: re-issue
+  // (or a first-ever generation) stamps now; a plain update keeps the frozen
+  // original invoice date.
   const reissue = formData.get("reissue") === "true";
+  const customBillDate = data.billDate ? parseColomboLocal(data.billDate) : null;
+  if (data.billDate && !customBillDate) {
+    return { error: "That bill date & time couldn't be read." };
+  }
   const billGeneratedAt =
-    reissue || !existing?.billGeneratedAt ? new Date() : existing.billGeneratedAt;
+    customBillDate ??
+    (reissue || !existing?.billGeneratedAt ? new Date() : existing.billGeneratedAt);
 
   await prisma.repairTicket.update({
     where: { id: data.ticketId },
