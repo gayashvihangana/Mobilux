@@ -31,7 +31,7 @@ export default async function AdminNotesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display flex items-center gap-2.5 text-2xl font-bold tracking-tight sm:text-3xl">
-          <NotebookPen className="size-7 text-warning" />
+          <NotebookPen className="size-7 text-muted-foreground" />
           Notes & lessons
         </h1>
         <p className="mt-1 text-muted-foreground">
@@ -43,8 +43,8 @@ export default async function AdminNotesPage() {
 
       {tickets.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-warning/25 bg-warning/10">
-            <NotebookPen className="size-5 text-warning" />
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-border bg-muted/40">
+            <NotebookPen className="size-5 text-muted-foreground" />
           </span>
           <h3 className="mt-4 font-semibold">No notes yet</h3>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">

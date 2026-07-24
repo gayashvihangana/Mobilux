@@ -26,6 +26,7 @@ export default async function AdminLayout({
               links={[
                 { href: "/admin", label: "Overview" },
                 { href: "/admin/tickets", label: "Repairs" },
+                { href: "/admin/customers", label: "Customers" },
                 { href: "/admin/reports", label: "Reports" },
                 { href: "/admin/notes", label: "Notes" },
                 { href: "/admin/payments", label: "Payments" },
@@ -47,6 +48,7 @@ export default async function AdminLayout({
               links={[
                 { href: "/admin", label: "Overview" },
                 { href: "/admin/tickets", label: "Repairs" },
+                { href: "/admin/customers", label: "Customers" },
                 { href: "/admin/reports", label: "Reports" },
                 { href: "/admin/notes", label: "Notes" },
                 { href: "/admin/payments", label: "Payments" },

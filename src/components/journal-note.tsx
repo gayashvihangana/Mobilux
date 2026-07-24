@@ -1,8 +1,9 @@
-import { NotebookPen } from "lucide-react";
+import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Reads like a personal notebook entry — lessons/mistakes the shop owner
-// wrote for themselves, not a data field. Never shown to customers.
+// A private note the shop owner wrote for themselves — lessons/mistakes,
+// never shown to customers. Styled as a clean, quiet card so it reads as
+// a calm aside rather than an alert.
 export function JournalNote({
   text,
   className,
@@ -13,17 +14,17 @@ export function JournalNote({
   return (
     <div
       className={cn(
-        "relative rounded-2xl border border-warning/25 bg-warning/[0.04] p-5 pl-6",
+        "rounded-xl border border-border bg-muted/30 p-4",
         className,
       )}
     >
-      <span className="absolute top-0 left-0 h-full w-1 rounded-l-2xl bg-warning/40" />
-      <div className="flex items-start gap-3">
-        <NotebookPen className="mt-0.5 size-4 shrink-0 text-warning" />
-        <p className="text-[0.95rem] leading-[1.75] whitespace-pre-wrap text-foreground/90">
-          {text}
-        </p>
+      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+        <Lock className="size-3" />
+        Private note
       </div>
+      <p className="text-[0.9rem] leading-relaxed whitespace-pre-wrap text-foreground/90">
+        {text}
+      </p>
     </div>
   );
 }

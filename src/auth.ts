@@ -36,6 +36,15 @@ export const {
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash);
         if (!valid) return null;
 
+        // Record the sign-in so the admin can see who's active. Fire-and-forget
+        // wrapped so a write hiccup never blocks a valid login.
+        await prisma.user
+          .update({
+            where: { id: user.id },
+            data: { lastLoginAt: new Date() },
+          })
+          .catch(() => {});
+
         return {
           id: user.id,
           name: user.name,

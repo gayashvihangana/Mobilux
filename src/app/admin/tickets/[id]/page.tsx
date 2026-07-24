@@ -327,8 +327,8 @@ export default async function AdminTicketDetailPage({
               <Card>
                 <CardHeader>
                   <CardTitle className="font-display flex items-center gap-2 text-lg">
-                    <NotebookPen className="size-5 text-warning" /> Notes &
-                    lessons
+                    <NotebookPen className="size-5 text-muted-foreground" />{" "}
+                    Notes & lessons
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     Private to you — mistakes, advice to yourself, things you
