@@ -6,12 +6,14 @@ import {
   Ban,
   CheckCircle2,
   ChevronDown,
+  Inbox,
   Link2,
   Loader2,
   Plus,
   Trash2,
   TriangleAlert,
   Undo2,
+  X,
 } from "lucide-react";
 import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -49,6 +51,7 @@ import {
   prevStatus,
   STATUS_PIPELINE,
 } from "@/lib/status";
+import { RECEIVED_ITEM_PRESETS } from "@/lib/received-items";
 import { FormAutosave } from "@/components/forms/form-autosave";
 
 function useSuccessToast(state: TicketFormState, message: string) {
@@ -89,8 +92,8 @@ const STEP_DESCRIPTION: Partial<Record<TicketStatus, string>> = {
   RECEIVED: "You've identified the fault.",
   DIAGNOSING: "Replacement parts are in.",
   AWAITING_PARTS: "Repair work is starting.",
-  IN_PROGRESS: "Repair finished and tested.",
-  COMPLETED: "The customer can come and collect it.",
+  IN_PROGRESS: "Repair finished and tested — the customer can come and collect.",
+  COMPLETED: "Device handed back to the customer.",
   READY_FOR_PICKUP: "Device handed back to the customer.",
 };
 
@@ -139,7 +142,11 @@ export function StatusUpdateForm({
           />
         </div>
 
-        {next ? (
+        {next === "RECEIVED" ? (
+          // Receiving a device asks what came in with it, so it opens a
+          // dialog (its own form) instead of submitting straight away.
+          <MarkReceivedDialog ticketId={ticketId} />
+        ) : next ? (
           <Button
             type="submit"
             name="status"
@@ -232,6 +239,190 @@ export function StatusUpdateForm({
       {/* Cancel — available at any live step, with a required reason */}
       {!terminal ? <CancelRepairForm ticketId={ticketId} /> : null}
     </div>
+  );
+}
+
+// One row in the Mark-as-Received dialog — a preset (Phone, SIM card…) the
+// admin ticks on/off, or a custom item they added themselves.
+type ReceivedDraft = {
+  id: string;
+  label: string;
+  detail: string;
+  checked: boolean;
+  placeholder?: string;
+  custom?: boolean;
+};
+
+// "Mark as Received" opens this instead of submitting directly: the shop
+// records exactly what the customer handed over (phone, back cover, SIM,
+// tempered glass…) with a short detail per item (SIM operator, cover
+// colour…). Items are saved on the ticket and, when no custom note is
+// written, become the timeline note the customer sees.
+function MarkReceivedDialog({ ticketId }: { ticketId: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(updateTicketStatus, null);
+  useSuccessToast(state, "Marked as Received — items logged.");
+
+  const [items, setItems] = useState<ReceivedDraft[]>(() =>
+    RECEIVED_ITEM_PRESETS.map((preset, index) => ({
+      id: `preset-${index}`,
+      label: preset.label,
+      detail: "",
+      // The device itself is always part of a repair drop-off.
+      checked: preset.label === "Phone",
+      placeholder: preset.placeholder,
+    })),
+  );
+
+  useEffect(() => {
+    if (state?.success) setOpen(false);
+  }, [state]);
+
+  const setItem = (id: string, patch: Partial<ReceivedDraft>) =>
+    setItems((cur) => cur.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+
+  const addCustom = () =>
+    setItems((cur) => [
+      ...cur,
+      {
+        id: `custom-${Date.now()}`,
+        label: "",
+        detail: "",
+        checked: true,
+        custom: true,
+      },
+    ]);
+
+  const removeCustom = (id: string) =>
+    setItems((cur) => cur.filter((i) => i.id !== id));
+
+  const selected = items.filter((i) => i.checked && i.label.trim());
+  const itemsJson = JSON.stringify(
+    selected.map((i) => ({ label: i.label.trim(), detail: i.detail.trim() })),
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          className="h-auto w-full flex-col items-start gap-0.5 py-3 text-left whitespace-normal"
+        >
+          <span className="flex items-center gap-1.5 text-sm font-semibold">
+            <Inbox className="size-4" /> Mark as Received
+          </span>
+          <span className="text-xs font-normal opacity-80">
+            The device has arrived — log what came in with it.
+          </span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <input type="hidden" name="status" value="RECEIVED" />
+          <input type="hidden" name="receivedItemsJson" value={itemsJson} />
+          <DialogHeader>
+            <DialogTitle>What did you receive?</DialogTitle>
+            <DialogDescription>
+              Tick everything the customer handed over. A short detail (SIM
+              operator, cover colour…) avoids mix-ups at pickup.
+            </DialogDescription>
+          </DialogHeader>
+          <FormError state={state} />
+
+          <div className="space-y-2">
+            {items.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-xl border border-border px-3 py-2.5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    id={`item-${item.id}`}
+                    checked={item.checked}
+                    onChange={(e) => setItem(item.id, { checked: e.target.checked })}
+                    className="size-4 shrink-0 accent-primary"
+                  />
+                  {item.custom ? (
+                    <Input
+                      value={item.label}
+                      onChange={(e) => setItem(item.id, { label: e.target.value })}
+                      placeholder="Item name, e.g. Memory card"
+                      className="h-8 flex-1 text-sm"
+                      autoFocus
+                    />
+                  ) : (
+                    <label
+                      htmlFor={`item-${item.id}`}
+                      className="flex-1 cursor-pointer text-sm font-medium"
+                    >
+                      {item.label}
+                    </label>
+                  )}
+                  {item.custom ? (
+                    <button
+                      type="button"
+                      onClick={() => removeCustom(item.id)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      aria-label="Remove item"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  ) : null}
+                </div>
+                {item.checked ? (
+                  <Input
+                    value={item.detail}
+                    onChange={(e) => setItem(item.id, { detail: e.target.value })}
+                    placeholder={item.placeholder ?? "Detail (optional)"}
+                    maxLength={120}
+                    className="mt-2 h-8 text-sm"
+                  />
+                ) : null}
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={addCustom}
+              className="w-full text-muted-foreground"
+            >
+              <Plus className="size-3.5" /> Add another item
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="received-note">
+              Note for customer{" "}
+              <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Textarea
+              id="received-note"
+              name="note"
+              rows={2}
+              placeholder="Leave empty to list the received items automatically."
+              className="resize-none"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending || selected.length === 0}>
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-4" />
+              )}
+              Mark as Received
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

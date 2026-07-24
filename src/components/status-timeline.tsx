@@ -11,9 +11,10 @@ import {
 import { cn, formatDateTime } from "@/lib/utils";
 
 // The stepper's visual pipeline. "Picked Up" is deliberately NOT its own
-// node — the final "Ready for Pickup" node stands in for collection: it's
-// the blue "awaiting pickup" step while the device waits, then ticks green
-// as "Picked up" once collected. So there's one collection circle, not two.
+// node — the final COMPLETED node stands in for collection: it's the blue
+// "Ready for pickup" step while the device waits at the shop, then ticks
+// green as "Picked up" once collected. So there's one collection circle,
+// not two. (Legacy READY_FOR_PICKUP tickets behave the same as COMPLETED.)
 const STEPPER_PIPELINE: TicketStatus[] = [
   "SUBMITTED",
   "CONFIRMED",
@@ -22,7 +23,6 @@ const STEPPER_PIPELINE: TicketStatus[] = [
   "AWAITING_PARTS",
   "IN_PROGRESS",
   "COMPLETED",
-  "READY_FOR_PICKUP",
 ];
 
 // Horizontal pipeline stepper (customer-facing "where is my device").
@@ -52,7 +52,7 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   if (status === "PICKED_UP") {
     doneUpTo = lastIndex;
     activeIndex = -1;
-  } else if (status === "READY_FOR_PICKUP") {
+  } else if (status === "COMPLETED" || status === "READY_FOR_PICKUP") {
     doneUpTo = lastIndex - 1;
     activeIndex = lastIndex;
   } else {
@@ -75,14 +75,17 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
         const current = index === activeIndex;
         // Finished steps read as the completed milestone; the last node reads
         // "Picked up" once collected. The blue node reads the live activity.
-        // Upcoming steps keep their neutral ongoing name.
+        // Upcoming steps keep their neutral ongoing name — the final node is
+        // the collection step, so it previews as "Ready for Pickup".
         const label = done
           ? index === lastIndex && status === "PICKED_UP"
             ? doneLabel("PICKED_UP")
             : doneLabel(step)
           : current
             ? currentActivityLabel(status)
-            : STATUS_META[step].label;
+            : index === lastIndex
+              ? STATUS_META.READY_FOR_PICKUP.label
+              : STATUS_META[step].label;
         return (
           <li key={step} className="flex flex-1 flex-col items-center">
             <div className="flex w-full items-center">
@@ -132,9 +135,18 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
 // The "happening now" row — the current activity, shown in blue with a
 // pulsing dot. Reads the fuller current-activity line (e.g. "Diagnosing your
 // device"). Turns into a real dated entry once the shop completes that step.
-export function PendingRow({ status }: { status: TicketStatus }) {
+// Once the repair is done, the row flips to "Ready for you to collect" and
+// tells the customer where and when to pick the device up (via `ctx`).
+export function PendingRow({
+  status,
+  ctx,
+}: {
+  status: TicketStatus;
+  ctx?: MilestoneContext;
+}) {
   const label = pendingLabel(status);
   if (!label) return null;
+  const awaitingPickup = status === "COMPLETED" || status === "READY_FOR_PICKUP";
   return (
     <li className="relative flex gap-4 pb-6">
       <span
@@ -149,11 +161,13 @@ export function PendingRow({ status }: { status: TicketStatus }) {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <p className="text-sm font-semibold text-primary">{label}</p>
           <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-            In progress
+            {awaitingPickup ? "Ready" : "In progress"}
           </span>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          We&apos;ll update this as soon as it&apos;s done.
+          {awaitingPickup
+            ? milestoneDescription(status, ctx)
+            : "We'll update this as soon as it's done."}
         </p>
       </div>
     </li>
@@ -213,7 +227,7 @@ export function StatusHistory({
       {upcoming.map((step) => (
         <UpcomingRow key={`upcoming-${step}`} status={step} />
       ))}
-      {status ? <PendingRow status={status} /> : null}
+      {status ? <PendingRow status={status} ctx={ctx} /> : null}
       {updates.map((update, index) => {
         const meta = STATUS_META[update.status];
         const latest = index === 0;

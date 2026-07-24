@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEVICE_TYPES, doneLabel } from "@/lib/status";
+import { parseReceivedItems } from "@/lib/received-items";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
   AcceptTicketForm,
@@ -104,6 +105,8 @@ export default async function AdminTicketDetailPage({
       )
       .map((u) => ({ label: doneLabel(u.status), text: u.note as string })),
   ];
+
+  const receivedItems = parseReceivedItems(ticket.receivedItems);
 
   const paid = ticket.paidAmount ? Number(ticket.paidAmount) : null;
   const parts = ticket.partsCost ? Number(ticket.partsCost) : null;
@@ -283,6 +286,28 @@ export default async function AdminTicketDetailPage({
                       <p className="mt-0.5 leading-relaxed font-medium whitespace-pre-wrap">
                         {ticket.solution}
                       </p>
+                    </div>
+                  ) : null}
+                  {receivedItems.length > 0 ? (
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Received with
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {receivedItems.map((item, index) => (
+                          <span
+                            key={`${item.label}-${index}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs"
+                          >
+                            <span className="font-medium">{item.label}</span>
+                            {item.detail ? (
+                              <span className="text-muted-foreground">
+                                — {item.detail}
+                              </span>
+                            ) : null}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                   {ticket.photos.length > 0 ? (

@@ -1,6 +1,9 @@
 import type { DeviceType, OrderStatus, TicketStatus } from "@prisma/client";
 import { SHOP } from "@/lib/config";
 
+// READY_FOR_PICKUP is deliberately absent: completing the repair IS being
+// ready for pickup, so COMPLETED goes straight to PICKED_UP. The enum value
+// still exists for legacy tickets and is treated as COMPLETED everywhere.
 export const STATUS_PIPELINE: TicketStatus[] = [
   "SUBMITTED",
   "CONFIRMED",
@@ -9,7 +12,6 @@ export const STATUS_PIPELINE: TicketStatus[] = [
   "AWAITING_PARTS",
   "IN_PROGRESS",
   "COMPLETED",
-  "READY_FOR_PICKUP",
   "PICKED_UP",
 ];
 
@@ -57,10 +59,11 @@ export const STATUS_META: Record<
   },
   COMPLETED: {
     label: "Completed",
-    description: "The repair is complete and tested.",
+    description: "The repair is complete — ready to collect.",
     className: "bg-success/15 text-success border-success/30",
     dotClassName: "bg-success",
   },
+  // Legacy status — old tickets may still carry it. Treated as COMPLETED.
   READY_FOR_PICKUP: {
     label: "Ready for Pickup",
     description: "Your device is ready to collect.",
@@ -115,7 +118,7 @@ const ACTIVITY_SHORT: Partial<Record<TicketStatus, string>> = {
   DIAGNOSING: "Waiting for parts",
   AWAITING_PARTS: "Waiting to start",
   IN_PROGRESS: "Repairing",
-  COMPLETED: "Finalizing",
+  COMPLETED: "Ready for pickup",
   READY_FOR_PICKUP: "Ready for pickup",
   // PICKED_UP / CANCELLED are terminal — nothing pending.
 };
@@ -127,7 +130,7 @@ const ACTIVITY_DETAILED: Partial<Record<TicketStatus, string>> = {
   DIAGNOSING: "Waiting for parts to arrive",
   AWAITING_PARTS: "Getting ready to start the repair",
   IN_PROGRESS: "Repairing your device",
-  COMPLETED: "Finalizing and getting ready for pickup",
+  COMPLETED: "Ready for you to collect",
   READY_FOR_PICKUP: "Ready for you to collect",
 };
 
@@ -138,7 +141,7 @@ const MILESTONE_DESCRIPTIONS: Record<TicketStatus, string> = {
   DIAGNOSING: "Diagnosis complete.",
   AWAITING_PARTS: "Replacement parts received.",
   IN_PROGRESS: "Repair work started.",
-  COMPLETED: "We're finalizing your repair and getting it ready for pickup.",
+  COMPLETED: "Ready to collect.",
   READY_FOR_PICKUP: "Ready to collect.",
   PICKED_UP: "Device collected. Thank you!",
   CANCELLED: "This repair was cancelled.",
@@ -157,7 +160,7 @@ const STATUS_HEADLINE: Record<TicketStatus, string> = {
   DIAGNOSING: "diagnosed",
   AWAITING_PARTS: "awaiting parts",
   IN_PROGRESS: "being repaired",
-  COMPLETED: "repaired",
+  COMPLETED: "ready for pickup",
   READY_FOR_PICKUP: "ready for pickup",
   PICKED_UP: "collected — thank you!",
   CANCELLED: "cancelled",
@@ -193,26 +196,37 @@ export function milestoneDescription(
   status: TicketStatus,
   ctx: MilestoneContext = {},
 ): string {
-  const device = ctx.deviceName?.trim() || "your device";
-  if (status === "READY_FOR_PICKUP") {
+  const device = ctx.deviceName?.trim() || "device";
+  if (status === "COMPLETED" || status === "READY_FOR_PICKUP") {
     const where = ctx.location?.trim() ? ` at ${ctx.location.trim()}` : " at our shop";
     const when = ctx.hours?.trim()
-      ? ` Collect it during ${ctx.hours.trim()}.`
+      ? ` We're open ${ctx.hours.trim()} — please collect it during these hours.`
       : "";
-    return `Your ${device} is ready for pickup${where}.${when} Thank you for choosing ${SHOP.name}!`;
+    return `Your ${device} is ready to collect${where}.${when} Thank you for choosing ${SHOP.name}!`;
+  }
+  if (status === "PICKED_UP") {
+    return `Your ${device} has been collected. Thank you for choosing ${SHOP.name}!`;
   }
   return MILESTONE_DESCRIPTIONS[status];
 }
 
 // Forward/back neighbours in the pipeline (CANCELLED sits outside it).
+// Legacy READY_FOR_PICKUP tickets take COMPLETED's place so they can
+// still move forward to PICKED_UP or back to IN_PROGRESS.
+function pipelineIndex(status: TicketStatus): number {
+  return STATUS_PIPELINE.indexOf(
+    status === "READY_FOR_PICKUP" ? "COMPLETED" : status,
+  );
+}
+
 export function nextStatus(status: TicketStatus): TicketStatus | null {
-  const i = STATUS_PIPELINE.indexOf(status);
+  const i = pipelineIndex(status);
   if (i === -1 || i === STATUS_PIPELINE.length - 1) return null;
   return STATUS_PIPELINE[i + 1];
 }
 
 export function prevStatus(status: TicketStatus): TicketStatus | null {
-  const i = STATUS_PIPELINE.indexOf(status);
+  const i = pipelineIndex(status);
   if (i <= 0) return null;
   return STATUS_PIPELINE[i - 1];
 }

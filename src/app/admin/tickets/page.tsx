@@ -29,8 +29,7 @@ const FILTERS: { value: string; label: string }[] = [
   { value: "DIAGNOSING", label: "Diagnosed" },
   { value: "AWAITING_PARTS", label: "Parts arrived" },
   { value: "IN_PROGRESS", label: "Repair started" },
-  { value: "COMPLETED", label: "Completed" },
-  { value: "READY_FOR_PICKUP", label: "Ready" },
+  { value: "COMPLETED", label: "Ready for pickup" },
   { value: "PICKED_UP", label: "Picked up" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
@@ -47,7 +46,13 @@ export default async function AdminTicketsPage({
       : undefined;
 
   const tickets = await prisma.repairTicket.findMany({
-    where: filter ? { status: filter } : undefined,
+    // Legacy tickets may still sit at READY_FOR_PICKUP — same shelf as
+    // COMPLETED now that the pipeline has no separate ready step.
+    where: filter
+      ? filter === "COMPLETED"
+        ? { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } }
+        : { status: filter }
+      : undefined,
     orderBy: { createdAt: "desc" },
     include: { customer: { select: { name: true, email: true } } },
   });

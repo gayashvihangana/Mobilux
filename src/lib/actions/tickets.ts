@@ -12,6 +12,7 @@ import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
 import { doneLabel, milestoneDescription, statusHeadline } from "@/lib/status";
+import { receivedItemsNote, type ReceivedItem } from "@/lib/received-items";
 import { getShopInfo } from "@/lib/settings";
 import {
   DONE_TICKET_STATUSES,
@@ -725,6 +726,23 @@ const updateStatusSchema = z.object({
   note: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
+// Items logged by the Mark-as-Received dialog ("what did the customer hand
+// over?") — phone, SIM, back cover…, each with an optional short detail.
+const receivedItemsSchema = z
+  .array(
+    z.object({
+      label: z.string().trim().min(1).max(60),
+      detail: z
+        .string()
+        .trim()
+        .max(120)
+        .optional()
+        .or(z.literal(""))
+        .transform((v) => v || undefined),
+    }),
+  )
+  .max(20);
+
 export async function updateTicketStatus(
   _prev: TicketFormState,
   formData: FormData,
@@ -759,6 +777,27 @@ export async function updateTicketStatus(
   if (!ticket) return { error: "Ticket not found." };
   if (ticket.status === status) return { error: "Ticket is already in this status." };
 
+  // Items handed over with the device — only sent by the Mark-as-Received
+  // dialog, so they're ignored for any other transition.
+  let receivedItems: ReceivedItem[] = [];
+  if (status === "RECEIVED") {
+    const rawItems = formData.get("receivedItemsJson");
+    if (typeof rawItems === "string" && rawItems) {
+      let json: unknown;
+      try {
+        json = JSON.parse(rawItems);
+      } catch {
+        return { error: "Couldn't read the received items." };
+      }
+      const itemsParsed = receivedItemsSchema.safeParse(json);
+      if (!itemsParsed.success) {
+        return { error: "One or more received items are invalid." };
+      }
+      receivedItems = itemsParsed.data;
+    }
+  }
+  const itemsNote = receivedItemsNote(receivedItems);
+
   // Context so the pickup note names the device and the shop's collection
   // details in the notification + email the customer receives.
   const shopInfo = await getShopInfo();
@@ -774,7 +813,8 @@ export async function updateTicketStatus(
   // Human-readable copy shared by the in-app notification and the email:
   // "Your iPhone 13 (REP-044) is diagnosed."
   const headline = statusHeadline(status as TicketStatus);
-  const message = note || milestoneDescription(status as TicketStatus, milestoneCtx);
+  const message =
+    note || itemsNote || milestoneDescription(status as TicketStatus, milestoneCtx);
   const notifTitle = `Your ${deviceName} (${ticket.ticketNumber}) is ${headline}`;
   const notifBody =
     !note && ticket.issueTitle ? `${message} · Issue: ${ticket.issueTitle}` : message;
@@ -790,13 +830,18 @@ export async function updateTicketStatus(
       where: { id: ticketId },
       data: {
         status: status as TicketStatus,
+        ...(receivedItems.length > 0 ? { receivedItems } : {}),
         ...(becameDone && !ticket.completedAt
           ? { completedAt: new Date() }
           : {}),
       },
     });
     await tx.statusUpdate.create({
-      data: { ticketId, status: status as TicketStatus, note: note || null },
+      data: {
+        ticketId,
+        status: status as TicketStatus,
+        note: note || itemsNote || null,
+      },
     });
     if (ticket.customerId) {
       await syncCompletedRepairs(tx, ticket.customerId);
