@@ -5,10 +5,12 @@ import Link from "next/link";
 import { toast } from "sonner";
 import {
   BadgeCheck,
+  CheckCircle2,
   Download,
   Eye,
   EyeOff,
   Loader2,
+  Pencil,
   Plus,
   Receipt,
   Trash2,
@@ -196,6 +198,19 @@ export function BillBuilder({
   const [state, formAction, pending] = useActionState(generateBill, null);
   useSuccessToast(state, "Bill generated. You can download it now.");
 
+  // Once a bill exists, the Generate button locks to "Bill generated" until
+  // the admin taps "Update bill" — then they can edit and re-generate, with a
+  // choice to keep the original invoice date or re-issue with today's.
+  const [editing, setEditing] = useState(false);
+  const [reissue, setReissue] = useState(false);
+  useEffect(() => {
+    // Leave edit mode after a successful (re)generate.
+    if (state?.success) {
+      setEditing(false);
+      setReissue(false);
+    }
+  }, [state]);
+
   // Draft persistence — keep an unsaved bill across reloads / errors, then
   // drop it once the bill is generated. Restore runs once on mount; the
   // first save (seeded values) is skipped so it never clobbers the draft.
@@ -318,6 +333,9 @@ export function BillBuilder({
     billDiscountAmount:
       discountMode === "amount" && discountValue ? String(discountValue) : null,
     billPayTo: payTo,
+    // Preview the invoice date the save will use: today when re-issuing,
+    // otherwise the frozen original (fallbacks handle a never-generated bill).
+    billGeneratedAt: reissue ? new Date() : bill.billGeneratedAt,
     warrantyPeriod: warrantyPeriod.trim() || null,
     warrantyParts: warrantyParts.trim() || null,
     billShow: show,
@@ -344,6 +362,7 @@ export function BillBuilder({
           <input type="hidden" name="warrantyParts" value={warrantyParts} />
           <input type="hidden" name="discountMode" value={discountMode} />
           <input type="hidden" name="discountValue" value={discountValue} />
+          <input type="hidden" name="reissue" value={reissue ? "true" : "false"} />
           <input type="hidden" name="payBankName" value={payTo.bankName} />
           <input type="hidden" name="payBranch" value={payTo.branch} />
           <input type="hidden" name="payAccountName" value={payTo.accountName} />
@@ -610,23 +629,70 @@ export function BillBuilder({
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={pending || cleanItems.length === 0}
-              >
-                {pending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Receipt className="size-4" />
-                )}
-                {hasGenerated ? "Update & regenerate bill" : "Generate bill"}
-              </Button>
+              {/* Re-issue date choice — only while editing a generated bill */}
+              {hasGenerated && editing ? (
+                <label className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 p-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={reissue}
+                    onChange={(e) => setReissue(e.target.checked)}
+                    className="mt-0.5 size-4 accent-primary"
+                  />
+                  <span>
+                    <span className="font-medium">
+                      Re-issue with today&apos;s date
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Leave unchecked to keep the original invoice date. The paid
+                      date is always separate.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
 
-              {(hasGenerated || state?.success) && (
+              {hasGenerated && !editing ? (
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    disabled
+                  >
+                    <CheckCircle2 className="size-4" /> Bill generated
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setEditing(true)}
+                  >
+                    <Pencil className="size-4" /> Update bill
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={pending || cleanItems.length === 0}
+                >
+                  {pending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Receipt className="size-4" />
+                  )}
+                  {hasGenerated ? "Update & regenerate bill" : "Generate bill"}
+                </Button>
+              )}
+
+              {hasGenerated || state?.success ? (
                 <div className="flex flex-wrap gap-2">
                   <Button asChild variant="secondary" size="sm">
-                    <a href={`/bill/${ticketId}/pdf`} target="_blank" rel="noreferrer">
+                    <a
+                      href={`/bill/${ticketId}?print=1`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       <Download className="size-4" /> Download bill
                     </a>
                   </Button>
@@ -636,7 +702,7 @@ export function BillBuilder({
                     </Link>
                   </Button>
                 </div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </form>
@@ -709,9 +775,25 @@ function BillPaymentCard({
               {paidDate ? ` · ${formatDate(paidDate)}` : ""}
             </p>
             <p className="text-xs text-muted-foreground">
-              The bill now shows a PAID seal and reads as a receipt. Download it
-              again to send the paid copy.
+              The bill now shows a PAID seal and reads as a receipt. Grab the
+              paid copy to send the customer.
             </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="secondary" size="sm">
+                <a
+                  href={`/bill/${ticketId}?print=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Download className="size-4" /> Download receipt
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/bill/${ticketId}`} target="_blank">
+                  <Eye className="size-4" /> View receipt
+                </Link>
+              </Button>
+            </div>
             {hasOnlinePayment ? (
               <p className="text-xs text-muted-foreground">
                 Settled by a verified online payment — manage it under Payments.

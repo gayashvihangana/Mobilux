@@ -13,11 +13,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "8mb",
     },
   },
-  // The bill PDF reads the Newsreader TTFs from public/fonts at request time,
-  // so make sure they're bundled into the serverless function.
-  outputFileTracingIncludes: {
-    "/bill/[id]/pdf": ["./public/fonts/*.ttf"],
-  },
 };
 
 export default nextConfig;

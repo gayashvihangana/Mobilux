@@ -479,6 +479,16 @@ export async function generateBill(
   };
   const hasPayTo = Object.values(payTo).some((v) => v !== "");
 
+  // Invoice date: set on first generation and frozen thereafter, unless the
+  // admin explicitly re-issues with today's date.
+  const existing = await prisma.repairTicket.findUnique({
+    where: { id: data.ticketId },
+    select: { billGeneratedAt: true },
+  });
+  const reissue = formData.get("reissue") === "true";
+  const billGeneratedAt =
+    reissue || !existing?.billGeneratedAt ? new Date() : existing.billGeneratedAt;
+
   await prisma.repairTicket.update({
     where: { id: data.ticketId },
     data: {
@@ -487,6 +497,7 @@ export async function generateBill(
       billDiscountPercent: discountPercent ?? null,
       billDiscountAmount: discountAmount ?? null,
       billPayTo: hasPayTo ? payTo : undefined,
+      billGeneratedAt,
       finalCost: total,
       // Only overwrite the ticket's issue when a value is supplied (it's a
       // required field); solution/warranty clear to null when blank.

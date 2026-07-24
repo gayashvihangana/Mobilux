@@ -118,6 +118,7 @@ model RepairTicket {
   billDiscountPercent Decimal? @db.Decimal(5, 2) // bill discount as a % of the subtotal
   billDiscountAmount  Decimal? @db.Decimal(10, 2) // bill discount as a flat LKR amount
   billPayTo           Json? // { bankName, branch, accountName, accountNumber } — where to pay, shown on unpaid invoices
+  billGeneratedAt     DateTime? // when the bill was first generated — the invoice date/time
   paidAt              DateTime? // when the shop manually marked the bill paid (drives the receipt/PAID stamp)
   paidMethod          String? // e.g. "Cash", "Bank transfer" — printed on the paid receipt
   warrantyPeriod      String? // e.g. "3 months" — only shown when the warranty field is enabled

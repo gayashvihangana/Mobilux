@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -6,7 +7,7 @@ import { auth } from "@/auth";
 import { fetchBillTicket } from "@/lib/bill-data";
 import { trackQrDataUrl } from "@/lib/track-qr";
 import { BillDocument } from "@/components/bill-document";
-import { DownloadBillButton } from "@/components/bill-print-button";
+import { AutoPrint, DownloadBillButton } from "@/components/bill-print-button";
 
 export const metadata: Metadata = {
   title: "Bill",
@@ -36,20 +37,27 @@ export default async function BillPage({
   const trackQr = await trackQrDataUrl(result.bill.ticketNumber);
 
   return (
-    <div className="min-h-dvh bg-neutral-100 py-10">
-      <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between px-4">
+    <div className="min-h-dvh bg-neutral-100 py-10 print:bg-white print:py-0">
+      {/* Print rules: only the bill prints, on a clean A4 page. */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 12mm; }
+          html, body { background: #ffffff !important; }
+        }
+      `}</style>
+      <Suspense>
+        <AutoPrint />
+      </Suspense>
+      <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between px-4 print:hidden">
         <Link
           href={backHref}
           className="inline-flex items-center gap-1.5 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
         >
           <ArrowLeft className="size-4" /> Back
         </Link>
-        <DownloadBillButton
-          ticketId={result.bill.id}
-          ticketNumber={result.bill.ticketNumber}
-        />
+        <DownloadBillButton />
       </div>
-      <div className="px-4">
+      <div className="px-4 print:px-0">
         <BillDocument ticket={result.bill} trackQr={trackQr} />
       </div>
     </div>

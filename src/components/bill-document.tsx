@@ -31,6 +31,7 @@ export function BillDocument({
     paidMethod,
     payTo,
     show,
+    warrantyEnd,
   } = computeBill(ticket);
 
   const showSubtotal = isItemized && (items.length > 1 || discountAmount > 0);
@@ -249,13 +250,13 @@ export function BillDocument({
 
         {/* ── Paid seal / balance due ───────────────────────── */}
         {isSettled ? (
-          <div className="mt-8 flex justify-center">
-            <div className="rounded-sm border-2 border-green-700/60 px-8 py-2 text-center">
-              <p className="text-2xl leading-none font-black tracking-[0.3em] text-green-700/80 uppercase">
+          <div className="mt-8 flex justify-center break-inside-avoid">
+            <div className="rounded-md border-[3px] border-green-700/70 px-10 py-3 text-center">
+              <p className="text-5xl leading-none font-black tracking-[0.15em] text-green-700/85 uppercase">
                 Paid
               </p>
               {paidMeta ? (
-                <p className="mt-1 text-[10px] font-medium tracking-widest text-green-800/70 uppercase">
+                <p className="mt-1.5 text-[9px] leading-tight font-medium tracking-[0.2em] text-green-800/70 uppercase">
                   {paidMeta}
                 </p>
               ) : null}
@@ -274,7 +275,7 @@ export function BillDocument({
 
         {/* ── How to pay ────────────────────────────────────── */}
         {!isSettled && show.payment && total > 0 ? (
-          <div className="mt-6 border border-neutral-200 bg-neutral-50 p-4">
+          <div className="mt-6 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
               How to pay
             </p>
@@ -317,7 +318,7 @@ export function BillDocument({
 
         {/* ── Specific warranty (when a period is set) ──────── */}
         {showWarranty ? (
-          <div className="mt-6 border border-neutral-200 bg-neutral-50 p-4">
+          <div className="mt-6 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
               Warranty
             </p>
@@ -326,12 +327,21 @@ export function BillDocument({
               warranty
               {ticket.warrantyParts ? <> on {ticket.warrantyParts}</> : null}.
             </p>
+            {warrantyEnd ? (
+              <p className="mt-1 text-sm text-neutral-700">
+                Valid until{" "}
+                <span className="font-semibold">
+                  {formatDate(warrantyEnd)}, 11:59 PM
+                </span>
+                .
+              </p>
+            ) : null}
           </div>
         ) : null}
 
         {/* ── Notes ─────────────────────────────────────────── */}
         {show.notes && ticket.billNotes ? (
-          <div className="mt-6 border border-neutral-200 bg-neutral-50 p-4">
+          <div className="mt-6 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
             <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
               Notes
             </p>
@@ -343,7 +353,7 @@ export function BillDocument({
 
         {/* ── Scan to track ─────────────────────────────────── */}
         {show.track && trackQr ? (
-          <div className="mt-6 flex items-center gap-4 border border-neutral-200 bg-neutral-50 p-4">
+          <div className="mt-6 flex items-center gap-4 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
             {/* eslint-disable-next-line @next/next/no-img-element -- static data URL */}
             <img
               src={trackQr}

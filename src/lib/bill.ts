@@ -12,6 +12,39 @@ export function invoiceNumber(ticketNumber: string): string {
   return digits ? `INV-${digits}` : `INV-${ticketNumber}`;
 }
 
+// The Colombo calendar Y/M/D of an instant — so warranty dates are computed
+// against the same day the customer sees as the invoice date.
+function colomboYMD(date: Date): { y: number; m: number; d: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  return { y: get("year"), m: get("month"), d: get("day") };
+}
+
+// The day a warranty runs out, given a start date and a free-text period like
+// "3 months", "30 days", "1 year". The bill labels the end as 11:59 PM that
+// day (the whole last day is covered). Returns null when the period can't be
+// parsed. Anchored at noon UTC so formatting back to Colombo keeps the day.
+export function warrantyEndDate(start: Date, period: string | null): Date | null {
+  const m = period?.trim().match(/(\d+)\s*(day|week|month|year)s?/i);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (!(n > 0)) return null;
+
+  const { y, m: mon, d } = colomboYMD(start);
+  const dt = new Date(Date.UTC(y, mon - 1, d, 12, 0, 0));
+  const unit = m[2].toLowerCase();
+  if (unit === "day") dt.setUTCDate(dt.getUTCDate() + n);
+  else if (unit === "week") dt.setUTCDate(dt.getUTCDate() + n * 7);
+  else if (unit === "month") dt.setUTCMonth(dt.getUTCMonth() + n);
+  else if (unit === "year") dt.setUTCFullYear(dt.getUTCFullYear() + n);
+  return dt;
+}
+
 // Where the customer should pay — shown on unpaid invoices. Any field left
 // blank falls back to the shop default in config (BANK_DETAILS).
 export type BillPayTo = {
@@ -80,6 +113,7 @@ export type BillTicket = {
   billDiscountPercent: string | null;
   billDiscountAmount: string | null;
   billPayTo: BillPayTo | null;
+  billGeneratedAt: Date | null;
   paidAt: Date | null;
   paidMethod: string | null;
   warrantyPeriod: string | null;
@@ -94,6 +128,7 @@ export type BillTotals = {
   owner: string;
   technician: string | null;
   billDate: Date;
+  warrantyEnd: Date | null;
   // When true, render `items` as separate rows with a subtotal; otherwise
   // the legacy single-line layout (solution + parts subtext).
   isItemized: boolean;
@@ -143,7 +178,11 @@ export function computeBill(ticket: BillTicket): BillTotals {
   const deviceName =
     [ticket.brand, ticket.model].filter(Boolean).join(" ") || "Device";
   const owner = ticket.customer?.name ?? ticket.customerName ?? "Customer";
-  const billDate = ticket.completedAt ?? ticket.createdAt;
+  // Invoice date = when the bill was generated (frozen at generation time),
+  // falling back to completion/creation for bills made before this existed.
+  const billDate =
+    ticket.billGeneratedAt ?? ticket.completedAt ?? ticket.createdAt;
+  const warrantyEnd = warrantyEndDate(billDate, ticket.warrantyPeriod);
 
   // Prefer a verified online payment; otherwise fall back to the
   // shop's own paid-amount record; otherwise the quoted price.
@@ -193,6 +232,7 @@ export function computeBill(ticket: BillTicket): BillTotals {
       owner,
       technician: ticket.technician,
       billDate,
+      warrantyEnd,
       isItemized: true,
       items,
       subtotal,
@@ -226,6 +266,7 @@ export function computeBill(ticket: BillTicket): BillTotals {
     owner,
     technician: ticket.technician,
     billDate,
+    warrantyEnd,
     isItemized: false,
     items: [],
     subtotal,

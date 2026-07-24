@@ -49,6 +49,7 @@ export async function fetchBillTicket(
       billDiscountPercent: ticket.billDiscountPercent?.toString() ?? null,
       billDiscountAmount: ticket.billDiscountAmount?.toString() ?? null,
       billPayTo: (ticket.billPayTo as BillPayTo | null) ?? null,
+      billGeneratedAt: ticket.billGeneratedAt,
       paidAt: ticket.paidAt,
       paidMethod: ticket.paidMethod,
       warrantyPeriod: ticket.warrantyPeriod,
