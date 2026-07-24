@@ -13,6 +13,9 @@ export const SHOP = {
   phone: "+94 71 949 5825",
   email: "mobiluxlk@gmail.com",
   city: "Colombo, Sri Lanka",
+  // Shown on the bill and in the "ready for pickup" message. Editable by
+  // admins under Admin → Settings (falls back to this default).
+  hours: "Mon–Sat, 9:00 AM – 7:00 PM",
   // Digits only, international format — used for wa.me chat links.
   whatsapp: "94719495825",
 } as const;

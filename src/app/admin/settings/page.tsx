@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Landmark } from "lucide-react";
+import { Landmark, Store } from "lucide-react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getShopBankAccounts } from "@/lib/settings";
+import { getShopBankAccounts, getShopInfo } from "@/lib/settings";
 import {
   BankAccountDialog,
   DeleteBankAccountButton,
   MakePrimaryButton,
+  ShopInfoForm,
 } from "./settings-forms";
 
 export const metadata: Metadata = {
@@ -18,7 +19,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminSettingsPage() {
-  const accounts = await getShopBankAccounts();
+  const [accounts, shopInfo] = await Promise.all([
+    getShopBankAccounts(),
+    getShopInfo(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -30,6 +34,21 @@ export default async function AdminSettingsPage() {
           Shop details used across the app.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2 text-lg">
+            <Store className="size-5 text-primary" /> Shop details
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Name, contact details and opening hours — shown on bills and in the
+            messages customers receive.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ShopInfoForm info={shopInfo} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">

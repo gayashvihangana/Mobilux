@@ -6,6 +6,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Save,
   Star,
   Trash2,
   TriangleAlert,
@@ -28,9 +29,10 @@ import {
   deleteBankAccount,
   makePrimaryBankAccount,
   updateBankAccount,
+  updateShopInfo,
   type SettingsFormState,
 } from "@/lib/actions/settings";
-import type { BankAccount } from "@/lib/settings";
+import type { BankAccount, ShopInfo } from "@/lib/settings";
 
 function useFormToast(
   state: SettingsFormState,
@@ -222,5 +224,72 @@ export function DeleteBankAccountButton({ account }: { account: BankAccount }) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function ShopInfoForm({ info }: { info: ShopInfo }) {
+  const [state, formAction, pending] = useActionState(updateShopInfo, null);
+  useFormToast(state, "Shop details saved.");
+
+  return (
+    <form action={formAction} className="space-y-4">
+      {state?.error ? (
+        <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <TriangleAlert className="size-4 shrink-0" />
+          {state.error}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="name">Shop name</Label>
+          <Input id="name" name="name" defaultValue={info.name} required />
+          <FieldError errors={state?.fieldErrors?.name} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="tagline">Tagline</Label>
+          <Input id="tagline" name="tagline" defaultValue={info.tagline} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone</Label>
+          <Input id="phone" name="phone" defaultValue={info.phone} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" defaultValue={info.email} />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="address">Address / location</Label>
+          <Input
+            id="address"
+            name="address"
+            defaultValue={info.address}
+            placeholder="e.g. 123 Galle Rd, Colombo 03"
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="hours">Opening hours</Label>
+          <Input
+            id="hours"
+            name="hours"
+            defaultValue={info.hours}
+            placeholder="e.g. Mon–Sat, 9:00 AM – 7:00 PM"
+          />
+          <p className="text-xs text-muted-foreground">
+            Shown on the bill and in the &ldquo;ready for pickup&rdquo; message
+            customers receive.
+          </p>
+        </div>
+      </div>
+
+      <Button type="submit" disabled={pending}>
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Save className="size-4" />
+        )}
+        Save shop details
+      </Button>
+    </form>
   );
 }

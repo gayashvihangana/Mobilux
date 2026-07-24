@@ -5,6 +5,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import {
   SHOP_BANK_ACCOUNTS_KEY,
+  SHOP_INFO_KEYS,
   getShopBankAccounts,
   setSetting,
   type BankAccount,
@@ -121,6 +122,47 @@ export async function makePrimaryBankAccount(
 
   const reordered = [target, ...accounts.filter((a) => a.id !== id)];
   await persistAccounts(reordered);
+  return { success: true };
+}
+
+const shopInfoSchema = z.object({
+  name: z.string().trim().min(1, "Shop name is required").max(120),
+  tagline: z.string().trim().max(120).optional().or(z.literal("")),
+  phone: z.string().trim().max(60).optional().or(z.literal("")),
+  email: z.string().trim().max(120).optional().or(z.literal("")),
+  address: z.string().trim().max(200).optional().or(z.literal("")),
+  hours: z.string().trim().max(200).optional().or(z.literal("")),
+});
+
+export async function updateShopInfo(
+  _prev: SettingsFormState,
+  formData: FormData,
+): Promise<SettingsFormState> {
+  if (!(await requireAdmin())) return { error: "Not authorized." };
+
+  const parsed = shopInfoSchema.safeParse({
+    name: formData.get("name") ?? "",
+    tagline: formData.get("tagline") ?? "",
+    phone: formData.get("phone") ?? "",
+    email: formData.get("email") ?? "",
+    address: formData.get("address") ?? "",
+    hours: formData.get("hours") ?? "",
+  });
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const { name, tagline, phone, email, address, hours } = parsed.data;
+  await Promise.all([
+    setSetting(SHOP_INFO_KEYS.name, name),
+    setSetting(SHOP_INFO_KEYS.tagline, tagline || ""),
+    setSetting(SHOP_INFO_KEYS.phone, phone || ""),
+    setSetting(SHOP_INFO_KEYS.email, email || ""),
+    setSetting(SHOP_INFO_KEYS.address, address || ""),
+    setSetting(SHOP_INFO_KEYS.hours, hours || ""),
+  ]);
+
+  revalidateSettings();
   return { success: true };
 }
 

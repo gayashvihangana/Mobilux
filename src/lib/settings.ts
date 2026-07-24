@@ -1,7 +1,42 @@
 import { prisma } from "@/lib/prisma";
-import { BANK_DETAILS } from "@/lib/config";
+import { BANK_DETAILS, SHOP } from "@/lib/config";
 
 export const PHONES_VISIBLE_KEY = "phones_storefront_visible";
+
+// ── Shop details (name, contact, opening hours) ──────────────────────
+// Editable under Admin → Settings; each falls back to the config default.
+export const SHOP_INFO_KEYS = {
+  name: "shop_name",
+  tagline: "shop_tagline",
+  phone: "shop_phone",
+  email: "shop_email",
+  address: "shop_address",
+  hours: "shop_hours",
+} as const;
+
+export type ShopInfo = {
+  name: string;
+  tagline: string;
+  phone: string;
+  email: string;
+  address: string;
+  hours: string;
+};
+
+export async function getShopInfo(): Promise<ShopInfo> {
+  const rows = await prisma.setting.findMany({
+    where: { key: { in: Object.values(SHOP_INFO_KEYS) } },
+  });
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+  return {
+    name: map.get(SHOP_INFO_KEYS.name) || SHOP.name,
+    tagline: map.get(SHOP_INFO_KEYS.tagline) || SHOP.tagline,
+    phone: map.get(SHOP_INFO_KEYS.phone) || SHOP.phone,
+    email: map.get(SHOP_INFO_KEYS.email) || SHOP.email,
+    address: map.get(SHOP_INFO_KEYS.address) || SHOP.city,
+    hours: map.get(SHOP_INFO_KEYS.hours) || SHOP.hours,
+  };
+}
 
 // Shop bank details — the default "pay to" account shown on unpaid bills.
 // Editable by admins under Admin → Settings; falls back to config defaults.

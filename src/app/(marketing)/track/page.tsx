@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MessageCircle, Search, SearchX } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { whatsappLink } from "@/lib/config";
+import { getShopInfo } from "@/lib/settings";
 import { StatusHistory, StatusStepper } from "@/components/status-timeline";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,11 @@ export default async function TrackPage({
   const deviceName =
     [ticket?.brand, ticket?.model].filter(Boolean).join(" ") ||
     (ticket ? DEVICE_LABEL[ticket.deviceType] : "");
+
+  const shopInfo = ticket ? await getShopInfo() : null;
+  const timelineCtx = shopInfo
+    ? { deviceName, location: shopInfo.address, hours: shopInfo.hours }
+    : undefined;
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-32 pb-20">
@@ -143,6 +149,7 @@ export default async function TrackPage({
               <StatusHistory
                 updates={ticket.statusUpdates}
                 status={ticket.status}
+                ctx={timelineCtx}
               />
             </div>
           </div>

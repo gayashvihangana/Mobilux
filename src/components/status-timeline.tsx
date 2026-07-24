@@ -6,6 +6,7 @@ import {
   milestoneDescription,
   pendingLabel,
   STATUS_META,
+  type MilestoneContext,
 } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -128,10 +129,9 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   );
 }
 
-// The note-less "what's next" row shown at the very top of the timeline
-// while a ticket is still in progress. Derived from the current status —
-// it has no note and no timestamp, and turns into a real entry once the
-// shop completes that step.
+// The "happening now" row — the current activity, shown in blue with a
+// pulsing dot. Reads the fuller current-activity line (e.g. "Diagnosing your
+// device"). Turns into a real dated entry once the shop completes that step.
 export function PendingRow({ status }: { status: TicketStatus }) {
   const label = pendingLabel(status);
   if (!label) return null;
@@ -160,18 +160,59 @@ export function PendingRow({ status }: { status: TicketStatus }) {
   );
 }
 
-// Vertical history for the customer. Each finished step is an entry with
-// its completed (milestone) name + note; the current step rides on top as
-// the note-less pending row. `status` is the ticket's current status.
+// A step that hasn't happened yet — shown faint with a hollow dot and a
+// "Waiting" tag, so the customer can see the whole road ahead.
+function UpcomingRow({ status }: { status: TicketStatus }) {
+  return (
+    <li className="relative flex gap-4 pb-6">
+      <span
+        className="absolute top-5 left-[7px] h-full w-0.5 bg-border"
+        aria-hidden
+      />
+      <span className="relative mt-1 size-4 shrink-0 rounded-full border-2 border-dashed border-muted-foreground/40 bg-background" />
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-sm font-medium text-muted-foreground">
+            {STATUS_META[status].label}
+          </p>
+          <span className="rounded-full border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+            Waiting
+          </span>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+// Vertical history for the customer. Top to bottom: the steps still to come
+// (faint "Waiting" rows), the step happening now (blue), then every finished
+// step newest-first. `status` is the ticket's current status; `ctx` lets the
+// pickup note name the device and the shop's collection details.
 export function StatusHistory({
   updates,
   status,
+  ctx,
 }: {
   updates: StatusUpdate[];
   status?: TicketStatus;
+  ctx?: MilestoneContext;
 }) {
+  // Steps after the one happening now — shown furthest-away first (top).
+  let upcoming: TicketStatus[] = [];
+  if (status) {
+    const ci = STEPPER_PIPELINE.indexOf(status);
+    if (ci !== -1) {
+      // status = last completed milestone → the active step is ci+1, so the
+      // still-to-come steps start at ci+2. Reverse so the finish line is up top.
+      upcoming = STEPPER_PIPELINE.slice(ci + 2).reverse();
+    }
+  }
+
   return (
     <ol className="space-y-0">
+      {upcoming.map((step) => (
+        <UpcomingRow key={`upcoming-${step}`} status={step} />
+      ))}
       {status ? <PendingRow status={status} /> : null}
       {updates.map((update, index) => {
         const meta = STATUS_META[update.status];
@@ -201,7 +242,7 @@ export function StatusHistory({
                 </p>
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                {update.note ?? milestoneDescription(update.status)}
+                {update.note ?? milestoneDescription(update.status, ctx)}
               </p>
             </div>
           </li>

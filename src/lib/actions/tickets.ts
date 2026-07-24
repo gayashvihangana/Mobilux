@@ -12,6 +12,7 @@ import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
 import { doneLabel, milestoneDescription } from "@/lib/status";
+import { getShopInfo } from "@/lib/settings";
 import {
   DONE_TICKET_STATUSES,
   syncCompletedRepairs,
@@ -746,6 +747,15 @@ export async function updateTicketStatus(
   if (!ticket) return { error: "Ticket not found." };
   if (ticket.status === status) return { error: "Ticket is already in this status." };
 
+  // Context so the pickup note names the device and the shop's collection
+  // details in the notification + email the customer receives.
+  const shopInfo = await getShopInfo();
+  const milestoneCtx = {
+    deviceName: [ticket.brand, ticket.model].filter(Boolean).join(" ") || undefined,
+    location: shopInfo.address,
+    hours: shopInfo.hours,
+  };
+
   // Reaching any done status marks the repair completed — statuses often
   // jump straight to READY_FOR_PICKUP without passing through COMPLETED.
   const becameDone =
@@ -771,7 +781,7 @@ export async function updateTicketStatus(
         data: {
           userId: ticket.customerId,
           title: `${ticket.ticketNumber} — ${doneLabel(status as TicketStatus)}`,
-          body: note || milestoneDescription(status as TicketStatus),
+          body: note || milestoneDescription(status as TicketStatus, milestoneCtx),
           href: `/repairs/${ticketId}`,
         },
       });
@@ -789,7 +799,7 @@ export async function updateTicketStatus(
       heading: `Your repair is now: ${label}`,
       lines: [
         `Hi ${ticket.customer.name},`,
-        note || milestoneDescription(status as TicketStatus),
+        note || milestoneDescription(status as TicketStatus, milestoneCtx),
         `Ticket ${ticket.ticketNumber}${device ? ` · ${device}` : ""}`,
       ],
       cta: {

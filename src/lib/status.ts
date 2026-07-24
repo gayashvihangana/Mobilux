@@ -1,4 +1,5 @@
 import type { DeviceType, OrderStatus, TicketStatus } from "@prisma/client";
+import { SHOP } from "@/lib/config";
 
 export const STATUS_PIPELINE: TicketStatus[] = [
   "SUBMITTED",
@@ -103,16 +104,31 @@ const DONE_LABELS: Partial<Record<TicketStatus, string>> = {
   IN_PROGRESS: "Repair Started",
 };
 
-const PENDING_LABELS: Partial<Record<TicketStatus, string>> = {
-  SUBMITTED: "Waiting for confirmation",
-  CONFIRMED: "Waiting to receive the device",
-  RECEIVED: "Diagnosing the device",
+// Current-activity labels — "what's happening right now" at a given status.
+// SHORT is used where space is tight (the stepper's blue node, the status
+// pill): just enough to name the activity ("Diagnosing", not "Diagnosing the
+// device"). DETAILED is the fuller line the customer reads in the timeline.
+const ACTIVITY_SHORT: Partial<Record<TicketStatus, string>> = {
+  SUBMITTED: "Confirming",
+  CONFIRMED: "Waiting to receive",
+  RECEIVED: "Diagnosing",
   DIAGNOSING: "Waiting for parts",
-  AWAITING_PARTS: "Waiting to start the repair",
-  IN_PROGRESS: "Repair in progress",
-  COMPLETED: "Getting ready for pickup",
-  READY_FOR_PICKUP: "Waiting for pickup",
+  AWAITING_PARTS: "Waiting to start",
+  IN_PROGRESS: "Repairing",
+  COMPLETED: "Finalizing",
+  READY_FOR_PICKUP: "Ready for pickup",
   // PICKED_UP / CANCELLED are terminal — nothing pending.
+};
+
+const ACTIVITY_DETAILED: Partial<Record<TicketStatus, string>> = {
+  SUBMITTED: "Waiting for the shop to confirm your request",
+  CONFIRMED: "Waiting to receive your device",
+  RECEIVED: "Diagnosing your device",
+  DIAGNOSING: "Waiting for parts to arrive",
+  AWAITING_PARTS: "Getting ready to start the repair",
+  IN_PROGRESS: "Repairing your device",
+  COMPLETED: "Finalizing and getting ready for pickup",
+  READY_FOR_PICKUP: "Ready for you to collect",
 };
 
 const MILESTONE_DESCRIPTIONS: Record<TicketStatus, string> = {
@@ -122,7 +138,7 @@ const MILESTONE_DESCRIPTIONS: Record<TicketStatus, string> = {
   DIAGNOSING: "Diagnosis complete.",
   AWAITING_PARTS: "Replacement parts received.",
   IN_PROGRESS: "Repair work started.",
-  COMPLETED: "Repair completed and tested.",
+  COMPLETED: "We're finalizing your repair and getting it ready for pickup.",
   READY_FOR_PICKUP: "Ready to collect.",
   PICKED_UP: "Device collected. Thank you!",
   CANCELLED: "This repair was cancelled.",
@@ -132,19 +148,40 @@ export function doneLabel(status: TicketStatus): string {
   return DONE_LABELS[status] ?? STATUS_META[status].label;
 }
 
+// Fuller current-activity line (timeline). Null once terminal.
 export function pendingLabel(status: TicketStatus): string | null {
-  return PENDING_LABELS[status] ?? null;
+  return ACTIVITY_DETAILED[status] ?? null;
 }
 
-// The single "what's happening right now" label for a status — the current
-// activity (what the shop is doing / waiting for). Falls back to the done
-// label for terminal statuses (Picked Up, Cancelled) that have no activity.
-// This is what the active blue node and the status pill both read from.
+// Compact current-activity name — the stepper's blue node and the status
+// pill. Falls back to the done label for terminal statuses.
 export function currentActivityLabel(status: TicketStatus): string {
-  return pendingLabel(status) ?? doneLabel(status);
+  return ACTIVITY_SHORT[status] ?? doneLabel(status);
 }
 
-export function milestoneDescription(status: TicketStatus): string {
+// Context that lets the pickup-related notes name the device and tell the
+// customer where/when to collect. All optional — the text degrades cleanly.
+export type MilestoneContext = {
+  deviceName?: string;
+  location?: string;
+  hours?: string;
+};
+
+// Default body text for a timeline entry with no custom note. The pickup
+// steps are personalised with the device name and the shop's collection
+// details when context is supplied.
+export function milestoneDescription(
+  status: TicketStatus,
+  ctx: MilestoneContext = {},
+): string {
+  const device = ctx.deviceName?.trim() || "your device";
+  if (status === "READY_FOR_PICKUP") {
+    const where = ctx.location?.trim() ? ` at ${ctx.location.trim()}` : " at our shop";
+    const when = ctx.hours?.trim()
+      ? ` Collect it during ${ctx.hours.trim()}.`
+      : "";
+    return `Your ${device} is ready for pickup${where}.${when} Thank you for choosing ${SHOP.name}!`;
+  }
   return MILESTONE_DESCRIPTIONS[status];
 }
 

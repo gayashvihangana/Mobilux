@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { discountForCount } from "@/lib/loyalty";
+import { getShopInfo } from "@/lib/settings";
 import { DEVICE_TYPES } from "@/lib/status";
 import { formatDate } from "@/lib/utils";
 import { PaymentCard } from "./payment-card";
@@ -61,6 +62,14 @@ export default async function RepairDetailPage({
 
   const deviceLabel =
     DEVICE_TYPES.find((d) => d.value === ticket.deviceType)?.label ?? "Device";
+
+  const shopInfo = await getShopInfo();
+  const timelineCtx = {
+    deviceName:
+      [ticket.brand, ticket.model].filter(Boolean).join(" ") || deviceLabel,
+    location: shopInfo.address,
+    hours: shopInfo.hours,
+  };
 
   return (
     <div className="space-y-6">
@@ -123,6 +132,7 @@ export default async function RepairDetailPage({
             <StatusHistory
               updates={ticket.statusUpdates}
               status={ticket.status}
+              ctx={timelineCtx}
             />
           </CardContent>
         </Card>

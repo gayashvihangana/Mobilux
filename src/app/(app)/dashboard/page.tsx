@@ -27,16 +27,13 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  const [user, activeTickets, discountRules, liveCompleted] = await Promise.all([
+  const [user, allTickets, discountRules, liveCompleted] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { name: true, completedRepairs: true },
     }),
     prisma.repairTicket.findMany({
-      where: {
-        customerId: session.user.id,
-        status: { in: [...ACTIVE_STATUSES] },
-      },
+      where: { customerId: session.user.id },
       orderBy: { createdAt: "desc" },
     }),
     prisma.discountRule.findMany({
@@ -51,6 +48,11 @@ export default async function DashboardPage() {
     }),
   ]);
   if (!user) redirect("/login");
+
+  const activeStatusSet = new Set<string>(ACTIVE_STATUSES);
+  const activeCount = allTickets.filter((t) =>
+    activeStatusSet.has(t.status),
+  ).length;
 
   // Heal counters that drifted before syncCompletedRepairs existed —
   // the loyalty discount at payment time reads the stored counter.
@@ -80,8 +82,8 @@ export default async function DashboardPage() {
             Hey {firstName} 👋
           </h1>
           <p className="mt-1 text-muted-foreground">
-            {activeTickets.length > 0
-              ? `You have ${activeTickets.length} repair${activeTickets.length > 1 ? "s" : ""} in progress.`
+            {activeCount > 0
+              ? `You have ${activeCount} repair${activeCount > 1 ? "s" : ""} in progress.`
               : "All quiet — no repairs in progress right now."}
           </p>
         </div>
@@ -94,22 +96,32 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <Link
+          href="/repairs?filter=active"
+          className="group rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-accent/40"
+        >
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">Active repairs</p>
             <Wrench className="size-4 text-primary" />
           </div>
-          <p className="font-display mt-2 text-3xl font-bold">
-            {activeTickets.length}
+          <p className="font-display mt-2 text-3xl font-bold">{activeCount}</p>
+          <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary opacity-0 transition-opacity group-hover:opacity-100">
+            View active <ArrowRight className="size-3" />
           </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-5">
+        </Link>
+        <Link
+          href="/repairs?filter=completed"
+          className="group rounded-2xl border border-border bg-card p-5 transition-colors hover:border-success/40 hover:bg-accent/40"
+        >
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">Completed repairs</p>
             <CheckCircle2 className="size-4 text-success" />
           </div>
           <p className="font-display mt-2 text-3xl font-bold">{completed}</p>
-        </div>
+          <p className="mt-1 inline-flex items-center gap-1 text-xs text-success opacity-0 transition-opacity group-hover:opacity-100">
+            View completed <ArrowRight className="size-3" />
+          </p>
+        </Link>
         <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">Loyalty reward</p>
@@ -142,10 +154,10 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Active repairs */}
+      {/* All repairs — most recent first */}
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold">Active repairs</h2>
+          <h2 className="font-display text-lg font-semibold">Your repairs</h2>
           <Link
             href="/repairs"
             className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -153,12 +165,12 @@ export default async function DashboardPage() {
             View all <ArrowRight className="size-3.5" />
           </Link>
         </div>
-        {activeTickets.length === 0 ? (
+        {allTickets.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-card/50 p-10 text-center">
             <span className="mx-auto grid size-12 place-items-center rounded-2xl border border-primary/25 bg-primary/10">
               <Wrench className="size-5 text-primary" />
             </span>
-            <h3 className="mt-4 font-semibold">No active repairs</h3>
+            <h3 className="mt-4 font-semibold">No repairs yet</h3>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
               Something broken? Submit a repair request and track it live from
               here.
@@ -171,7 +183,7 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {activeTickets.map((ticket) => (
+            {allTickets.map((ticket) => (
               <TicketCard
                 key={ticket.id}
                 ticket={ticket}
