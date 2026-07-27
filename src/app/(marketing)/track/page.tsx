@@ -45,11 +45,7 @@ export default async function TrackPage({
           status: true,
           createdAt: true,
           completedAt: true,
-          issueStatus: true,
-          issueNote: true,
-          issueSolution: true,
-          issueReportedAt: true,
-          issueResolvedAt: true,
+          issues: { orderBy: { reportedAt: "asc" } },
           statusUpdates: { orderBy: { createdAt: "desc" } },
         },
       })
@@ -64,15 +60,7 @@ export default async function TrackPage({
     ? { deviceName, location: shopInfo.address, hours: shopInfo.hours }
     : undefined;
 
-  const timelineIssue = ticket?.issueStatus
-    ? {
-        status: ticket.issueStatus,
-        note: ticket.issueNote,
-        solution: ticket.issueSolution,
-        reportedAt: ticket.issueReportedAt,
-        resolvedAt: ticket.issueResolvedAt,
-      }
-    : null;
+  const issuePending = !!ticket?.issues.some((i) => i.status === "PENDING");
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-32 pb-20">
@@ -158,7 +146,7 @@ export default async function TrackPage({
                   ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
                     ?.status ?? null
                 }
-                issuePending={ticket.issueStatus === "PENDING"}
+                issuePending={issuePending}
               />
             </div>
           </div>
@@ -172,7 +160,7 @@ export default async function TrackPage({
                 updates={ticket.statusUpdates}
                 status={ticket.status}
                 ctx={timelineCtx}
-                issue={timelineIssue}
+                issues={ticket.issues}
               />
             </div>
           </div>

@@ -1,9 +1,6 @@
-import type {
-  RepairIssueStatus,
-  StatusUpdate,
-  TicketStatus,
-} from "@prisma/client";
+import type { StatusUpdate, TicketStatus } from "@prisma/client";
 import { Check, TriangleAlert, X } from "lucide-react";
+import type { IssueSummary } from "@/lib/repair-issue";
 import {
   currentActivityLabel,
   doneLabel,
@@ -15,12 +12,10 @@ import {
 } from "@/lib/status";
 import { cn, formatDateTime } from "@/lib/utils";
 
-// The stepper's visual pipeline. The final READY_FOR_PICKUP node is purely
-// visual — it's no longer a milestone the admin marks (COMPLETED goes
-// straight to PICKED_UP). It's the blue "Ready for pickup" circle while the
-// device waits at the shop after the Completed node ticks green, then ticks
-// green itself as "Picked up" once collected. One collection circle, not two.
-const STEPPER_PIPELINE: TicketStatus[] = [
+// Every milestone, in order — used by the vertical timeline to list the
+// steps still to come. Submitted/Confirmed belong here: the timeline tells
+// the whole story, including the online request and its acceptance.
+const TIMELINE_PIPELINE: TicketStatus[] = [
   "SUBMITTED",
   "CONFIRMED",
   "RECEIVED",
@@ -31,29 +26,54 @@ const STEPPER_PIPELINE: TicketStatus[] = [
   "READY_FOR_PICKUP",
 ];
 
-// The issue-during-repair fields the timeline needs to weave the dispute
-// into the story: an "Issue reported" entry when it happened, a "Free fix
-// agreed" entry once accepted, and an amber paused state while pending.
-export type TimelineIssue = {
-  status: RepairIssueStatus;
-  note: string | null;
-  solution: string | null;
-  reportedAt: Date | null;
-  resolvedAt: Date | null;
+// The horizontal bar shows only the hands-on repair, starting where the
+// device physically arrives — Submitted/Confirmed are pre-arrival paperwork
+// and would just eat width. While a ticket still sits at either of them the
+// first circle is the blue "happening now" node ("Waiting to receive"), so
+// nothing is lost.
+//
+// The final READY_FOR_PICKUP node is purely visual — it's no longer a
+// milestone the admin marks (COMPLETED goes straight to PICKED_UP). It's the
+// blue "Ready for pickup" circle while the device waits at the shop after the
+// Completed node ticks green, then ticks green itself as "Picked up" once
+// collected. One collection circle, not two.
+const STEPPER_PIPELINE: TicketStatus[] = [
+  "RECEIVED",
+  "DIAGNOSING",
+  "AWAITING_PARTS",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "READY_FOR_PICKUP",
+];
+
+// The dated rows the issues contribute to the vertical timeline, ready to be
+// merged with the real status updates by date. (A declined issue adds no
+// "resolved" row of its own — the CANCELLED status update tells that part.)
+type IssueEvent = {
+  key: string;
+  variant: "reported" | "accepted";
+  at: Date;
+  issue: IssueSummary;
 };
 
-// The dated rows an issue contributes to the vertical timeline, ready to be
-// merged with the real status updates by date. (A declined issue adds no row
-// of its own — the CANCELLED status update already tells that part.)
-function issueEvents(
-  issue?: TimelineIssue | null,
-): { variant: "reported" | "accepted"; at: Date }[] {
-  if (!issue?.reportedAt) return [];
-  const events: { variant: "reported" | "accepted"; at: Date }[] = [
-    { variant: "reported", at: issue.reportedAt },
-  ];
-  if (issue.status === "ACCEPTED" && issue.resolvedAt) {
-    events.push({ variant: "accepted", at: issue.resolvedAt });
+function issueEvents(issues?: IssueSummary[] | null): IssueEvent[] {
+  if (!issues?.length) return [];
+  const events: IssueEvent[] = [];
+  for (const issue of issues) {
+    events.push({
+      key: `issue-${issue.id}-reported`,
+      variant: "reported",
+      at: issue.reportedAt,
+      issue,
+    });
+    if (issue.status === "ACCEPTED" && issue.resolvedAt) {
+      events.push({
+        key: `issue-${issue.id}-accepted`,
+        variant: "accepted",
+        at: issue.resolvedAt,
+        issue,
+      });
+    }
   }
   return events;
 }
@@ -68,7 +88,7 @@ function IssueRow({
 }: {
   variant: "reported" | "accepted";
   at: Date;
-  issue: TimelineIssue;
+  issue: IssueSummary;
   withLine: boolean;
 }) {
   const reported = variant === "reported";
@@ -370,25 +390,25 @@ export function StatusHistory({
   updates,
   status,
   ctx,
-  issue,
+  issues,
 }: {
   updates: StatusUpdate[];
   status?: TicketStatus;
   ctx?: MilestoneContext;
-  issue?: TimelineIssue | null;
+  issues?: IssueSummary[] | null;
 }) {
   // Steps after the one happening now — shown furthest-away first (top).
   let upcoming: TicketStatus[] = [];
   if (status) {
-    const ci = STEPPER_PIPELINE.indexOf(status);
+    const ci = TIMELINE_PIPELINE.indexOf(status);
     if (ci !== -1) {
       // status = last completed milestone → the active step is ci+1, so the
       // still-to-come steps start at ci+2. Reverse so the finish line is up top.
-      upcoming = STEPPER_PIPELINE.slice(ci + 2).reverse();
+      upcoming = TIMELINE_PIPELINE.slice(ci + 2).reverse();
     }
   }
 
-  // The dated part of the timeline: real status updates plus the issue's
+  // The dated part of the timeline: real status updates plus the issues'
   // own rows, woven together newest-first.
   const rows = [
     ...updates.map((u) => ({
@@ -397,15 +417,16 @@ export function StatusHistory({
       kind: "update" as const,
       update: u,
     })),
-    ...issueEvents(issue).map((e) => ({
-      key: `issue-${e.variant}`,
+    ...issueEvents(issues).map((e) => ({
+      key: e.key,
       at: e.at,
       kind: "issue" as const,
       variant: e.variant,
+      issue: e.issue,
     })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
-  const issuePending = issue?.status === "PENDING";
+  const issuePending = !!issues?.some((i) => i.status === "PENDING");
 
   return (
     <ol className="space-y-0">
@@ -423,7 +444,7 @@ export function StatusHistory({
               key={row.key}
               variant={row.variant}
               at={row.at}
-              issue={issue as TimelineIssue}
+              issue={row.issue}
               withLine={withLine}
             />
           );

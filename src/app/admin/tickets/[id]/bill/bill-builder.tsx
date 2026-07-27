@@ -9,6 +9,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  GripVertical,
   Loader2,
   Pencil,
   Plus,
@@ -406,6 +407,49 @@ export function BillBuilder({
   const removeRow = (id: string) =>
     setRows((rs) => rs.filter((r) => r.id !== id));
   const addRow = (label = "") => setRows((rs) => [...rs, newRow(label)]);
+
+  // ── Reordering line items ──────────────────────────────────────
+  // Rows print in the order shown here, so the shop can group the bill the
+  // way it wants to read. Dragging is armed by the grip handle only — the
+  // container would otherwise hijack text selection inside the inputs.
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  // Move the row at `from` to index `to`, both resolved against the live
+  // list so concurrent edits can't reorder the wrong row.
+  const moveRow = (resolve: (rs: Row[]) => [number, number]) =>
+    setRows((rs) => {
+      const [from, to] = resolve(rs);
+      if (from < 0 || to < 0 || from >= rs.length || to >= rs.length) return rs;
+      if (from === to) return rs;
+      const next = [...rs];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+
+  const dropOn = (targetId: string) => {
+    if (!dragId || dragId === targetId) return;
+    moveRow((rs) => [
+      rs.findIndex((r) => r.id === dragId),
+      rs.findIndex((r) => r.id === targetId),
+    ]);
+  };
+
+  // Arrow keys on the focused handle move a row — drag-and-drop alone is
+  // unusable by keyboard and screen-reader users.
+  const nudge = (id: string, delta: number) =>
+    moveRow((rs) => {
+      const from = rs.findIndex((r) => r.id === id);
+      return [from, from + delta];
+    });
+
+  const endDrag = () => {
+    setArmedId(null);
+    setDragId(null);
+    setOverId(null);
+  };
   const toggle = (key: keyof BillShow) =>
     setShow((s) => ({ ...s, [key]: !s[key] }));
 
@@ -513,13 +557,60 @@ export function BillBuilder({
                 <Label>Line items</Label>
                 <p className="text-xs text-muted-foreground">
                   Add a row per charge — parts, battery, service, etc. Remove any
-                  you don&apos;t need. These are the prices the customer sees;
+                  you don&apos;t need. Drag the handle to reorder them; they
+                  print in this order. These are the prices the customer sees;
                   your internal part cost and private notes never appear on the
                   bill.
                 </p>
                 <div className="space-y-2">
                   {rows.map((row) => (
-                    <div key={row.id} className="flex items-center gap-2">
+                    <div
+                      key={row.id}
+                      draggable={armedId === row.id}
+                      onDragStart={(e) => {
+                        setDragId(row.id);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragOver={(e) => {
+                        if (!dragId) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (overId !== row.id) setOverId(row.id);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        dropOn(row.id);
+                        endDrag();
+                      }}
+                      onDragEnd={endDrag}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-xl transition-all",
+                        dragId === row.id && "opacity-40",
+                        overId === row.id &&
+                          dragId &&
+                          dragId !== row.id &&
+                          "ring-2 ring-primary/50",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onMouseDown={() => setArmedId(row.id)}
+                        onTouchStart={() => setArmedId(row.id)}
+                        onBlur={() => setArmedId(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            nudge(row.id, -1);
+                          } else if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            nudge(row.id, 1);
+                          }
+                        }}
+                        aria-label={`Reorder ${row.label.trim() || "line item"} — use the arrow keys`}
+                        className="shrink-0 cursor-grab touch-none rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:cursor-grabbing"
+                      >
+                        <GripVertical className="size-4" />
+                      </button>
                       <Input
                         aria-label="Item"
                         value={row.label}
@@ -547,7 +638,7 @@ export function BillBuilder({
                         size="icon"
                         onClick={() => removeRow(row.id)}
                         aria-label="Remove item"
-                        className="text-muted-foreground hover:text-destructive"
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="size-4" />
                       </Button>

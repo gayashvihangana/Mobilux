@@ -15,11 +15,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import type {
-  DeviceType,
-  RepairIssueStatus,
-  TicketStatus,
-} from "@prisma/client";
+import type { DeviceType, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,7 +47,11 @@ import {
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
-import { ISSUE_REPORTABLE_STATUSES } from "@/lib/repair-issue";
+import {
+  ISSUE_REPORTABLE_STATUSES,
+  type IssueSummary,
+} from "@/lib/repair-issue";
+import { formatDateTime } from "@/lib/utils";
 import {
   DEVICE_TYPES,
   doneLabel,
@@ -938,7 +938,14 @@ export function LinkCustomerForm({
 // bent frame…). The report goes straight to the customer with either a
 // free-of-charge fix to accept, or — when no fix is possible — an offer
 // to cancel with a refund for the damage.
-function ReportIssueDialog({ ticketId }: { ticketId: string }) {
+function ReportIssueDialog({
+  ticketId,
+  another = false,
+}: {
+  ticketId: string;
+  /** A previous issue has already been resolved on this repair. */
+  another?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(reportRepairIssue, null);
   useSuccessToast(state, "Issue reported — customer notified.");
@@ -950,18 +957,29 @@ function ReportIssueDialog({ ticketId }: { ticketId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-auto w-full flex-col items-start gap-0.5 border-warning/40 py-3 text-left whitespace-normal hover:bg-warning/10"
-        >
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-warning">
-            <TriangleAlert className="size-4" /> Report an issue
-          </span>
-          <span className="text-xs font-normal text-muted-foreground">
-            The device was harmed or damaged while at the shop.
-          </span>
-        </Button>
+        {another ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full border-warning/40 text-warning hover:bg-warning/10 hover:text-warning"
+          >
+            <TriangleAlert className="size-3.5" /> Report another issue
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-auto w-full flex-col items-start gap-0.5 border-warning/40 py-3 text-left whitespace-normal hover:bg-warning/10"
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-warning">
+              <TriangleAlert className="size-4" /> Report an issue
+            </span>
+            <span className="text-xs font-normal text-muted-foreground">
+              The device was harmed or damaged while at the shop.
+            </span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <form action={formAction} className="space-y-4">
@@ -1024,10 +1042,10 @@ function ReportIssueDialog({ ticketId }: { ticketId: string }) {
 // Record the customer's decision on their behalf — walk-ins and phone
 // calls have no account to respond from.
 function RecordIssueDecision({
-  ticketId,
+  issueId,
   hasFix,
 }: {
-  ticketId: string;
+  issueId: string;
   hasFix: boolean;
 }) {
   const [state, formAction, pending] = useActionState(respondRepairIssue, null);
@@ -1035,7 +1053,7 @@ function RecordIssueDecision({
 
   return (
     <form action={formAction} className="space-y-2">
-      <input type="hidden" name="ticketId" value={ticketId} />
+      <input type="hidden" name="issueId" value={issueId} />
       <FormError state={state} />
       <p className="text-xs text-muted-foreground">
         Customer told you their decision in person? Record it here:
@@ -1074,10 +1092,10 @@ function RecordIssueDecision({
 // Reverse a decision recorded by mistake. Sends the choice back to the
 // customer; undoing a cancellation also reopens the repair.
 function UndoIssueDecision({
-  ticketId,
+  issueId,
   declined,
 }: {
-  ticketId: string;
+  issueId: string;
   declined: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
@@ -1088,7 +1106,7 @@ function UndoIssueDecision({
 
   return (
     <form action={formAction} className="space-y-1.5">
-      <input type="hidden" name="ticketId" value={ticketId} />
+      <input type="hidden" name="issueId" value={issueId} />
       <FormError state={state} />
       <Button
         type="submit"
@@ -1115,26 +1133,30 @@ function UndoIssueDecision({
 
 // The whole issue section on the admin ticket page: the report button while
 // nothing is wrong, then the live state of the dispute once reported.
-export function RepairIssuePanel({
-  ticketId,
-  status,
+// One reported issue with whatever action it currently allows.
+function IssueEntry({
   issue,
+  index,
+  total,
 }: {
-  ticketId: string;
-  status: TicketStatus;
-  issue: {
-    status: RepairIssueStatus | null;
-    note: string | null;
-    solution: string | null;
-  };
+  issue: IssueSummary;
+  index: number;
+  total: number;
 }) {
+  const label = total > 1 ? `Issue ${index + 1} of ${total}` : "Issue";
+
   if (issue.status === "PENDING") {
     return (
       <div className="space-y-3">
         <div className="space-y-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
-          <p className="font-semibold text-warning">
-            Waiting for the customer&apos;s decision
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold text-warning">
+              Waiting for the customer&apos;s decision
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {label} · {formatDateTime(issue.reportedAt)}
+            </p>
+          </div>
           <p className="whitespace-pre-wrap">{issue.note}</p>
           {issue.solution ? (
             <p className="text-muted-foreground">
@@ -1147,18 +1169,23 @@ export function RepairIssuePanel({
             </p>
           )}
         </div>
-        <RecordIssueDecision ticketId={ticketId} hasFix={!!issue.solution} />
+        <RecordIssueDecision issueId={issue.id} hasFix={!!issue.solution} />
       </div>
     );
   }
 
   if (issue.status === "ACCEPTED") {
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="space-y-2 rounded-xl border border-success/40 bg-success/10 p-3 text-sm">
-          <p className="font-semibold text-success">
-            Customer accepted — fix it free of charge and continue the repair.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-semibold text-success">
+              Customer accepted — fix free of charge, repair continues.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {label} · {formatDateTime(issue.reportedAt)}
+            </p>
+          </div>
           <p className="whitespace-pre-wrap text-muted-foreground">
             {issue.note}
           </p>
@@ -1166,35 +1193,81 @@ export function RepairIssuePanel({
             <p className="text-muted-foreground">Agreed fix: {issue.solution}</p>
           ) : null}
         </div>
-        <UndoIssueDecision ticketId={ticketId} declined={false} />
+        <UndoIssueDecision issueId={issue.id} declined={false} />
       </div>
     );
   }
 
-  if (issue.status === "DECLINED") {
-    return (
-      <div className="space-y-3">
-        <div className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
+  return (
+    <div className="space-y-2">
+      <div className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-semibold text-destructive">
-            Repair cancelled over this issue — refund the customer for the
-            damage.
+            Repair cancelled over this issue — refund the customer.
           </p>
-          <p className="whitespace-pre-wrap text-muted-foreground">
-            {issue.note}
+          <p className="text-xs text-muted-foreground">
+            {label} · {formatDateTime(issue.reportedAt)}
           </p>
         </div>
-        <UndoIssueDecision ticketId={ticketId} declined />
+        <p className="whitespace-pre-wrap text-muted-foreground">{issue.note}</p>
       </div>
-    );
+      <UndoIssueDecision issueId={issue.id} declined />
+    </div>
+  );
+}
+
+export function RepairIssuePanel({
+  ticketId,
+  status,
+  issues,
+}: {
+  ticketId: string;
+  status: TicketStatus;
+  issues: IssueSummary[];
+}) {
+  const pending = issues.some((i) => i.status === "PENDING");
+  const cancelledOver = issues.some((i) => i.status === "DECLINED");
+  const canReport = ISSUE_REPORTABLE_STATUSES.includes(status);
+
+  if (issues.length === 0) {
+    if (!canReport) {
+      return (
+        <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+          Issues can be reported while the device is at the shop.
+        </p>
+      );
+    }
+    return <ReportIssueDialog ticketId={ticketId} />;
   }
 
-  if (!ISSUE_REPORTABLE_STATUSES.includes(status)) {
-    return (
-      <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
-        Issues can be reported while the device is at the shop.
-      </p>
-    );
-  }
+  return (
+    <div className="space-y-4">
+      {issues.map((issue, index) => (
+        <IssueEntry
+          key={issue.id}
+          issue={issue}
+          index={index}
+          total={issues.length}
+        />
+      ))}
 
-  return <ReportIssueDialog ticketId={ticketId} />;
+      {/* Another mishap can happen after the first was settled — as long as
+          nothing is awaiting the customer and the device is still here. */}
+      {pending ? (
+        <p className="text-xs text-muted-foreground">
+          Settle this issue before reporting another.
+        </p>
+      ) : cancelledOver ? (
+        <p className="text-xs text-muted-foreground">
+          This repair was cancelled — undo the decision above to reopen it.
+        </p>
+      ) : canReport ? (
+        <ReportIssueDialog ticketId={ticketId} another />
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Issues can be reported while the device is at the shop.
+        </p>
+      )}
+    </div>
+  );
 }

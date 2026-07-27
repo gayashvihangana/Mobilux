@@ -7,12 +7,8 @@ import type { StatusUpdate } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteStatusUpdate, updateStatusNote } from "@/lib/actions/tickets";
-import {
-  IssueRow,
-  issueEvents,
-  PendingRow,
-  type TimelineIssue,
-} from "@/components/status-timeline";
+import { IssueRow, issueEvents, PendingRow } from "@/components/status-timeline";
+import type { IssueSummary } from "@/lib/repair-issue";
 import { doneLabel, milestoneDescription, STATUS_META } from "@/lib/status";
 import type { TicketStatus } from "@prisma/client";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -112,11 +108,11 @@ function DeleteConfirm({
 export function EditableStatusHistory({
   updates,
   status,
-  issue,
+  issues,
 }: {
   updates: StatusUpdate[];
   status?: TicketStatus;
-  issue?: TimelineIssue | null;
+  issues?: IssueSummary[] | null;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -135,18 +131,22 @@ export function EditableStatusHistory({
       kind: "update" as const,
       update: u,
     })),
-    ...issueEvents(issue).map((e) => ({
-      key: `issue-${e.variant}`,
+    ...issueEvents(issues).map((e) => ({
+      key: e.key,
       at: e.at,
       kind: "issue" as const,
       variant: e.variant,
+      issue: e.issue,
     })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   return (
     <ol className="space-y-0">
       {status ? (
-        <PendingRow status={status} issuePending={issue?.status === "PENDING"} />
+        <PendingRow
+          status={status}
+          issuePending={!!issues?.some((i) => i.status === "PENDING")}
+        />
       ) : null}
       {rows.map((row, index) => {
         const withLine = index < rows.length - 1;
@@ -156,7 +156,7 @@ export function EditableStatusHistory({
               key={row.key}
               variant={row.variant}
               at={row.at}
-              issue={issue as TimelineIssue}
+              issue={row.issue}
               withLine={withLine}
             />
           );

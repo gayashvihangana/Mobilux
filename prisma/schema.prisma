@@ -132,15 +132,10 @@ model RepairTicket {
   warrantyPeriod      String? // e.g. "3 months" — only shown when the warranty field is enabled
   warrantyParts       String? // e.g. "Display, Battery" — what the warranty covers
   billShow            Json? // BillShow — per-field visibility toggles for the bill
-  // Issue during repair (device harmed/damaged at the shop). The shop reports
-  // what happened + an optional free fix; the customer accepts (repair
-  // continues at no charge) or declines (cancelled + refund for the damage).
-  issueStatus     RepairIssueStatus?
-  issueNote       String? // what went wrong
-  issueSolution   String? // the proposed free-of-charge fix; null = no fix possible
-  issueReportedAt DateTime?
-  issueResolvedAt DateTime? // when the customer (or shop on their behalf) decided
-  refunded        Boolean            @default(false) // a refund was agreed for the damage
+  // Issues during repair — see the RepairIssue model. A repair can hit more
+  // than one (another mishap after the first was fixed), so they're rows.
+  issues           RepairIssue[]
+  refunded         Boolean        @default(false) // a refund was agreed for damage
   statusUpdates    StatusUpdate[]
   payments         Payment[]
   createdAt        DateTime       @default(now())
@@ -149,6 +144,25 @@ model RepairTicket {
 
   @@index([customerId])
   @@index([status])
+}
+
+// Something went wrong at the shop while the device was in its hands. The
+// shop reports what happened plus an optional free-of-charge fix; the
+// customer accepts (repair continues at no charge) or declines (repair is
+// cancelled with a refund for the damage). A repair can hit several of
+// these in sequence — only one may be awaiting a decision at a time.
+model RepairIssue {
+  id         String            @id @default(cuid())
+  ticketId   String
+  ticket     RepairTicket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  status     RepairIssueStatus @default(PENDING)
+  note       String // what went wrong
+  solution   String? // the proposed free fix; null = no fix possible
+  reportedAt DateTime          @default(now())
+  resolvedAt DateTime? // when the customer (or shop on their behalf) decided
+  createdAt  DateTime          @default(now())
+
+  @@index([ticketId])
 }
 
 model StatusUpdate {

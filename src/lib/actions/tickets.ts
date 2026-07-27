@@ -1026,15 +1026,17 @@ export async function reportRepairIssue(
       customerId: true,
       brand: true,
       model: true,
-      issueStatus: true,
       customer: { select: { name: true, email: true } },
+      issues: { where: { status: "PENDING" }, take: 1, select: { id: true } },
     },
   });
   if (!ticket) return { error: "Ticket not found." };
   if (!ISSUE_REPORTABLE_STATUSES.includes(ticket.status)) {
     return { error: "Issues can only be reported while the device is at the shop." };
   }
-  if (ticket.issueStatus === "PENDING") {
+  // Only one open question at a time — otherwise the customer would face two
+  // competing accept/decline choices on the same repair.
+  if (ticket.issues.length > 0) {
     return { error: "An issue is already awaiting the customer's decision." };
   }
 
@@ -1044,16 +1046,18 @@ export async function reportRepairIssue(
     : "Unfortunately there is no way to fix this. We're sorry — we'll cancel the repair and refund you for the damage.";
 
   await prisma.$transaction(async (tx) => {
+    await tx.repairIssue.create({
+      data: {
+        ticketId,
+        status: "PENDING",
+        note,
+        solution: solution ?? null,
+      },
+    });
+    // A fresh issue reopens the question of a refund.
     await tx.repairTicket.update({
       where: { id: ticketId },
-      data: {
-        issueStatus: "PENDING",
-        issueNote: note,
-        issueSolution: solution ?? null,
-        issueReportedAt: new Date(),
-        issueResolvedAt: null,
-        refunded: false,
-      },
+      data: { refunded: false },
     });
     if (ticket.customerId) {
       await tx.notification.create({
@@ -1109,31 +1113,44 @@ export async function undoRepairIssueDecision(
   const session = await auth();
   if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
 
-  const ticketId = formData.get("ticketId");
-  if (typeof ticketId !== "string") return { error: "Invalid ticket." };
+  const issueId = formData.get("issueId");
+  if (typeof issueId !== "string") return { error: "Invalid issue." };
 
-  const ticket = await prisma.repairTicket.findUnique({
-    where: { id: ticketId },
-    select: {
-      id: true,
-      status: true,
-      ticketNumber: true,
-      customerId: true,
-      brand: true,
-      model: true,
-      issueStatus: true,
-      statusUpdates: {
-        orderBy: { createdAt: "desc" },
-        select: { id: true, status: true },
+  const issue = await prisma.repairIssue.findUnique({
+    where: { id: issueId },
+    include: {
+      ticket: {
+        select: {
+          id: true,
+          ticketNumber: true,
+          customerId: true,
+          brand: true,
+          model: true,
+          statusUpdates: {
+            orderBy: { createdAt: "desc" },
+            select: { id: true, status: true },
+          },
+          issues: {
+            where: { status: "PENDING" },
+            select: { id: true },
+          },
+        },
       },
     },
   });
-  if (!ticket) return { error: "Ticket not found." };
-  if (ticket.issueStatus !== "ACCEPTED" && ticket.issueStatus !== "DECLINED") {
+  if (!issue) return { error: "Issue not found." };
+  if (issue.status !== "ACCEPTED" && issue.status !== "DECLINED") {
     return { error: "There's no decision to undo." };
   }
+  // Reopening this one would leave two issues awaiting a decision.
+  if (issue.ticket.issues.some((i) => i.id !== issueId)) {
+    return {
+      error: "Another issue is already awaiting the customer's decision.",
+    };
+  }
 
-  const wasDeclined = ticket.issueStatus === "DECLINED";
+  const ticket = issue.ticket;
+  const wasDeclined = issue.status === "DECLINED";
   // Undoing a decline reopens the repair: drop the cancellation entry and
   // restore the milestone the ticket sat at before it (same "how far did we
   // get" logic the stepper uses for cancelled tickets).
@@ -1149,12 +1166,14 @@ export async function undoRepairIssueDecision(
     [ticket.brand, ticket.model].filter(Boolean).join(" ") || "device";
 
   await prisma.$transaction(async (tx) => {
+    await tx.repairIssue.update({
+      where: { id: issueId },
+      data: { status: "PENDING", resolvedAt: null },
+    });
     await tx.repairTicket.update({
-      where: { id: ticketId },
+      where: { id: ticket.id },
       data: {
-        issueStatus: "PENDING",
-        issueResolvedAt: null,
-        refunded: false,
+        ...(wasDeclined ? { refunded: false } : {}),
         ...(restoreStatus ? { status: restoreStatus } : {}),
       },
     });
@@ -1170,23 +1189,23 @@ export async function undoRepairIssueDecision(
           body: wasDeclined
             ? "We've reversed the cancellation — please review the issue and choose again."
             : "We've reversed the recorded decision — please review the issue and choose again.",
-          href: `/repairs/${ticketId}`,
+          href: `/repairs/${ticket.id}`,
         },
       });
     }
   });
 
-  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath(`/admin/tickets/${ticket.id}`);
   revalidatePath("/admin/tickets");
   revalidatePath("/admin");
-  revalidatePath(`/repairs/${ticketId}`);
+  revalidatePath(`/repairs/${ticket.id}`);
   revalidatePath("/dashboard");
   revalidatePath("/track");
   return { success: true };
 }
 
 const respondIssueSchema = z.object({
-  ticketId: z.string().min(1),
+  issueId: z.string().min(1),
   decision: z.enum(["accept", "decline"]),
 });
 
@@ -1198,40 +1217,42 @@ export async function respondRepairIssue(
   if (!session?.user) return { error: "Not authorized." };
 
   const parsed = respondIssueSchema.safeParse({
-    ticketId: formData.get("ticketId"),
+    issueId: formData.get("issueId"),
     decision: formData.get("decision"),
   });
   if (!parsed.success) return { error: "Invalid request." };
-  const { ticketId, decision } = parsed.data;
+  const { issueId, decision } = parsed.data;
 
-  const ticket = await prisma.repairTicket.findUnique({
-    where: { id: ticketId },
-    select: {
-      id: true,
-      status: true,
-      ticketNumber: true,
-      customerId: true,
-      brand: true,
-      model: true,
-      issueStatus: true,
-      issueNote: true,
-      issueSolution: true,
+  const issue = await prisma.repairIssue.findUnique({
+    where: { id: issueId },
+    include: {
+      ticket: {
+        select: {
+          id: true,
+          status: true,
+          ticketNumber: true,
+          customerId: true,
+          brand: true,
+          model: true,
+        },
+      },
     },
   });
-  if (!ticket) return { error: "Ticket not found." };
+  if (!issue) return { error: "Issue not found." };
 
+  const ticket = issue.ticket;
   const isAdmin = session.user.role === "ADMIN";
   if (!isAdmin && ticket.customerId !== session.user.id) {
     return { error: "Not authorized." };
   }
-  if (ticket.issueStatus !== "PENDING") {
+  if (issue.status !== "PENDING") {
     return { error: "This issue has already been decided." };
   }
 
   const deviceName = [ticket.brand, ticket.model].filter(Boolean).join(" ") || "device";
   // "Accept" only continues the repair when there IS a fix to accept —
   // with no fix on the table, the only outcome is cancellation + refund.
-  const continueRepair = decision === "accept" && !!ticket.issueSolution;
+  const continueRepair = decision === "accept" && !!issue.solution;
 
   const admins = await prisma.user.findMany({
     where: { role: "ADMIN" },
@@ -1240,17 +1261,17 @@ export async function respondRepairIssue(
 
   if (continueRepair) {
     await prisma.$transaction(async (tx) => {
-      await tx.repairTicket.update({
-        where: { id: ticketId },
-        data: { issueStatus: "ACCEPTED", issueResolvedAt: new Date() },
+      await tx.repairIssue.update({
+        where: { id: issueId },
+        data: { status: "ACCEPTED", resolvedAt: new Date() },
       });
       if (admins.length > 0) {
         await tx.notification.createMany({
           data: admins.map((a) => ({
             userId: a.id,
             title: `${ticket.ticketNumber}: customer accepted the free fix — continue the repair`,
-            body: ticket.issueSolution ?? "",
-            href: `/admin/tickets/${ticketId}`,
+            body: issue.solution ?? "",
+            href: `/admin/tickets/${ticket.id}`,
           })),
         });
       }
@@ -1260,29 +1281,29 @@ export async function respondRepairIssue(
             userId: ticket.customerId,
             title: `We're fixing the issue on your ${deviceName} (${ticket.ticketNumber}) — free of charge`,
             body: "Thanks for your patience — the repair continues at no extra cost to you.",
-            href: `/repairs/${ticketId}`,
+            href: `/repairs/${ticket.id}`,
           },
         });
       }
     });
   } else {
     await prisma.$transaction(async (tx) => {
+      await tx.repairIssue.update({
+        where: { id: issueId },
+        data: { status: "DECLINED", resolvedAt: new Date() },
+      });
       await tx.repairTicket.update({
-        where: { id: ticketId },
-        data: {
-          issueStatus: "DECLINED",
-          issueResolvedAt: new Date(),
-          refunded: true,
-          status: "CANCELLED",
-        },
+        where: { id: ticket.id },
+        data: { refunded: true, status: "CANCELLED" },
       });
       await tx.statusUpdate.create({
         data: {
-          ticketId,
+          ticketId: ticket.id,
           status: "CANCELLED",
-          note: `Cancelled due to an issue during the repair — a refund for the damage will be issued.${
-            ticket.issueNote ? ` Issue: ${ticket.issueNote}` : ""
-          }`.slice(0, 500),
+          note: `Cancelled due to an issue during the repair — a refund for the damage will be issued. Issue: ${issue.note}`.slice(
+            0,
+            500,
+          ),
         },
       });
       if (ticket.customerId) {
@@ -1292,7 +1313,7 @@ export async function respondRepairIssue(
             userId: ticket.customerId,
             title: `Your ${deviceName} (${ticket.ticketNumber}) repair was cancelled — refund on its way`,
             body: "We're sorry about the issue. We'll refund you for the damage.",
-            href: `/repairs/${ticketId}`,
+            href: `/repairs/${ticket.id}`,
           },
         });
       }
@@ -1301,18 +1322,18 @@ export async function respondRepairIssue(
           data: admins.map((a) => ({
             userId: a.id,
             title: `${ticket.ticketNumber}: repair cancelled over the issue — refund the customer`,
-            body: ticket.issueNote ?? "",
-            href: `/admin/tickets/${ticketId}`,
+            body: issue.note,
+            href: `/admin/tickets/${ticket.id}`,
           })),
         });
       }
     });
   }
 
-  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath(`/admin/tickets/${ticket.id}`);
   revalidatePath("/admin/tickets");
   revalidatePath("/admin");
-  revalidatePath(`/repairs/${ticketId}`);
+  revalidatePath(`/repairs/${ticket.id}`);
   revalidatePath("/dashboard");
   revalidatePath("/track");
   return { success: true };

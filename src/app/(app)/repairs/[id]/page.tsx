@@ -42,6 +42,7 @@ export default async function RepairDetailPage({
     where: { id },
     include: {
       statusUpdates: { orderBy: { createdAt: "desc" } },
+      issues: { orderBy: { reportedAt: "asc" } },
       payments: { orderBy: { createdAt: "desc" }, take: 1 },
       customer: { select: { completedRepairs: true } },
     },
@@ -72,15 +73,9 @@ export default async function RepairDetailPage({
     hours: shopInfo.hours,
   };
 
-  const timelineIssue = ticket.issueStatus
-    ? {
-        status: ticket.issueStatus,
-        note: ticket.issueNote,
-        solution: ticket.issueSolution,
-        reportedAt: ticket.issueReportedAt,
-        resolvedAt: ticket.issueResolvedAt,
-      }
-    : null;
+  // Newest first in the cards — the one that needs a decision sits on top.
+  const issueCards = [...ticket.issues].reverse();
+  const issuePending = ticket.issues.some((i) => i.status === "PENDING");
 
   return (
     <div className="space-y-6">
@@ -126,18 +121,14 @@ export default async function RepairDetailPage({
         </div>
       </div>
 
-      {/* Issue during repair — the customer's decision, front and centre */}
-      {ticket.issueStatus ? (
+      {/* Issues during repair — any decision the customer owes us first */}
+      {issueCards.map((issue) => (
         <RepairIssueCard
-          ticketId={ticket.id}
+          key={issue.id}
           ticketStatus={ticket.status}
-          issue={{
-            status: ticket.issueStatus,
-            note: ticket.issueNote,
-            solution: ticket.issueSolution,
-          }}
+          issue={issue}
         />
-      ) : null}
+      ))}
 
       {/* Pipeline stepper */}
       <Card>
@@ -148,7 +139,7 @@ export default async function RepairDetailPage({
               ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
                 ?.status ?? null
             }
-            issuePending={ticket.issueStatus === "PENDING"}
+            issuePending={issuePending}
           />
         </CardContent>
       </Card>
@@ -164,7 +155,7 @@ export default async function RepairDetailPage({
               updates={ticket.statusUpdates}
               status={ticket.status}
               ctx={timelineCtx}
-              issue={timelineIssue}
+              issues={ticket.issues}
             />
           </CardContent>
         </Card>

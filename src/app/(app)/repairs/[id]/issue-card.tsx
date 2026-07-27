@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
-import type { RepairIssueStatus, TicketStatus } from "@prisma/client";
+import type { TicketStatus } from "@prisma/client";
+import type { IssueSummary } from "@/lib/repair-issue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,17 +26,11 @@ import {
 // no charge) or decline and cancel with a refund for the damage. Afterwards
 // the card stays as a quiet record of what was agreed.
 export function RepairIssueCard({
-  ticketId,
   ticketStatus,
   issue,
 }: {
-  ticketId: string;
   ticketStatus: TicketStatus;
-  issue: {
-    status: RepairIssueStatus;
-    note: string | null;
-    solution: string | null;
-  };
+  issue: IssueSummary;
 }) {
   // Accept and decline are separate forms: the decline button lives inside a
   // confirmation dialog, which Radix portals outside the card's DOM.
@@ -149,7 +144,7 @@ export function RepairIssueCard({
         <div className="space-y-2">
           {hasFix ? (
             <form action={acceptAction}>
-              <input type="hidden" name="ticketId" value={ticketId} />
+              <input type="hidden" name="issueId" value={issue.id} />
               <input type="hidden" name="decision" value="accept" />
               <Button type="submit" className="w-full" disabled={accepting}>
                 {accepting ? (
@@ -200,7 +195,7 @@ export function RepairIssueCard({
                 <li>You will receive a refund for the damage.</li>
               </ul>
               <form action={declineAction}>
-                <input type="hidden" name="ticketId" value={ticketId} />
+                <input type="hidden" name="issueId" value={issue.id} />
                 <input type="hidden" name="decision" value="decline" />
                 <DialogFooter>
                   <Button

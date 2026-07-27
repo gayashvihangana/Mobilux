@@ -55,7 +55,10 @@ export default async function AdminTicketsPage({
         : { status: filter }
       : undefined,
     orderBy: { createdAt: "desc" },
-    include: { customer: { select: { name: true, email: true } } },
+    include: {
+      customer: { select: { name: true, email: true } },
+      issues: { select: { id: true, status: true } },
+    },
   });
 
   return (
@@ -126,7 +129,7 @@ export default async function AdminTicketsPage({
                   paid !== null || parts !== null
                     ? (paid ?? 0) - (parts ?? 0)
                     : null;
-                const chip = issueChip(ticket.issueStatus, ticket.refunded);
+                const chip = issueChip(ticket.issues, ticket.refunded);
                 return (
                   <LinkedTableRow
                     key={ticket.id}

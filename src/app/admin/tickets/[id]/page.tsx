@@ -73,6 +73,7 @@ export default async function AdminTicketDetailPage({
           },
         },
         statusUpdates: { orderBy: { createdAt: "desc" } },
+        issues: { orderBy: { reportedAt: "asc" } },
         payments: { orderBy: { createdAt: "desc" } },
       },
     }),
@@ -109,7 +110,7 @@ export default async function AdminTicketDetailPage({
   ];
 
   const receivedItems = parseReceivedItems(ticket.receivedItems);
-  const chip = issueChip(ticket.issueStatus, ticket.refunded);
+  const chip = issueChip(ticket.issues, ticket.refunded);
 
   const paid = ticket.paidAmount ? Number(ticket.paidAmount) : null;
   const parts = ticket.partsCost ? Number(ticket.partsCost) : null;
@@ -182,7 +183,7 @@ export default async function AdminTicketDetailPage({
               ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
                 ?.status ?? null
             }
-            issuePending={ticket.issueStatus === "PENDING"}
+            issuePending={ticket.issues.some((i) => i.status === "PENDING")}
           />
         </CardContent>
       </Card>
@@ -368,17 +369,7 @@ export default async function AdminTicketDetailPage({
                   <EditableStatusHistory
                     updates={ticket.statusUpdates}
                     status={ticket.status}
-                    issue={
-                      ticket.issueStatus
-                        ? {
-                            status: ticket.issueStatus,
-                            note: ticket.issueNote,
-                            solution: ticket.issueSolution,
-                            reportedAt: ticket.issueReportedAt,
-                            resolvedAt: ticket.issueResolvedAt,
-                          }
-                        : null
-                    }
+                    issues={ticket.issues}
                   />
                 </CardContent>
               </Card>
@@ -535,7 +526,9 @@ export default async function AdminTicketDetailPage({
           </Card>
 
           {/* Issue during repair (damage/dispute) */}
-          <Card className={ticket.issueStatus ? "border-warning/40" : undefined}>
+          <Card
+            className={ticket.issues.length > 0 ? "border-warning/40" : undefined}
+          >
             <CardHeader>
               <CardTitle className="font-display text-lg">
                 Issue during repair
@@ -549,11 +542,7 @@ export default async function AdminTicketDetailPage({
               <RepairIssuePanel
                 ticketId={ticket.id}
                 status={ticket.status}
-                issue={{
-                  status: ticket.issueStatus,
-                  note: ticket.issueNote,
-                  solution: ticket.issueSolution,
-                }}
+                issues={ticket.issues}
               />
             </CardContent>
           </Card>
