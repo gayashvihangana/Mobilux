@@ -182,6 +182,7 @@ export default async function AdminTicketDetailPage({
               ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
                 ?.status ?? null
             }
+            issuePending={ticket.issueStatus === "PENDING"}
           />
         </CardContent>
       </Card>
@@ -367,6 +368,17 @@ export default async function AdminTicketDetailPage({
                   <EditableStatusHistory
                     updates={ticket.statusUpdates}
                     status={ticket.status}
+                    issue={
+                      ticket.issueStatus
+                        ? {
+                            status: ticket.issueStatus,
+                            note: ticket.issueNote,
+                            solution: ticket.issueSolution,
+                            reportedAt: ticket.issueReportedAt,
+                            resolvedAt: ticket.issueResolvedAt,
+                          }
+                        : null
+                    }
                   />
                 </CardContent>
               </Card>

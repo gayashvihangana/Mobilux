@@ -1,5 +1,9 @@
-import type { StatusUpdate, TicketStatus } from "@prisma/client";
-import { Check, X } from "lucide-react";
+import type {
+  RepairIssueStatus,
+  StatusUpdate,
+  TicketStatus,
+} from "@prisma/client";
+import { Check, TriangleAlert, X } from "lucide-react";
 import {
   currentActivityLabel,
   doneLabel,
@@ -27,6 +31,100 @@ const STEPPER_PIPELINE: TicketStatus[] = [
   "READY_FOR_PICKUP",
 ];
 
+// The issue-during-repair fields the timeline needs to weave the dispute
+// into the story: an "Issue reported" entry when it happened, a "Free fix
+// agreed" entry once accepted, and an amber paused state while pending.
+export type TimelineIssue = {
+  status: RepairIssueStatus;
+  note: string | null;
+  solution: string | null;
+  reportedAt: Date | null;
+  resolvedAt: Date | null;
+};
+
+// The dated rows an issue contributes to the vertical timeline, ready to be
+// merged with the real status updates by date. (A declined issue adds no row
+// of its own — the CANCELLED status update already tells that part.)
+function issueEvents(
+  issue?: TimelineIssue | null,
+): { variant: "reported" | "accepted"; at: Date }[] {
+  if (!issue?.reportedAt) return [];
+  const events: { variant: "reported" | "accepted"; at: Date }[] = [
+    { variant: "reported", at: issue.reportedAt },
+  ];
+  if (issue.status === "ACCEPTED" && issue.resolvedAt) {
+    events.push({ variant: "accepted", at: issue.resolvedAt });
+  }
+  return events;
+}
+
+// One issue row in the vertical timeline — amber for the report itself,
+// green once the free fix was agreed.
+function IssueRow({
+  variant,
+  at,
+  issue,
+  withLine,
+}: {
+  variant: "reported" | "accepted";
+  at: Date;
+  issue: TimelineIssue;
+  withLine: boolean;
+}) {
+  const reported = variant === "reported";
+  return (
+    <li className="relative flex gap-4 pb-6 last:pb-0">
+      {withLine ? (
+        <span
+          className="absolute top-5 left-[7px] h-full w-0.5 bg-border"
+          aria-hidden
+        />
+      ) : null}
+      <span
+        className={cn(
+          "relative mt-1 grid size-4 shrink-0 place-items-center rounded-full",
+          reported ? "bg-warning/20 text-warning" : "bg-success/20 text-success",
+        )}
+      >
+        {reported ? (
+          <TriangleAlert className="size-3" />
+        ) : (
+          <Check className="size-3" />
+        )}
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p
+            className={cn(
+              "text-sm font-semibold",
+              reported ? "text-warning" : "text-success",
+            )}
+          >
+            {reported ? "Issue reported" : "Free fix agreed"}
+          </p>
+          <p className="text-xs text-muted-foreground">{formatDateTime(at)}</p>
+        </div>
+        {reported ? (
+          <>
+            <p className="mt-0.5 text-sm whitespace-pre-wrap text-muted-foreground">
+              {issue.note}
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {issue.solution
+                ? `Proposed fix (free of charge): ${issue.solution}`
+                : "No fix was possible — a cancellation with a refund was offered."}
+            </p>
+          </>
+        ) : (
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            The fix goes ahead free of charge — the repair continues.
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
 // Horizontal pipeline stepper (customer-facing "where is my device").
 //
 // The blue circle is always the step happening RIGHT NOW — labelled with the
@@ -37,12 +135,16 @@ const STEPPER_PIPELINE: TicketStatus[] = [
 export function StatusStepper({
   status,
   cancelledFrom,
+  issuePending = false,
 }: {
   status: TicketStatus;
   /** For cancelled tickets: the last real milestone reached before the
    * cancellation (derived from the timeline), so the stepper can still show
    * how far the repair got. The steps that never happened are crossed out. */
   cancelledFrom?: TicketStatus | null;
+  /** An issue is awaiting the customer's decision — the current node turns
+   * amber with an alert to show the pipeline is paused right there. */
+  issuePending?: boolean;
 }) {
   const cancelled = status === "CANCELLED";
   const lastIndex = STEPPER_PIPELINE.length - 1;
@@ -71,7 +173,7 @@ export function StatusStepper({
   // Color of the connector segment joining index and index+1.
   const segmentClass = (index: number) => {
     if (index + 1 <= doneUpTo) return "bg-success";
-    if (index + 1 === activeIndex) return "bg-primary";
+    if (index + 1 === activeIndex) return issuePending ? "bg-warning" : "bg-primary";
     return cancelled ? "bg-destructive/25" : "bg-border";
   };
 
@@ -95,7 +197,9 @@ export function StatusStepper({
               ? doneLabel("PICKED_UP")
               : doneLabel(step)
             : current
-              ? currentActivityLabel(status)
+              ? issuePending
+                ? "Issue — decision needed"
+                : currentActivityLabel(status)
               : STATUS_META[step].label;
           return (
             <li key={step} className="flex flex-1 flex-col items-center">
@@ -111,7 +215,9 @@ export function StatusStepper({
                     "grid size-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-bold",
                     done && "border-success bg-success text-white",
                     current &&
-                      "border-primary bg-primary/15 text-primary shadow-[0_0_12px] shadow-primary/40",
+                      (issuePending
+                        ? "border-warning bg-warning/15 text-warning shadow-[0_0_12px] shadow-warning/40"
+                        : "border-primary bg-primary/15 text-primary shadow-[0_0_12px] shadow-primary/40"),
                     !done &&
                       !current &&
                       (cancelled
@@ -121,6 +227,8 @@ export function StatusStepper({
                 >
                   {done ? (
                     <Check className="size-3.5" />
+                  ) : current && issuePending ? (
+                    <TriangleAlert className="size-3.5" />
                   ) : cancelled ? (
                     <X className="size-3.5" />
                   ) : (
@@ -138,7 +246,9 @@ export function StatusStepper({
                 className={cn(
                   "mt-2 hidden px-1 text-center text-[11px] leading-tight md:block",
                   current
-                    ? "font-semibold text-primary"
+                    ? issuePending
+                      ? "font-semibold text-warning"
+                      : "font-semibold text-primary"
                     : done
                       ? "font-medium text-success"
                       : cancelled
@@ -164,13 +274,43 @@ export function StatusStepper({
 export function PendingRow({
   status,
   ctx,
+  issuePending = false,
 }: {
   status: TicketStatus;
   ctx?: MilestoneContext;
+  /** The pipeline is paused on a reported issue — the row turns amber. */
+  issuePending?: boolean;
 }) {
   const label = pendingLabel(status);
   if (!label) return null;
   const awaitingPickup = status === "COMPLETED" || status === "READY_FOR_PICKUP";
+  if (issuePending) {
+    return (
+      <li className="relative flex gap-4 pb-6">
+        <span
+          className="absolute top-5 left-[7px] h-full w-0.5 bg-border"
+          aria-hidden
+        />
+        <span className="relative mt-1 grid size-4 shrink-0 place-items-center">
+          <span className="absolute inline-flex size-4 animate-ping rounded-full bg-warning/40" />
+          <span className="relative size-3 rounded-full border-2 border-warning bg-background" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="text-sm font-semibold text-warning">
+              Paused — issue reported
+            </p>
+            <span className="rounded-full border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+              Decision needed
+            </span>
+          </div>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Work is on hold until the reported issue is decided.
+          </p>
+        </div>
+      </li>
+    );
+  }
   return (
     <li className="relative flex gap-4 pb-6">
       <span
@@ -230,10 +370,12 @@ export function StatusHistory({
   updates,
   status,
   ctx,
+  issue,
 }: {
   updates: StatusUpdate[];
   status?: TicketStatus;
   ctx?: MilestoneContext;
+  issue?: TimelineIssue | null;
 }) {
   // Steps after the one happening now — shown furthest-away first (top).
   let upcoming: TicketStatus[] = [];
@@ -246,18 +388,52 @@ export function StatusHistory({
     }
   }
 
+  // The dated part of the timeline: real status updates plus the issue's
+  // own rows, woven together newest-first.
+  const rows = [
+    ...updates.map((u) => ({
+      key: u.id,
+      at: u.createdAt,
+      kind: "update" as const,
+      update: u,
+    })),
+    ...issueEvents(issue).map((e) => ({
+      key: `issue-${e.variant}`,
+      at: e.at,
+      kind: "issue" as const,
+      variant: e.variant,
+    })),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime());
+
+  const issuePending = issue?.status === "PENDING";
+
   return (
     <ol className="space-y-0">
       {upcoming.map((step) => (
         <UpcomingRow key={`upcoming-${step}`} status={step} />
       ))}
-      {status ? <PendingRow status={status} ctx={ctx} /> : null}
-      {updates.map((update, index) => {
+      {status ? (
+        <PendingRow status={status} ctx={ctx} issuePending={issuePending} />
+      ) : null}
+      {rows.map((row, index) => {
+        const withLine = index < rows.length - 1;
+        if (row.kind === "issue") {
+          return (
+            <IssueRow
+              key={row.key}
+              variant={row.variant}
+              at={row.at}
+              issue={issue as TimelineIssue}
+              withLine={withLine}
+            />
+          );
+        }
+        const update = row.update;
         const meta = STATUS_META[update.status];
         const latest = index === 0;
         return (
-          <li key={update.id} className="relative flex gap-4 pb-6 last:pb-0">
-            {index < updates.length - 1 ? (
+          <li key={row.key} className="relative flex gap-4 pb-6 last:pb-0">
+            {withLine ? (
               <span
                 className="absolute top-5 left-[7px] h-full w-0.5 bg-border"
                 aria-hidden
@@ -304,3 +480,7 @@ export function StatusHistory({
     </ol>
   );
 }
+
+// Re-exported for the admin's editable timeline, which merges the same
+// issue rows between its editable status entries.
+export { issueEvents, IssueRow };

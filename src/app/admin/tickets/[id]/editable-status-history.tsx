@@ -7,7 +7,12 @@ import type { StatusUpdate } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteStatusUpdate, updateStatusNote } from "@/lib/actions/tickets";
-import { PendingRow } from "@/components/status-timeline";
+import {
+  IssueRow,
+  issueEvents,
+  PendingRow,
+  type TimelineIssue,
+} from "@/components/status-timeline";
 import { doneLabel, milestoneDescription, STATUS_META } from "@/lib/status";
 import type { TicketStatus } from "@prisma/client";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -107,9 +112,11 @@ function DeleteConfirm({
 export function EditableStatusHistory({
   updates,
   status,
+  issue,
 }: {
   updates: StatusUpdate[];
   status?: TicketStatus;
+  issue?: TimelineIssue | null;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -119,17 +126,49 @@ export function EditableStatusHistory({
     setDeletingId(null);
   };
 
+  // Same newest-first merge as StatusHistory: real (editable) status
+  // entries interleaved with the issue's own (read-only) rows.
+  const rows = [
+    ...updates.map((u) => ({
+      key: u.id,
+      at: u.createdAt,
+      kind: "update" as const,
+      update: u,
+    })),
+    ...issueEvents(issue).map((e) => ({
+      key: `issue-${e.variant}`,
+      at: e.at,
+      kind: "issue" as const,
+      variant: e.variant,
+    })),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime());
+
   return (
     <ol className="space-y-0">
-      {status ? <PendingRow status={status} /> : null}
-      {updates.map((update, index) => {
+      {status ? (
+        <PendingRow status={status} issuePending={issue?.status === "PENDING"} />
+      ) : null}
+      {rows.map((row, index) => {
+        const withLine = index < rows.length - 1;
+        if (row.kind === "issue") {
+          return (
+            <IssueRow
+              key={row.key}
+              variant={row.variant}
+              at={row.at}
+              issue={issue as TimelineIssue}
+              withLine={withLine}
+            />
+          );
+        }
+        const update = row.update;
         const meta = STATUS_META[update.status];
         const latest = index === 0;
         const editing = editingId === update.id;
         const deleting = deletingId === update.id;
         return (
-          <li key={update.id} className="group relative flex gap-4 pb-6 last:pb-0">
-            {index < updates.length - 1 ? (
+          <li key={row.key} className="group relative flex gap-4 pb-6 last:pb-0">
+            {withLine ? (
               <span
                 className="absolute top-5 left-[7px] h-full w-0.5 bg-border"
                 aria-hidden

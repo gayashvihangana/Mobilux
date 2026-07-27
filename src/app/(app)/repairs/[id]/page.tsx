@@ -72,6 +72,16 @@ export default async function RepairDetailPage({
     hours: shopInfo.hours,
   };
 
+  const timelineIssue = ticket.issueStatus
+    ? {
+        status: ticket.issueStatus,
+        note: ticket.issueNote,
+        solution: ticket.issueSolution,
+        reportedAt: ticket.issueReportedAt,
+        resolvedAt: ticket.issueResolvedAt,
+      }
+    : null;
+
   return (
     <div className="space-y-6">
       <Link
@@ -138,6 +148,7 @@ export default async function RepairDetailPage({
               ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
                 ?.status ?? null
             }
+            issuePending={ticket.issueStatus === "PENDING"}
           />
         </CardContent>
       </Card>
@@ -153,6 +164,7 @@ export default async function RepairDetailPage({
               updates={ticket.statusUpdates}
               status={ticket.status}
               ctx={timelineCtx}
+              issue={timelineIssue}
             />
           </CardContent>
         </Card>
