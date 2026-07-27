@@ -2,15 +2,23 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, TriangleAlert, Undo2 } from "lucide-react";
+import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
 import type { RepairIssueStatus, TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   respondRepairIssue,
   type TicketFormState,
 } from "@/lib/actions/tickets";
-import { cn } from "@/lib/utils";
 
 // The customer's side of the issue-during-repair flow. While a report is
 // pending they decide right here: accept the free fix (repair continues at
@@ -29,13 +37,33 @@ export function RepairIssueCard({
     solution: string | null;
   };
 }) {
-  const [state, formAction, pending] = useActionState(respondRepairIssue, null);
-  const [confirmingDecline, setConfirmingDecline] = useState(false);
-  const last = useRef<TicketFormState>(null);
+  // Accept and decline are separate forms: the decline button lives inside a
+  // confirmation dialog, which Radix portals outside the card's DOM.
+  const [acceptState, acceptAction, accepting] = useActionState(
+    respondRepairIssue,
+    null,
+  );
+  const [declineState, declineAction, declining] = useActionState(
+    respondRepairIssue,
+    null,
+  );
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const lastAccept = useRef<TicketFormState>(null);
+  const lastDecline = useRef<TicketFormState>(null);
   useEffect(() => {
-    if (state !== last.current && state?.error) toast.error(state.error);
-    last.current = state;
-  }, [state]);
+    if (acceptState !== lastAccept.current && acceptState?.error) {
+      toast.error(acceptState.error);
+    }
+    lastAccept.current = acceptState;
+  }, [acceptState]);
+  useEffect(() => {
+    if (declineState !== lastDecline.current) {
+      if (declineState?.error) toast.error(declineState.error);
+      else if (declineState?.success) setConfirmOpen(false);
+    }
+    lastDecline.current = declineState;
+  }, [declineState]);
 
   const hasFix = !!issue.solution;
 
@@ -118,86 +146,87 @@ export function RepairIssueCard({
           </p>
         )}
 
-        <form action={formAction} className="space-y-2">
-          <input type="hidden" name="ticketId" value={ticketId} />
+        <div className="space-y-2">
           {hasFix ? (
-            <>
-              <Button
-                type="submit"
-                name="decision"
-                value="accept"
-                className="w-full"
-                disabled={pending}
-              >
-                {pending ? (
+            <form action={acceptAction}>
+              <input type="hidden" name="ticketId" value={ticketId} />
+              <input type="hidden" name="decision" value="accept" />
+              <Button type="submit" className="w-full" disabled={accepting}>
+                {accepting ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
                   <CheckCircle2 className="size-4" />
                 )}
                 Accept — fix it free of charge
               </Button>
-              {confirmingDecline ? (
-                <div className="space-y-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3">
-                  <p className="text-xs text-destructive">
-                    This cancels the repair — you&apos;ll get your device back
-                    unrepaired, with a refund for the damage. Sure?
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      type="submit"
-                      name="decision"
-                      value="decline"
-                      variant="destructive"
-                      size="sm"
-                      disabled={pending}
-                    >
-                      {pending ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : null}
-                      Yes, cancel &amp; refund me
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setConfirmingDecline(false)}
-                    >
-                      <Undo2 className="size-3.5" /> Keep the repair
-                    </Button>
-                  </div>
-                </div>
-              ) : (
+            </form>
+          ) : null}
+
+          <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <DialogTrigger asChild>
+              {hasFix ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setConfirmingDecline(true)}
-                  className={cn(
-                    "w-full text-destructive hover:bg-destructive/10 hover:text-destructive",
-                  )}
+                  className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
-                  Decline — cancel with a refund
+                  Decline — cancel the repair and refund me
+                </Button>
+              ) : (
+                <Button type="button" variant="destructive" className="w-full">
+                  <TriangleAlert className="size-4" />
+                  Accept cancellation &amp; refund
                 </Button>
               )}
-            </>
-          ) : (
-            <Button
-              type="submit"
-              name="decision"
-              value="decline"
-              variant="destructive"
-              className="w-full"
-              disabled={pending}
-            >
-              {pending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <TriangleAlert className="size-4" />
-              )}
-              Accept cancellation &amp; refund
-            </Button>
-          )}
-        </form>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  Cancel the repair and receive a refund?
+                </DialogTitle>
+                <DialogDescription>
+                  Please read this carefully — once you confirm, this decision
+                  is final and cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+                <li>All work on your device will stop immediately.</li>
+                <li>Your device will not be repaired any further.</li>
+                <li>
+                  We will carefully reassemble it and hand it back to you as
+                  soon as that is finished.
+                </li>
+                <li>You will receive a refund for the damage.</li>
+              </ul>
+              <form action={declineAction}>
+                <input type="hidden" name="ticketId" value={ticketId} />
+                <input type="hidden" name="decision" value="decline" />
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setConfirmOpen(false)}
+                  >
+                    {hasFix ? "Keep the repair" : "Go back"}
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="destructive"
+                    disabled={declining}
+                  >
+                    {declining ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <TriangleAlert className="size-4" />
+                    )}
+                    Yes, cancel and refund me
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </CardContent>
     </Card>
   );

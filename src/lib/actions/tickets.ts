@@ -1089,6 +1089,95 @@ export async function reportRepairIssue(
   return { success: true };
 }
 
+// Reverse a decision that was recorded by mistake (wrong button, customer
+// changed their mind before the device left, a phone-call decision logged
+// against the wrong ticket). The issue goes back to PENDING so the choice
+// is the customer's again; undoing a cancellation also reopens the repair
+// at the step it was cancelled from. Admin-only — the customer's own
+// confirmation dialog tells them their decision is final.
+export async function undoRepairIssueDecision(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const ticketId = formData.get("ticketId");
+  if (typeof ticketId !== "string") return { error: "Invalid ticket." };
+
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: ticketId },
+    select: {
+      id: true,
+      status: true,
+      ticketNumber: true,
+      customerId: true,
+      brand: true,
+      model: true,
+      issueStatus: true,
+      statusUpdates: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, status: true },
+      },
+    },
+  });
+  if (!ticket) return { error: "Ticket not found." };
+  if (ticket.issueStatus !== "ACCEPTED" && ticket.issueStatus !== "DECLINED") {
+    return { error: "There's no decision to undo." };
+  }
+
+  const wasDeclined = ticket.issueStatus === "DECLINED";
+  // Undoing a decline reopens the repair: drop the cancellation entry and
+  // restore the milestone the ticket sat at before it (same "how far did we
+  // get" logic the stepper uses for cancelled tickets).
+  const cancelEntry = wasDeclined
+    ? ticket.statusUpdates.find((u) => u.status === "CANCELLED")
+    : null;
+  const restoreStatus = wasDeclined
+    ? (ticket.statusUpdates.find((u) => u.status !== "CANCELLED")?.status ??
+      "RECEIVED")
+    : null;
+
+  const deviceName =
+    [ticket.brand, ticket.model].filter(Boolean).join(" ") || "device";
+
+  await prisma.$transaction(async (tx) => {
+    await tx.repairTicket.update({
+      where: { id: ticketId },
+      data: {
+        issueStatus: "PENDING",
+        issueResolvedAt: null,
+        refunded: false,
+        ...(restoreStatus ? { status: restoreStatus } : {}),
+      },
+    });
+    if (cancelEntry) {
+      await tx.statusUpdate.delete({ where: { id: cancelEntry.id } });
+    }
+    if (ticket.customerId) {
+      await syncCompletedRepairs(tx, ticket.customerId);
+      await tx.notification.create({
+        data: {
+          userId: ticket.customerId,
+          title: `The decision on your ${deviceName} (${ticket.ticketNumber}) has been reopened`,
+          body: wasDeclined
+            ? "We've reversed the cancellation — please review the issue and choose again."
+            : "We've reversed the recorded decision — please review the issue and choose again.",
+          href: `/repairs/${ticketId}`,
+        },
+      });
+    }
+  });
+
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
+  revalidatePath(`/repairs/${ticketId}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/track");
+  return { success: true };
+}
+
 const respondIssueSchema = z.object({
   ticketId: z.string().min(1),
   decision: z.enum(["accept", "decline"]),

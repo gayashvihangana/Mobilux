@@ -45,6 +45,7 @@ import {
   linkTicketCustomer,
   reportRepairIssue,
   respondRepairIssue,
+  undoRepairIssueDecision,
   updateBillNotes,
   updateTicketDetails,
   updateTicketStatus,
@@ -1070,6 +1071,48 @@ function RecordIssueDecision({
   );
 }
 
+// Reverse a decision recorded by mistake. Sends the choice back to the
+// customer; undoing a cancellation also reopens the repair.
+function UndoIssueDecision({
+  ticketId,
+  declined,
+}: {
+  ticketId: string;
+  declined: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(
+    undoRepairIssueDecision,
+    null,
+  );
+  useSuccessToast(state, "Decision undone — back to the customer.");
+
+  return (
+    <form action={formAction} className="space-y-1.5">
+      <input type="hidden" name="ticketId" value={ticketId} />
+      <FormError state={state} />
+      <Button
+        type="submit"
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground"
+        disabled={pending}
+      >
+        {pending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Undo2 className="size-3.5" />
+        )}
+        Undo this decision
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        {declined
+          ? "Reopens the repair at the step it was cancelled from and puts the choice back to the customer."
+          : "Puts the choice back to the customer."}
+      </p>
+    </form>
+  );
+}
+
 // The whole issue section on the admin ticket page: the report button while
 // nothing is wrong, then the live state of the dispute once reported.
 export function RepairIssuePanel({
@@ -1111,25 +1154,36 @@ export function RepairIssuePanel({
 
   if (issue.status === "ACCEPTED") {
     return (
-      <div className="space-y-2 rounded-xl border border-success/40 bg-success/10 p-3 text-sm">
-        <p className="font-semibold text-success">
-          Customer accepted — fix it free of charge and continue the repair.
-        </p>
-        <p className="whitespace-pre-wrap text-muted-foreground">{issue.note}</p>
-        {issue.solution ? (
-          <p className="text-muted-foreground">Agreed fix: {issue.solution}</p>
-        ) : null}
+      <div className="space-y-3">
+        <div className="space-y-2 rounded-xl border border-success/40 bg-success/10 p-3 text-sm">
+          <p className="font-semibold text-success">
+            Customer accepted — fix it free of charge and continue the repair.
+          </p>
+          <p className="whitespace-pre-wrap text-muted-foreground">
+            {issue.note}
+          </p>
+          {issue.solution ? (
+            <p className="text-muted-foreground">Agreed fix: {issue.solution}</p>
+          ) : null}
+        </div>
+        <UndoIssueDecision ticketId={ticketId} declined={false} />
       </div>
     );
   }
 
   if (issue.status === "DECLINED") {
     return (
-      <div className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
-        <p className="font-semibold text-destructive">
-          Repair cancelled over this issue — refund the customer for the damage.
-        </p>
-        <p className="whitespace-pre-wrap text-muted-foreground">{issue.note}</p>
+      <div className="space-y-3">
+        <div className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <p className="font-semibold text-destructive">
+            Repair cancelled over this issue — refund the customer for the
+            damage.
+          </p>
+          <p className="whitespace-pre-wrap text-muted-foreground">
+            {issue.note}
+          </p>
+        </div>
+        <UndoIssueDecision ticketId={ticketId} declined />
       </div>
     );
   }
