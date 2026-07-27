@@ -2,9 +2,17 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Check, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Check, Loader2, Pencil, Trash2, TriangleAlert } from "lucide-react";
 import type { StatusUpdate } from "@prisma/client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteStatusUpdate, updateStatusNote } from "@/lib/actions/tickets";
 import { IssueRow, issueEvents, PendingRow } from "@/components/status-timeline";
@@ -59,45 +67,75 @@ function NoteEditor({
   );
 }
 
+// Deleting the newest entry rewinds the repair; deleting an older one just
+// removes that row and leaves the status alone. The two outcomes are very
+// different, so the dialog spells out which one is about to happen.
 function DeleteConfirm({
   update,
+  isNewest,
+  rollbackTo,
   onClose,
 }: {
   update: StatusUpdate;
+  isNewest: boolean;
+  rollbackTo: TicketStatus | null;
   onClose: () => void;
 }) {
   const [state, formAction, pending] = useActionState(deleteStatusUpdate, null);
 
   useEffect(() => {
     if (state?.success) {
-      toast.success("Timeline entry deleted.");
+      toast.success(
+        isNewest ? "Entry deleted — repair rolled back." : "Timeline entry deleted.",
+      );
       onClose();
     } else if (state?.error) {
       toast.error(state.error);
     }
-  }, [state, onClose]);
+  }, [state, onClose, isNewest]);
 
   return (
-    <form
-      action={formAction}
-      className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2"
-    >
-      <input type="hidden" name="updateId" value={update.id} />
-      <p className="text-xs text-destructive">Delete this entry?</p>
-      <div className="ml-auto flex gap-2">
-        <Button type="submit" size="sm" variant="destructive" disabled={pending}>
-          {pending ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Trash2 className="size-3.5" />
-          )}
-          Delete
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onClose}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+    <Dialog open onOpenChange={(open) => (open ? null : onClose())}>
+      <DialogContent>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="updateId" value={update.id} />
+          <DialogHeader>
+            <DialogTitle>
+              Delete the “{doneLabel(update.status)}” entry?
+            </DialogTitle>
+            <DialogDescription>
+              {isNewest && rollbackTo
+                ? `This is the latest entry, so the repair will roll back to “${doneLabel(rollbackTo)}” — the status card and the pipeline bar will follow.`
+                : "This removes the entry and its note from the timeline. The steps after it stay exactly as they are, so the repair will NOT roll back to this step."}
+            </DialogDescription>
+          </DialogHeader>
+          {!isNewest ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-warning">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              To move the repair back to this step, use “Go back to…” in the
+              status card instead — that rewinds the timeline properly.
+            </div>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            The note on this entry is deleted for good and can&apos;t be
+            recovered.
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Keep it
+            </Button>
+            <Button type="submit" variant="destructive" disabled={pending}>
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Trash2 className="size-4" />
+              )}
+              Delete entry
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -139,6 +177,13 @@ export function EditableStatusHistory({
       issue: e.issue,
     })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
+
+  // `updates` arrives newest-first. Only the newest entry can rewind the
+  // repair, and the last remaining entry can't be deleted at all — a ticket
+  // with no history has nothing to derive its status from.
+  const newestUpdateId = updates[0]?.id ?? null;
+  const rollbackTo = updates[1]?.status ?? null;
+  const canDelete = updates.length > 1;
 
   return (
     <ol className="space-y-0">
@@ -204,6 +249,7 @@ export function EditableStatusHistory({
                     </button>
                     <button
                       type="button"
+                      hidden={!canDelete}
                       onClick={() => {
                         setEditingId(null);
                         setDeletingId(update.id);
@@ -218,8 +264,6 @@ export function EditableStatusHistory({
               </div>
               {editing ? (
                 <NoteEditor update={update} onClose={closeAll} />
-              ) : deleting ? (
-                <DeleteConfirm update={update} onClose={closeAll} />
               ) : (
                 <>
                   <p className="mt-0.5 text-sm text-muted-foreground">
@@ -242,6 +286,14 @@ export function EditableStatusHistory({
                   ) : null}
                 </>
               )}
+              {deleting ? (
+                <DeleteConfirm
+                  update={update}
+                  isNewest={update.id === newestUpdateId}
+                  rollbackTo={rollbackTo}
+                  onClose={closeAll}
+                />
+              ) : null}
             </div>
           </li>
         );

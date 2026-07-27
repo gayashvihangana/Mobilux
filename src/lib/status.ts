@@ -219,14 +219,25 @@ export function pickupNote(ctx: MilestoneContext = {}): string {
   return `Your ${device} is ready to collect${where}.${when} Thank you for choosing ${SHOP.name}!`;
 }
 
-// Forward/back neighbours in the pipeline (CANCELLED sits outside it).
-// Legacy READY_FOR_PICKUP tickets take COMPLETED's place so they can
-// still move forward to PICKED_UP or back to IN_PROGRESS.
-function pipelineIndex(status: TicketStatus): number {
+// How far along the pipeline a status sits. CANCELLED sits outside it and
+// returns -1. Legacy READY_FOR_PICKUP tickets take COMPLETED's place so they
+// can still move forward to PICKED_UP or back to IN_PROGRESS.
+export function statusRank(status: TicketStatus): number {
   return STATUS_PIPELINE.indexOf(
     status === "READY_FOR_PICKUP" ? "COMPLETED" : status,
   );
 }
+
+// Moving to `target` from `current` walks the pipeline backwards — the shop
+// is correcting a step it marked too early, not making progress. Both must
+// be inside the pipeline: CANCELLED is neither ahead nor behind.
+export function isRewind(current: TicketStatus, target: TicketStatus): boolean {
+  const from = statusRank(current);
+  const to = statusRank(target);
+  return from >= 0 && to >= 0 && to < from;
+}
+
+const pipelineIndex = statusRank;
 
 export function nextStatus(status: TicketStatus): TicketStatus | null {
   const i = pipelineIndex(status);

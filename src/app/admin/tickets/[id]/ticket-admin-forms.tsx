@@ -42,6 +42,7 @@ import {
   reportRepairIssue,
   respondRepairIssue,
   undoRepairIssueDecision,
+  withdrawRepairIssue,
   updateBillNotes,
   updateTicketDetails,
   updateTicketStatus,
@@ -206,18 +207,26 @@ export function StatusUpdateForm({
         )}
 
         {prev ? (
-          <Button
-            type="submit"
-            name="status"
-            value={prev}
-            variant="ghost"
-            size="sm"
-            className="w-full text-muted-foreground"
-            disabled={pending}
-          >
-            <Undo2 className="size-3.5" />
-            Go back to {doneLabel(prev)}
-          </Button>
+          <div className="space-y-1">
+            <Button
+              type="submit"
+              name="status"
+              value={prev}
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground"
+              disabled={pending}
+            >
+              <Undo2 className="size-3.5" />
+              Go back to {doneLabel(prev)}
+            </Button>
+            {/* Going back rewinds rather than appends, so the admin is
+                deleting history — say so before they click, not after. */}
+            <p className="text-center text-[11px] text-muted-foreground">
+              Rewinds the timeline: the steps after {doneLabel(prev)} are
+              deleted, notes and all. The customer isn&apos;t notified.
+            </p>
+          </div>
         ) : null}
 
         {!showOverride ? (
@@ -234,6 +243,10 @@ export function StatusUpdateForm({
             <Label htmlFor="status" className="text-xs text-muted-foreground">
               Set any status directly
             </Label>
+            <p className="text-[11px] text-muted-foreground">
+              Jumping forward adds a step. Jumping back rewinds — everything
+              after that step is deleted from the timeline.
+            </p>
             <div className="flex gap-2">
               <Select
                 value={selected}
@@ -1089,6 +1102,68 @@ function RecordIssueDecision({
   );
 }
 
+// Take back an issue the customer hasn't answered yet — reported in error,
+// or settled face to face. The report is deleted outright, so it also
+// disappears from the timeline.
+function WithdrawIssue({ issueId }: { issueId: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(
+    withdrawRepairIssue,
+    null,
+  );
+  useSuccessToast(state, "Issue withdrawn — customer notified.");
+
+  useEffect(() => {
+    if (state?.success) setOpen(false);
+  }, [state]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+        >
+          <Undo2 className="size-3.5" /> Undo this issue
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="issueId" value={issueId} />
+          <DialogHeader>
+            <DialogTitle>Withdraw this issue?</DialogTitle>
+            <DialogDescription>
+              The report is deleted and disappears from the customer&apos;s
+              timeline, along with the decision you asked them for. The repair
+              carries on as if it was never raised.
+            </DialogDescription>
+          </DialogHeader>
+          <FormError state={state} />
+          <p className="text-xs text-muted-foreground">
+            They&apos;ll be told the issue was withdrawn — they may already have
+            seen it and be worrying. What you wrote can&apos;t be recovered.
+          </p>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Keep it
+            </Button>
+            <Button type="submit" variant="destructive" disabled={pending}>
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Undo2 className="size-4" />
+              )}
+              Withdraw issue
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Reverse a decision recorded by mistake. Sends the choice back to the
 // customer; undoing a cancellation also reopens the repair.
 function UndoIssueDecision({
@@ -1170,6 +1245,7 @@ function IssueEntry({
           )}
         </div>
         <RecordIssueDecision issueId={issue.id} hasFix={!!issue.solution} />
+        <WithdrawIssue issueId={issue.id} />
       </div>
     );
   }

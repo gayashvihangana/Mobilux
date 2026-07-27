@@ -13,9 +13,11 @@ import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
 import {
   doneLabel,
+  isRewind,
   milestoneDescription,
   pickupNote,
   statusHeadline,
+  statusRank,
 } from "@/lib/status";
 import { receivedItemsNote, type ReceivedItem } from "@/lib/received-items";
 import { ISSUE_REPORTABLE_STATUSES } from "@/lib/repair-issue";
@@ -749,12 +751,59 @@ export async function deleteStatusUpdate(
   });
   if (!update) return { error: "Timeline entry not found." };
 
-  // Removes only the timeline entry — the ticket's current status is
-  // stored on the ticket itself and is not affected.
-  await prisma.statusUpdate.delete({ where: { id: update.id } });
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: update.ticketId },
+    select: {
+      id: true,
+      customerId: true,
+      statusUpdates: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, status: true },
+      },
+    },
+  });
+  if (!ticket) return { error: "Ticket not found." };
+
+  const updates = ticket.statusUpdates;
+  // A ticket with no history at all would have nothing to derive its status
+  // from, and the timeline would render empty.
+  if (updates.length <= 1) {
+    return {
+      error:
+        "This is the only timeline entry — a repair can't be left with no history.",
+    };
+  }
+
+  // Deleting the newest entry rewinds the repair to the one beneath it, so
+  // the timeline, the stepper and the status card stay in agreement. Deleting
+  // anything older only removes that row: the steps after it really did
+  // happen, so the ticket's status is left where it is.
+  const isNewest = updates[0].id === update.id;
+  const rollbackTo = isNewest ? updates[1].status : null;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.statusUpdate.delete({ where: { id: update.id } });
+    if (rollbackTo) {
+      await tx.repairTicket.update({
+        where: { id: ticket.id },
+        data: {
+          status: rollbackTo,
+          ...(DONE_TICKET_STATUSES.includes(rollbackTo)
+            ? {}
+            : { completedAt: null }),
+        },
+      });
+      if (ticket.customerId) {
+        await syncCompletedRepairs(tx, ticket.customerId);
+      }
+    }
+  });
 
   revalidatePath(`/admin/tickets/${update.ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
   revalidatePath(`/repairs/${update.ticketId}`);
+  revalidatePath("/dashboard");
   revalidatePath("/track");
   return { success: true };
 }
@@ -783,6 +832,72 @@ const receivedItemsSchema = z
     }),
   )
   .max(20);
+
+// Roll a ticket back to an earlier milestone, deleting every timeline entry
+// that came after it. Notes on those entries go with them — that's the point
+// of a rewind, and it's why the UI asks first.
+async function rewindTicketStatus(
+  ticket: { id: string; status: TicketStatus; customerId: string | null },
+  target: TicketStatus,
+  note: string | undefined,
+): Promise<TicketFormState> {
+  const updates = await prisma.statusUpdate.findMany({
+    where: { ticketId: ticket.id },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, status: true },
+  });
+
+  // Land on the milestone's own entry when it exists, so the timeline keeps
+  // the original note and date instead of gaining a duplicate row.
+  const targetIndex = updates.findIndex((u) => u.status === target);
+  const doomed =
+    targetIndex >= 0
+      ? // Everything newer than it — the entries it contradicts.
+        updates.slice(0, targetIndex)
+      : // The step was skipped on the way up and has no entry: drop whatever
+        // sits ahead of it and write the milestone in.
+        updates.filter((u) => statusRank(u.status) > statusRank(target));
+
+  const stillDone = DONE_TICKET_STATUSES.includes(target);
+
+  await prisma.$transaction(async (tx) => {
+    if (doomed.length > 0) {
+      await tx.statusUpdate.deleteMany({
+        where: { id: { in: doomed.map((u) => u.id) } },
+      });
+    }
+    if (targetIndex === -1) {
+      await tx.statusUpdate.create({
+        data: { ticketId: ticket.id, status: target, note: note || null },
+      });
+    } else if (note) {
+      // The admin explained the rollback — keep it on the entry they landed on.
+      await tx.statusUpdate.update({
+        where: { id: updates[targetIndex].id },
+        data: { note },
+      });
+    }
+    await tx.repairTicket.update({
+      where: { id: ticket.id },
+      data: {
+        status: target,
+        // A repair that's back in progress can't keep claiming a finish date.
+        ...(stillDone ? {} : { completedAt: null }),
+      },
+    });
+    if (ticket.customerId) {
+      await syncCompletedRepairs(tx, ticket.customerId);
+    }
+  });
+
+  revalidatePath(`/admin/tickets/${ticket.id}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
+  revalidatePath(`/repairs/${ticket.id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/track");
+  return { success: true };
+}
 
 export async function updateTicketStatus(
   _prev: TicketFormState,
@@ -817,6 +932,16 @@ export async function updateTicketStatus(
   });
   if (!ticket) return { error: "Ticket not found." };
   if (ticket.status === status) return { error: "Ticket is already in this status." };
+
+  // ── Rewind ───────────────────────────────────────────────────────
+  // Stepping BACK is a correction, not progress: the timeline rewinds to
+  // that milestone rather than growing a new entry on top of the ones it
+  // contradicts. Everything newer is deleted, and the customer isn't
+  // notified — a rollback is the shop fixing its own mistake, and
+  // "ready for pickup" followed by "being repaired" reads as chaos.
+  if (isRewind(ticket.status, status as TicketStatus)) {
+    return rewindTicketStatus(ticket, status as TicketStatus, note);
+  }
 
   // Items handed over with the device — only sent by the Mark-as-Received
   // dialog, so they're ignored for any other transition.
@@ -1189,6 +1314,68 @@ export async function undoRepairIssueDecision(
           body: wasDeclined
             ? "We've reversed the cancellation — please review the issue and choose again."
             : "We've reversed the recorded decision — please review the issue and choose again.",
+          href: `/repairs/${ticket.id}`,
+        },
+      });
+    }
+  });
+
+  revalidatePath(`/admin/tickets/${ticket.id}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
+  revalidatePath(`/repairs/${ticket.id}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/track");
+  return { success: true };
+}
+
+// Withdraw an issue that's still awaiting the customer — reported in error,
+// or sorted out in person before they answered. The record is deleted
+// outright so it also leaves the timeline; the customer is told, since they
+// may already have seen the alert and be worrying about their device.
+export async function withdrawRepairIssue(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const issueId = formData.get("issueId");
+  if (typeof issueId !== "string") return { error: "Invalid issue." };
+
+  const issue = await prisma.repairIssue.findUnique({
+    where: { id: issueId },
+    include: {
+      ticket: {
+        select: {
+          id: true,
+          ticketNumber: true,
+          customerId: true,
+          brand: true,
+          model: true,
+        },
+      },
+    },
+  });
+  if (!issue) return { error: "Issue not found." };
+  if (issue.status !== "PENDING") {
+    return {
+      error: "Only an issue still awaiting the customer can be withdrawn.",
+    };
+  }
+
+  const ticket = issue.ticket;
+  const deviceName =
+    [ticket.brand, ticket.model].filter(Boolean).join(" ") || "device";
+
+  await prisma.$transaction(async (tx) => {
+    await tx.repairIssue.delete({ where: { id: issueId } });
+    if (ticket.customerId) {
+      await tx.notification.create({
+        data: {
+          userId: ticket.customerId,
+          title: `Update on your ${deviceName} (${ticket.ticketNumber}) — the reported issue has been withdrawn`,
+          body: "Please disregard our earlier message: there's no decision for you to make, and your repair continues as normal.",
           href: `/repairs/${ticket.id}`,
         },
       });
