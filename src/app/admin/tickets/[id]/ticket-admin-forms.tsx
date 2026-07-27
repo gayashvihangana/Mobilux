@@ -15,7 +15,11 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import type { DeviceType, TicketStatus } from "@prisma/client";
+import type {
+  DeviceType,
+  RepairIssueStatus,
+  TicketStatus,
+} from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,11 +43,14 @@ import {
 import {
   deleteTicket,
   linkTicketCustomer,
+  reportRepairIssue,
+  respondRepairIssue,
   updateBillNotes,
   updateTicketDetails,
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
+import { ISSUE_REPORTABLE_STATUSES } from "@/lib/repair-issue";
 import {
   DEVICE_TYPES,
   doneLabel,
@@ -922,4 +929,218 @@ export function LinkCustomerForm({
       </Button>
     </form>
   );
+}
+
+// ── Issue during repair (damage/dispute) ─────────────────────────
+
+// "Report an issue" — something went wrong at the shop (cracked glass,
+// bent frame…). The report goes straight to the customer with either a
+// free-of-charge fix to accept, or — when no fix is possible — an offer
+// to cancel with a refund for the damage.
+function ReportIssueDialog({ ticketId }: { ticketId: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(reportRepairIssue, null);
+  useSuccessToast(state, "Issue reported — customer notified.");
+
+  useEffect(() => {
+    if (state?.success) setOpen(false);
+  }, [state]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-auto w-full flex-col items-start gap-0.5 border-warning/40 py-3 text-left whitespace-normal hover:bg-warning/10"
+        >
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-warning">
+            <TriangleAlert className="size-4" /> Report an issue
+          </span>
+          <span className="text-xs font-normal text-muted-foreground">
+            The device was harmed or damaged while at the shop.
+          </span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <DialogHeader>
+            <DialogTitle>Report an issue to the customer</DialogTitle>
+            <DialogDescription>
+              Be honest and specific — the customer sees exactly what you write
+              here and decides how to proceed.
+            </DialogDescription>
+          </DialogHeader>
+          <FormError state={state} />
+          <div className="space-y-2">
+            <Label htmlFor="issue-note">What happened</Label>
+            <Textarea
+              id="issue-note"
+              name="note"
+              rows={3}
+              required
+              placeholder="e.g. While opening the device, the back glass cracked."
+              className="resize-none"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="issue-solution">
+              The fix you&apos;ll do free of charge{" "}
+              <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Textarea
+              id="issue-solution"
+              name="solution"
+              rows={3}
+              placeholder="e.g. We'll replace the back glass with a new original panel at no cost."
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave empty if there&apos;s no way to fix it — the customer will
+              be offered a cancellation with a refund for the damage instead.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <TriangleAlert className="size-4" />
+              )}
+              Send to customer
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Record the customer's decision on their behalf — walk-ins and phone
+// calls have no account to respond from.
+function RecordIssueDecision({
+  ticketId,
+  hasFix,
+}: {
+  ticketId: string;
+  hasFix: boolean;
+}) {
+  const [state, formAction, pending] = useActionState(respondRepairIssue, null);
+  useSuccessToast(state, "Decision recorded.");
+
+  return (
+    <form action={formAction} className="space-y-2">
+      <input type="hidden" name="ticketId" value={ticketId} />
+      <FormError state={state} />
+      <p className="text-xs text-muted-foreground">
+        Customer told you their decision in person? Record it here:
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {hasFix ? (
+          <Button
+            type="submit"
+            name="decision"
+            value="accept"
+            variant="secondary"
+            size="sm"
+            disabled={pending}
+          >
+            {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            Accepted the free fix
+          </Button>
+        ) : null}
+        <Button
+          type="submit"
+          name="decision"
+          value="decline"
+          variant="outline"
+          size="sm"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          disabled={pending}
+        >
+          {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+          Cancel &amp; refund
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// The whole issue section on the admin ticket page: the report button while
+// nothing is wrong, then the live state of the dispute once reported.
+export function RepairIssuePanel({
+  ticketId,
+  status,
+  issue,
+}: {
+  ticketId: string;
+  status: TicketStatus;
+  issue: {
+    status: RepairIssueStatus | null;
+    note: string | null;
+    solution: string | null;
+  };
+}) {
+  if (issue.status === "PENDING") {
+    return (
+      <div className="space-y-3">
+        <div className="space-y-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+          <p className="font-semibold text-warning">
+            Waiting for the customer&apos;s decision
+          </p>
+          <p className="whitespace-pre-wrap">{issue.note}</p>
+          {issue.solution ? (
+            <p className="text-muted-foreground">
+              Offered fix (free of charge): {issue.solution}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">
+              No fix possible — the customer was offered a cancellation with a
+              refund for the damage.
+            </p>
+          )}
+        </div>
+        <RecordIssueDecision ticketId={ticketId} hasFix={!!issue.solution} />
+      </div>
+    );
+  }
+
+  if (issue.status === "ACCEPTED") {
+    return (
+      <div className="space-y-2 rounded-xl border border-success/40 bg-success/10 p-3 text-sm">
+        <p className="font-semibold text-success">
+          Customer accepted — fix it free of charge and continue the repair.
+        </p>
+        <p className="whitespace-pre-wrap text-muted-foreground">{issue.note}</p>
+        {issue.solution ? (
+          <p className="text-muted-foreground">Agreed fix: {issue.solution}</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (issue.status === "DECLINED") {
+    return (
+      <div className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
+        <p className="font-semibold text-destructive">
+          Repair cancelled over this issue — refund the customer for the damage.
+        </p>
+        <p className="whitespace-pre-wrap text-muted-foreground">{issue.note}</p>
+      </div>
+    );
+  }
+
+  if (!ISSUE_REPORTABLE_STATUSES.includes(status)) {
+    return (
+      <p className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+        Issues can be reported while the device is at the shop.
+      </p>
+    );
+  }
+
+  return <ReportIssueDialog ticketId={ticketId} />;
 }

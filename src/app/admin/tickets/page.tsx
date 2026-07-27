@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
 import { doneLabel, STATUS_META } from "@/lib/status";
+import { issueChip } from "@/lib/repair-issue";
 import {
   Table,
   TableBody,
@@ -125,6 +126,7 @@ export default async function AdminTicketsPage({
                   paid !== null || parts !== null
                     ? (paid ?? 0) - (parts ?? 0)
                     : null;
+                const chip = issueChip(ticket.issueStatus, ticket.refunded);
                 return (
                   <LinkedTableRow
                     key={ticket.id}
@@ -154,7 +156,19 @@ export default async function AdminTicketsPage({
                       {ticket.issueTitle}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={ticket.status} />
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge status={ticket.status} />
+                        {chip ? (
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap",
+                              chip.className,
+                            )}
+                          >
+                            {chip.label}
+                          </span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell
                       className={cn(

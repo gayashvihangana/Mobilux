@@ -137,7 +137,13 @@ export default async function TrackPage({
               <StatusBadge status={ticket.status} />
             </div>
             <div className="mt-6">
-              <StatusStepper status={ticket.status} />
+              <StatusStepper
+                status={ticket.status}
+                cancelledFrom={
+                  ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
+                    ?.status ?? null
+                }
+              />
             </div>
           </div>
 

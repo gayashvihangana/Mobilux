@@ -36,6 +36,13 @@ enum DeviceType {
   OTHER
 }
 
+// Issue-during-repair (damage/dispute) flow — see reportRepairIssue.
+enum RepairIssueStatus {
+  PENDING // reported — waiting for the customer's decision
+  ACCEPTED // customer accepted the free fix — repair continues
+  DECLINED // customer declined (or no fix existed) — cancelled, refund owed
+}
+
 enum PaymentMethod {
   PAYHERE
   BANK_TRANSFER
@@ -125,6 +132,15 @@ model RepairTicket {
   warrantyPeriod      String? // e.g. "3 months" — only shown when the warranty field is enabled
   warrantyParts       String? // e.g. "Display, Battery" — what the warranty covers
   billShow            Json? // BillShow — per-field visibility toggles for the bill
+  // Issue during repair (device harmed/damaged at the shop). The shop reports
+  // what happened + an optional free fix; the customer accepts (repair
+  // continues at no charge) or declines (cancelled + refund for the damage).
+  issueStatus     RepairIssueStatus?
+  issueNote       String? // what went wrong
+  issueSolution   String? // the proposed free-of-charge fix; null = no fix possible
+  issueReportedAt DateTime?
+  issueResolvedAt DateTime? // when the customer (or shop on their behalf) decided
+  refunded        Boolean            @default(false) // a refund was agreed for the damage
   statusUpdates    StatusUpdate[]
   payments         Payment[]
   createdAt        DateTime       @default(now())

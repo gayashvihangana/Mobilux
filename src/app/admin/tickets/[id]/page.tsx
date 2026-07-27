@@ -31,12 +31,14 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEVICE_TYPES, doneLabel } from "@/lib/status";
 import { parseReceivedItems } from "@/lib/received-items";
+import { issueChip } from "@/lib/repair-issue";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
   AcceptTicketForm,
   BillNotesForm,
   DeleteTicketDialog,
   LinkCustomerForm,
+  RepairIssuePanel,
   StatusUpdateForm,
   TicketDetailsForm,
 } from "./ticket-admin-forms";
@@ -107,6 +109,7 @@ export default async function AdminTicketDetailPage({
   ];
 
   const receivedItems = parseReceivedItems(ticket.receivedItems);
+  const chip = issueChip(ticket.issueStatus, ticket.refunded);
 
   const paid = ticket.paidAmount ? Number(ticket.paidAmount) : null;
   const parts = ticket.partsCost ? Number(ticket.partsCost) : null;
@@ -135,11 +138,23 @@ export default async function AdminTicketDetailPage({
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <StatusBadge
-            status={ticket.status}
-            activity
-            className="px-3 py-1.5 text-sm"
-          />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {chip ? (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+                  chip.className,
+                )}
+              >
+                {chip.label}
+              </span>
+            ) : null}
+            <StatusBadge
+              status={ticket.status}
+              activity
+              className="px-3 py-1.5 text-sm"
+            />
+          </div>
           <div className="flex gap-2">
             <Button asChild size="sm">
               <Link href={`/admin/tickets/${ticket.id}/bill`}>
@@ -161,7 +176,13 @@ export default async function AdminTicketDetailPage({
 
       <Card>
         <CardContent className="pt-2 pb-5">
-          <StatusStepper status={ticket.status} />
+          <StatusStepper
+            status={ticket.status}
+            cancelledFrom={
+              ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
+                ?.status ?? null
+            }
+          />
         </CardContent>
       </Card>
 
@@ -497,6 +518,30 @@ export default async function AdminTicketDetailPage({
               <StatusUpdateForm
                 ticketId={ticket.id}
                 currentStatus={ticket.status}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Issue during repair (damage/dispute) */}
+          <Card className={ticket.issueStatus ? "border-warning/40" : undefined}>
+            <CardHeader>
+              <CardTitle className="font-display text-lg">
+                Issue during repair
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Something went wrong on the bench? Report it — the customer
+                decides between a free fix or cancelling with a refund.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <RepairIssuePanel
+                ticketId={ticket.id}
+                status={ticket.status}
+                issue={{
+                  status: ticket.issueStatus,
+                  note: ticket.issueNote,
+                  solution: ticket.issueSolution,
+                }}
               />
             </CardContent>
           </Card>

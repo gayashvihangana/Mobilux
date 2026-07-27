@@ -20,6 +20,7 @@ import { getShopInfo } from "@/lib/settings";
 import { DEVICE_TYPES } from "@/lib/status";
 import { formatDate } from "@/lib/utils";
 import { PaymentCard } from "./payment-card";
+import { RepairIssueCard } from "./issue-card";
 
 export const metadata: Metadata = {
   title: "Repair details",
@@ -115,10 +116,29 @@ export default async function RepairDetailPage({
         </div>
       </div>
 
+      {/* Issue during repair — the customer's decision, front and centre */}
+      {ticket.issueStatus ? (
+        <RepairIssueCard
+          ticketId={ticket.id}
+          ticketStatus={ticket.status}
+          issue={{
+            status: ticket.issueStatus,
+            note: ticket.issueNote,
+            solution: ticket.issueSolution,
+          }}
+        />
+      ) : null}
+
       {/* Pipeline stepper */}
       <Card>
         <CardContent className="pt-2 pb-5">
-          <StatusStepper status={ticket.status} />
+          <StatusStepper
+            status={ticket.status}
+            cancelledFrom={
+              ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
+                ?.status ?? null
+            }
+          />
         </CardContent>
       </Card>
 

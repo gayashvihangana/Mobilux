@@ -1,5 +1,5 @@
 import type { StatusUpdate, TicketStatus } from "@prisma/client";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 import {
   currentActivityLabel,
   doneLabel,
@@ -34,15 +34,17 @@ const STEPPER_PIPELINE: TicketStatus[] = [
 // step is not ticked green until that work is actually finished, at which
 // point its label switches to the completed name. Everything ahead is a
 // greyed-out upcoming step.
-export function StatusStepper({ status }: { status: TicketStatus }) {
-  if (status === "CANCELLED") {
-    return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-        This ticket was cancelled. Contact us if this looks wrong.
-      </div>
-    );
-  }
-
+export function StatusStepper({
+  status,
+  cancelledFrom,
+}: {
+  status: TicketStatus;
+  /** For cancelled tickets: the last real milestone reached before the
+   * cancellation (derived from the timeline), so the stepper can still show
+   * how far the repair got. The steps that never happened are crossed out. */
+  cancelledFrom?: TicketStatus | null;
+}) {
+  const cancelled = status === "CANCELLED";
   const lastIndex = STEPPER_PIPELINE.length - 1;
 
   // doneUpTo = index of the last green (finished) node; activeIndex = the
@@ -51,7 +53,10 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   // final node stays blue ("awaiting pickup") until the device is collected.
   let doneUpTo: number;
   let activeIndex: number;
-  if (status === "PICKED_UP") {
+  if (cancelled) {
+    doneUpTo = cancelledFrom ? STEPPER_PIPELINE.indexOf(cancelledFrom) : -1;
+    activeIndex = -1;
+  } else if (status === "PICKED_UP") {
     doneUpTo = lastIndex;
     activeIndex = -1;
   } else if (status === "READY_FOR_PICKUP") {
@@ -67,67 +72,87 @@ export function StatusStepper({ status }: { status: TicketStatus }) {
   const segmentClass = (index: number) => {
     if (index + 1 <= doneUpTo) return "bg-success";
     if (index + 1 === activeIndex) return "bg-primary";
-    return "bg-border";
+    return cancelled ? "bg-destructive/25" : "bg-border";
   };
 
   return (
-    <ol className="flex items-start">
-      {STEPPER_PIPELINE.map((step, index) => {
-        const done = index <= doneUpTo;
-        const current = index === activeIndex;
-        // Finished steps read as the completed milestone; the last node reads
-        // "Picked up" once collected. The blue node reads the live activity.
-        // Upcoming steps keep their neutral ongoing name.
-        const label = done
-          ? index === lastIndex && status === "PICKED_UP"
-            ? doneLabel("PICKED_UP")
-            : doneLabel(step)
-          : current
-            ? currentActivityLabel(status)
-            : STATUS_META[step].label;
-        return (
-          <li key={step} className="flex flex-1 flex-col items-center">
-            <div className="flex w-full items-center">
-              <div
-                className={cn(
-                  "h-0.5 flex-1",
-                  index === 0 ? "bg-transparent" : segmentClass(index - 1),
-                )}
-              />
+    <div className={cancelled ? "space-y-3" : undefined}>
+      {cancelled ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          This repair was cancelled — the crossed-out steps never happened.
+          Contact us if this looks wrong.
+        </div>
+      ) : null}
+      <ol className="flex items-start">
+        {STEPPER_PIPELINE.map((step, index) => {
+          const done = index <= doneUpTo;
+          const current = index === activeIndex;
+          // Finished steps read as the completed milestone; the last node
+          // reads "Picked up" once collected. The blue node reads the live
+          // activity. Upcoming steps keep their neutral ongoing name.
+          const label = done
+            ? index === lastIndex && status === "PICKED_UP"
+              ? doneLabel("PICKED_UP")
+              : doneLabel(step)
+            : current
+              ? currentActivityLabel(status)
+              : STATUS_META[step].label;
+          return (
+            <li key={step} className="flex flex-1 flex-col items-center">
+              <div className="flex w-full items-center">
+                <div
+                  className={cn(
+                    "h-0.5 flex-1",
+                    index === 0 ? "bg-transparent" : segmentClass(index - 1),
+                  )}
+                />
+                <span
+                  className={cn(
+                    "grid size-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-bold",
+                    done && "border-success bg-success text-white",
+                    current &&
+                      "border-primary bg-primary/15 text-primary shadow-[0_0_12px] shadow-primary/40",
+                    !done &&
+                      !current &&
+                      (cancelled
+                        ? "border-destructive/40 bg-destructive/5 text-destructive/70"
+                        : "border-border bg-card text-muted-foreground"),
+                  )}
+                >
+                  {done ? (
+                    <Check className="size-3.5" />
+                  ) : cancelled ? (
+                    <X className="size-3.5" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
+                <div
+                  className={cn(
+                    "h-0.5 flex-1",
+                    index === lastIndex ? "bg-transparent" : segmentClass(index),
+                  )}
+                />
+              </div>
               <span
                 className={cn(
-                  "grid size-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-bold",
-                  done && "border-success bg-success text-white",
-                  current &&
-                    "border-primary bg-primary/15 text-primary shadow-[0_0_12px] shadow-primary/40",
-                  !done && !current && "border-border bg-card text-muted-foreground",
+                  "mt-2 hidden px-1 text-center text-[11px] leading-tight md:block",
+                  current
+                    ? "font-semibold text-primary"
+                    : done
+                      ? "font-medium text-success"
+                      : cancelled
+                        ? "text-muted-foreground/70 line-through"
+                        : "text-muted-foreground",
                 )}
               >
-                {done ? <Check className="size-3.5" /> : index + 1}
+                {label}
               </span>
-              <div
-                className={cn(
-                  "h-0.5 flex-1",
-                  index === lastIndex ? "bg-transparent" : segmentClass(index),
-                )}
-              />
-            </div>
-            <span
-              className={cn(
-                "mt-2 hidden px-1 text-center text-[11px] leading-tight md:block",
-                current
-                  ? "font-semibold text-primary"
-                  : done
-                    ? "font-medium text-success"
-                    : "text-muted-foreground",
-              )}
-            >
-              {label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
