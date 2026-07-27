@@ -19,7 +19,11 @@ import {
 } from "@/lib/status";
 import { receivedItemsNote, type ReceivedItem } from "@/lib/received-items";
 import { ISSUE_REPORTABLE_STATUSES } from "@/lib/repair-issue";
-import { getShopInfo } from "@/lib/settings";
+import {
+  BILL_SHOW_DEFAULT_KEY,
+  getShopInfo,
+  setSetting,
+} from "@/lib/settings";
 import {
   DONE_TICKET_STATUSES,
   syncCompletedRepairs,
@@ -543,6 +547,9 @@ export async function generateBill(
       billShow,
     },
   });
+
+  // Carry this bill's show/hide layout over as the default for the next one.
+  await setSetting(BILL_SHOW_DEFAULT_KEY, JSON.stringify(billShow));
 
   revalidatePath(`/admin/tickets/${data.ticketId}/bill`);
   revalidatePath(`/admin/tickets/${data.ticketId}`);

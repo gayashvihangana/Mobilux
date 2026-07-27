@@ -54,7 +54,10 @@ export async function fetchBillTicket(
       paidMethod: ticket.paidMethod,
       warrantyPeriod: ticket.warrantyPeriod,
       warrantyParts: ticket.warrantyParts,
-      billShow: resolveBillShow(ticket.billShow),
+      // Null when the shop has never chosen a layout for this bill — the
+      // builder then falls back to the saved shop-wide default. computeBill
+      // resolves null to the built-in defaults on its own.
+      billShow: ticket.billShow ? resolveBillShow(ticket.billShow) : null,
       customer: ticket.customer,
       paidPayment: ticket.payments[0]
         ? {

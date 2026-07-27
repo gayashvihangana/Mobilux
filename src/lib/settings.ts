@@ -1,7 +1,23 @@
 import { prisma } from "@/lib/prisma";
 import { BANK_DETAILS, SHOP } from "@/lib/config";
+import { DEFAULT_BILL_SHOW, resolveBillShow, type BillShow } from "@/lib/bill";
 
 export const PHONES_VISIBLE_KEY = "phones_storefront_visible";
+
+// The bill field show/hide choices carried over to the NEXT bill — saved
+// every time a bill is generated, so the shop sets its layout once and new
+// bills open the same way. A bill that already has its own billShow keeps it.
+export const BILL_SHOW_DEFAULT_KEY = "bill_show_default";
+
+export async function getDefaultBillShow(): Promise<BillShow> {
+  const raw = await getSetting(BILL_SHOW_DEFAULT_KEY);
+  if (!raw) return { ...DEFAULT_BILL_SHOW };
+  try {
+    return resolveBillShow(JSON.parse(raw));
+  } catch {
+    return { ...DEFAULT_BILL_SHOW };
+  }
+}
 
 // ── Shop details (name, contact, opening hours) ──────────────────────
 // Editable under Admin → Settings; each falls back to the config default.

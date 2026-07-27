@@ -227,9 +227,39 @@ export function DeleteBankAccountButton({ account }: { account: BankAccount }) {
   );
 }
 
+// Read-only summary until the admin taps Edit — the same "show what's set,
+// edit on demand" shape the bank accounts list uses, so the settings page
+// reads as a summary rather than a wall of inputs.
 export function ShopInfoForm({ info }: { info: ShopInfo }) {
+  const [editing, setEditing] = useState(false);
   const [state, formAction, pending] = useActionState(updateShopInfo, null);
-  useFormToast(state, "Shop details saved.");
+  useFormToast(state, "Shop details saved.", () => setEditing(false));
+
+  if (!editing) {
+    const rows: { label: string; value: string; wide?: boolean }[] = [
+      { label: "Shop name", value: info.name },
+      { label: "Tagline", value: info.tagline },
+      { label: "Phone", value: info.phone },
+      { label: "Email", value: info.email },
+      { label: "Address / location", value: info.address, wide: true },
+      { label: "Opening hours", value: info.hours, wide: true },
+    ];
+    return (
+      <div className="space-y-4">
+        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          {rows.map((row) => (
+            <div key={row.label} className={row.wide ? "sm:col-span-2" : undefined}>
+              <dt className="text-xs text-muted-foreground">{row.label}</dt>
+              <dd className="mt-0.5 font-medium">{row.value || "—"}</dd>
+            </div>
+          ))}
+        </dl>
+        <Button type="button" variant="outline" onClick={() => setEditing(true)}>
+          <Pencil className="size-4" /> Edit shop details
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -282,14 +312,24 @@ export function ShopInfoForm({ info }: { info: ShopInfo }) {
         </div>
       </div>
 
-      <Button type="submit" disabled={pending}>
-        {pending ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : (
-          <Save className="size-4" />
-        )}
-        Save shop details
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={pending}>
+          {pending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Save className="size-4" />
+          )}
+          Save shop details
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => setEditing(false)}
+          disabled={pending}
+        >
+          Cancel
+        </Button>
+      </div>
     </form>
   );
 }

@@ -41,6 +41,7 @@ import {
   type BillTicket,
 } from "@/lib/bill";
 import { BANK_DETAILS } from "@/lib/config";
+import { doneLabel } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
   generateBill,
@@ -67,16 +68,29 @@ const PRESETS = [
   "Other",
 ];
 
-const TOGGLES: { key: keyof BillShow; label: string }[] = [
-  { key: "device", label: "Device" },
-  { key: "status", label: "Status" },
-  { key: "technician", label: "Technician" },
-  { key: "issue", label: "Issue" },
-  { key: "solution", label: "What we did" },
-  { key: "warranty", label: "Warranty" },
-  { key: "notes", label: "Notes" },
-  { key: "payment", label: "How to pay" },
-  { key: "track", label: "Track QR" },
+// Fields the bill prints straight from the ticket — there's nothing to type
+// here, so the builder lists them read-only with just a show/hide toggle.
+// (The letterhead is deliberately absent: the shop's own header always
+// prints.) `value` is filled in from the bill at render time.
+type ReadonlyFieldKey = "device" | "status" | "notes" | "track";
+
+const READONLY_FIELDS: {
+  key: ReadonlyFieldKey;
+  label: string;
+  hint: string;
+}[] = [
+  { key: "device", label: "Device", hint: "Brand and model from the ticket" },
+  { key: "status", label: "Status", hint: "The repair's current status" },
+  {
+    key: "notes",
+    label: "Notes",
+    hint: "Edited on the ticket page under “Bill notes”",
+  },
+  {
+    key: "track",
+    label: "Track QR",
+    hint: "QR code linking to the public repair tracker",
+  },
 ];
 
 let rowSeq = 0;
@@ -129,7 +143,10 @@ function useSuccessToast(state: TicketFormState, message: string) {
   }, [state, message]);
 }
 
-function FieldToggle({
+// The show/hide switch that sits beside every field's label. Says what it
+// IS ("Shown" / "Hidden"), not what clicking will do, so the current state
+// of the bill is readable at a glance down the form.
+function ShowToggle({
   on,
   label,
   onClick,
@@ -143,16 +160,71 @@ function FieldToggle({
       type="button"
       onClick={onClick}
       aria-pressed={on}
+      aria-label={`${label} — ${on ? "shown on bill" : "hidden from bill"}`}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+        "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
         on
-          ? "border-primary/40 bg-primary/10 text-foreground"
-          : "border-border bg-card text-muted-foreground line-through",
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border bg-muted/50 text-muted-foreground",
       )}
     >
       {on ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
-      {label}
+      {on ? "Shown" : "Hidden"}
     </button>
+  );
+}
+
+// A label row with its toggle on the right. Hidden fields dim so the eye
+// skips them, but stay editable — hiding a field never wipes its value.
+function FieldHeader({
+  htmlFor,
+  label,
+  on,
+  onToggle,
+}: {
+  htmlFor?: string;
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      <ShowToggle on={on} label={label} onClick={onToggle} />
+    </div>
+  );
+}
+
+// One of the ticket-driven fields: nothing to edit, just show or hide.
+function ReadonlyField({
+  label,
+  value,
+  hint,
+  on,
+  onToggle,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  on: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-border bg-muted/30 px-3 py-2.5 transition-opacity",
+        !on && "opacity-60",
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{label}</p>
+          <p className="truncate text-sm text-muted-foreground">{value}</p>
+        </div>
+        <ShowToggle on={on} label={label} onClick={onToggle} />
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+    </div>
   );
 }
 
@@ -161,6 +233,7 @@ export function BillBuilder({
   bill,
   trackQr,
   defaultPayTo,
+  defaultShow,
   isSettled,
   currentTotal,
   paidDate,
@@ -171,6 +244,8 @@ export function BillBuilder({
   bill: BillTicket;
   trackQr?: string;
   defaultPayTo?: PayTo;
+  /** The show/hide layout saved from the last bill the shop generated. */
+  defaultShow?: BillShow;
   isSettled: boolean;
   currentTotal: number;
   paidDate: string | null;
@@ -192,7 +267,11 @@ export function BillBuilder({
     bill.warrantyPeriod ?? "",
   );
   const [warrantyParts, setWarrantyParts] = useState(bill.warrantyParts ?? "");
-  const [show, setShow] = useState<BillShow>(bill.billShow ?? DEFAULT_BILL_SHOW);
+  // This bill's own layout if it has one, otherwise the layout carried over
+  // from the last bill generated, otherwise the built-in defaults.
+  const [show, setShow] = useState<BillShow>(
+    bill.billShow ?? defaultShow ?? DEFAULT_BILL_SHOW,
+  );
   const [discountMode, setDiscountMode] = useState<
     "none" | "percent" | "amount"
   >(
@@ -378,6 +457,16 @@ export function BillBuilder({
 
   const hasGenerated = !!(bill.billItems && bill.billItems.length > 0);
 
+  // What the ticket-driven rows display — the same values the bill prints.
+  const readonlyValues: Record<ReadonlyFieldKey, string> =
+    {
+      device:
+        [bill.brand, bill.model].filter(Boolean).join(" ") || "Not recorded",
+      status: doneLabel(bill.status),
+      notes: bill.billNotes?.trim() || "None added yet",
+      track: `Ticket ${bill.ticketNumber}`,
+    };
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* ── Builder ─────────────────────────────────────────── */}
@@ -524,8 +613,13 @@ export function BillBuilder({
               <Separator />
 
               {/* Repair details */}
-              <div className="space-y-2">
-                <Label htmlFor="issueTitle">Issue</Label>
+              <div className={cn("space-y-2", !show.issue && "opacity-60")}>
+                <FieldHeader
+                  htmlFor="issueTitle"
+                  label="Issue"
+                  on={show.issue}
+                  onToggle={() => toggle("issue")}
+                />
                 <Textarea
                   id="issueTitle"
                   value={issueTitle}
@@ -535,8 +629,13 @@ export function BillBuilder({
                   className="resize-none"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="solution">What we did</Label>
+              <div className={cn("space-y-2", !show.solution && "opacity-60")}>
+                <FieldHeader
+                  htmlFor="solution"
+                  label="What we did"
+                  on={show.solution}
+                  onToggle={() => toggle("solution")}
+                />
                 <Textarea
                   id="solution"
                   value={solution}
@@ -548,8 +647,13 @@ export function BillBuilder({
               </div>
 
               {/* Technician */}
-              <div className="space-y-2">
-                <Label htmlFor="technician">Technician</Label>
+              <div className={cn("space-y-2", !show.technician && "opacity-60")}>
+                <FieldHeader
+                  htmlFor="technician"
+                  label="Technician"
+                  on={show.technician}
+                  onToggle={() => toggle("technician")}
+                />
                 <Input
                   id="technician"
                   value={technician}
@@ -559,39 +663,41 @@ export function BillBuilder({
               </div>
 
               {/* Warranty */}
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="warrantyPeriod">Warranty period</Label>
+              <div className={cn("space-y-2", !show.warranty && "opacity-60")}>
+                <FieldHeader
+                  label="Warranty"
+                  on={show.warranty}
+                  onToggle={() => toggle("warranty")}
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
                   <Input
-                    id="warrantyPeriod"
+                    aria-label="Warranty period"
                     value={warrantyPeriod}
                     onChange={(e) => setWarrantyPeriod(e.target.value)}
                     placeholder="e.g. 3 months"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="warrantyParts">Warranty covers</Label>
                   <Input
-                    id="warrantyParts"
+                    aria-label="Warranty covers"
                     value={warrantyParts}
                     onChange={(e) => setWarrantyParts(e.target.value)}
                     placeholder="e.g. Display, Battery"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground sm:col-span-2">
-                  Shown on the bill only when the “Warranty” toggle below is on.
-                </p>
               </div>
 
               <Separator />
 
               {/* Pay-to (bank details) */}
-              <div className="space-y-2">
-                <Label>Payment details (shown while unpaid)</Label>
+              <div className={cn("space-y-2", !show.payment && "opacity-60")}>
+                <FieldHeader
+                  label="How to pay"
+                  on={show.payment}
+                  onToggle={() => toggle("payment")}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Where the customer pays. Prefilled from your shop defaults —
-                  edit for this bill if needed, or set the shop default under
-                  Admin → Settings.
+                  Where the customer pays, shown while the bill is unpaid.
+                  Prefilled from your shop defaults — edit for this bill if
+                  needed, or set the shop default under Admin → Settings.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Input
@@ -631,19 +737,22 @@ export function BillBuilder({
 
               <Separator />
 
-              {/* Field visibility toggles */}
+              {/* Ticket-driven fields — show/hide only, nothing to type */}
               <div className="space-y-2">
-                <Label>Show on bill</Label>
+                <Label>Also on the bill</Label>
                 <p className="text-xs text-muted-foreground">
-                  Tap to show or hide each field on the printed bill.
+                  These come straight from the ticket. Show or hide them here —
+                  to change the text, edit the ticket itself.
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {TOGGLES.map((t) => (
-                    <FieldToggle
-                      key={t.key}
-                      on={show[t.key]}
-                      label={t.label}
-                      onClick={() => toggle(t.key)}
+                <div className="space-y-2">
+                  {READONLY_FIELDS.map((field) => (
+                    <ReadonlyField
+                      key={field.key}
+                      label={field.label}
+                      value={readonlyValues[field.key]}
+                      hint={field.hint}
+                      on={show[field.key]}
+                      onToggle={() => toggle(field.key)}
                     />
                   ))}
                 </div>
