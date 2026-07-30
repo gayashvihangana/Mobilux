@@ -15,6 +15,7 @@ export async function fetchBillTicket(
     where: { id },
     include: {
       customer: { select: { name: true, email: true, phone: true } },
+      issues: { orderBy: { reportedAt: "asc" } },
       payments: {
         where: { status: "PAID" },
         orderBy: { createdAt: "desc" },
@@ -54,6 +55,13 @@ export async function fetchBillTicket(
       paidMethod: ticket.paidMethod,
       warrantyPeriod: ticket.warrantyPeriod,
       warrantyParts: ticket.warrantyParts,
+      issues: ticket.issues.map((issue) => ({
+        note: issue.note,
+        solution: issue.solution,
+        status: issue.status,
+        reportedAt: issue.reportedAt,
+      })),
+      issueWarranty: ticket.issueWarranty,
       // Null when the shop has never chosen a layout for this bill — the
       // builder then falls back to the saved shop-wide default. computeBill
       // resolves null to the built-in defaults on its own.

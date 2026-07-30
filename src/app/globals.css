@@ -110,6 +110,10 @@
   --animate-glow-pulse: glow-pulse 4s ease-in-out infinite;
   --animate-float: float-y 6s ease-in-out infinite;
   --animate-scroll-hint: scroll-hint 2.2s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+  --animate-star-pop: star-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  /* Testimonial rails — duration is set per row via --marquee-duration */
+  --animate-marquee-left: marquee-left var(--marquee-duration, 44s) linear infinite;
+  --animate-marquee-right: marquee-right var(--marquee-duration, 44s) linear infinite;
 
   @keyframes fade-up {
     from {
@@ -158,6 +162,34 @@
     100% {
       transform: translateY(260%);
       opacity: 0;
+    }
+  }
+  @keyframes star-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.3) rotate(-30deg);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+    }
+  }
+  /* The track holds the cards twice over, so travelling exactly half its
+     width loops seamlessly. */
+  @keyframes marquee-left {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes marquee-right {
+    from {
+      transform: translateX(-50%);
+    }
+    to {
+      transform: translateX(0);
     }
   }
 }
@@ -228,6 +260,37 @@
   transition:
     opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0s),
     transform 0.8s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0s);
+}
+
+/* ── Testimonial rails ────────────────────────────────────────────
+   Softens both ends of a horizontally scrolling row so cards drift in
+   and out of view instead of being clipped at the edge. */
+@utility mask-fade-x {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 10%,
+    black 90%,
+    transparent
+  );
+}
+
+/* Hovering (or focusing a link inside) a rail freezes it so the review
+   can actually be read. */
+.marquee-row:hover [data-marquee-track],
+.marquee-row:focus-within [data-marquee-track] {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No auto-scroll and no pop-in — the rail becomes a plain scrollable row. */
+  [data-marquee-track] {
+    animation: none !important;
+    transform: none !important;
+  }
+  .animate-star-pop {
+    animation: none !important;
+  }
 }
 
 @media print {

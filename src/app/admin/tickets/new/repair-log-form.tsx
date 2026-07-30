@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { FieldError } from "@/components/forms/field-error";
 import { FormAutosave } from "@/components/forms/form-autosave";
+import { PartsEditor } from "@/components/forms/parts-editor";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { DEVICE_TYPES, doneLabel, STATUS_PIPELINE } from "@/lib/status";
 
@@ -189,17 +190,6 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
       </p>
       <div className="grid gap-5 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="partsCost">Parts cost (LKR)</Label>
-          <Input
-            id="partsCost"
-            name="partsCost"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="What the shop spent"
-          />
-        </div>
-        <div className="space-y-2">
           <Label htmlFor="paidAmount">Customer paid (LKR)</Label>
           <Input
             id="paidAmount"
@@ -208,18 +198,6 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
             min="0"
             step="0.01"
             placeholder="What the customer paid"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="partsUsed">Parts used</Label>
-          <Input id="partsUsed" name="partsUsed" placeholder="e.g. Display, Battery" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="partsSupplier">Parts supplier</Label>
-          <Input
-            id="partsSupplier"
-            name="partsSupplier"
-            placeholder="e.g. Trans Asia Cellular"
           />
         </div>
         <div className="space-y-2">
@@ -244,6 +222,9 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
           />
         </div>
       </div>
+
+      <PartsEditor initial={[]} />
+
       <div className="space-y-2">
         <Label htmlFor="adminNotes">
           Notes & lessons{" "}

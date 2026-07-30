@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEVICE_TYPES, doneLabel } from "@/lib/status";
 import { parseReceivedItems } from "@/lib/received-items";
+import { parseParts, partsTotalCost, partsWithFallback } from "@/lib/parts";
 import { issueChip } from "@/lib/repair-issue";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
@@ -110,7 +111,23 @@ export default async function AdminTicketDetailPage({
   ];
 
   const receivedItems = parseReceivedItems(ticket.receivedItems);
+  const partsList = partsWithFallback(
+    ticket.parts,
+    ticket.partsUsed,
+    ticket.partsSupplier,
+  );
   const chip = issueChip(ticket.issues, ticket.refunded);
+
+  // Issues carry the parts the shop bought to fix its own mistake — internal
+  // only, so they're attached for the admin panel and never leave it.
+  const issuesWithParts = ticket.issues.map((issue) => ({
+    ...issue,
+    parts: parseParts(issue.parts),
+  }));
+  const issuePartsCost = issuesWithParts.reduce(
+    (sum, issue) => sum + partsTotalCost(issue.parts),
+    0,
+  );
 
   const paid = ticket.paidAmount ? Number(ticket.paidAmount) : null;
   const parts = ticket.partsCost ? Number(ticket.partsCost) : null;
@@ -240,45 +257,54 @@ export default async function AdminTicketDetailPage({
                       </p>
                     </div>
                   </div>
-                  {(ticket.partsUsed ||
-                    ticket.partsSupplier ||
-                    ticket.duration) && (
+                  {partsList.length > 0 || issuePartsCost > 0 || ticket.duration ? (
                     <>
                       <Separator className="my-4" />
-                      <div className="grid gap-3 text-sm sm:grid-cols-3">
-                        {ticket.partsUsed ? (
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Parts used
-                            </p>
-                            <p className="mt-0.5 font-medium">
-                              {ticket.partsUsed}
-                            </p>
-                          </div>
-                        ) : null}
-                        {ticket.partsSupplier ? (
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Supplier
-                            </p>
-                            <p className="mt-0.5 font-medium">
-                              {ticket.partsSupplier}
-                            </p>
-                          </div>
-                        ) : null}
-                        {ticket.duration ? (
-                          <div>
-                            <p className="text-xs text-muted-foreground">
-                              Duration
-                            </p>
-                            <p className="mt-0.5 font-medium">
-                              {ticket.duration}
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
+                      {partsList.length > 0 ? (
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Parts used
+                          </p>
+                          <ul className="mt-1.5 space-y-1 text-sm">
+                            {partsList.map((entry, i) => (
+                              <li
+                                key={`${entry.part}-${i}`}
+                                className="flex flex-wrap items-baseline justify-between gap-x-3 rounded-lg bg-muted/40 px-2.5 py-1.5"
+                              >
+                                <span className="font-medium">{entry.part}</span>
+                                <span className="flex items-baseline gap-3 text-xs text-muted-foreground">
+                                  <span>
+                                    {entry.supplier ?? "No supplier recorded"}
+                                  </span>
+                                  {entry.cost !== undefined ? (
+                                    <span className="font-semibold text-foreground tabular-nums">
+                                      {formatLKR(entry.cost)}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {issuePartsCost > 0 ? (
+                        <p className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
+                          <span>Parts to fix our own mistakes</span>
+                          <span className="font-semibold tabular-nums">
+                            {formatLKR(issuePartsCost)}
+                          </span>
+                        </p>
+                      ) : null}
+                      {ticket.duration ? (
+                        <div className="mt-3 text-sm">
+                          <p className="text-xs text-muted-foreground">
+                            Duration
+                          </p>
+                          <p className="mt-0.5 font-medium">{ticket.duration}</p>
+                        </div>
+                      ) : null}
                     </>
-                  )}
+                  ) : null}
                   {ticket.forgottenParts ? (
                     <p className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
                       Forgotten parts: {ticket.forgottenParts}
@@ -425,8 +451,8 @@ export default async function AdminTicketDetailPage({
                       partsCost: ticket.partsCost?.toString() ?? null,
                       paidAmount: ticket.paidAmount?.toString() ?? null,
                       duration: ticket.duration,
-                      partsUsed: ticket.partsUsed,
-                      partsSupplier: ticket.partsSupplier,
+                      parts: partsList,
+                      issuePartsCost,
                       adminNotes: ticket.adminNotes,
                       forgottenParts: ticket.forgottenParts,
                     }}
@@ -542,7 +568,7 @@ export default async function AdminTicketDetailPage({
               <RepairIssuePanel
                 ticketId={ticket.id}
                 status={ticket.status}
-                issues={ticket.issues}
+                issues={issuesWithParts}
               />
             </CardContent>
           </Card>

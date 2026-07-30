@@ -62,6 +62,14 @@ enum ProductCategory {
   PHONE
 }
 
+// Customer feedback moderation — nothing reaches the home page until an
+// admin approves it. HIDDEN is "was live, taken down" as well as "rejected".
+enum TestimonialStatus {
+  PENDING
+  APPROVED
+  HIDDEN
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -89,6 +97,7 @@ model User {
   payments         Payment[]
   orders           Order[]
   notifications    Notification[]
+  testimonials     Testimonial[]
 }
 
 model RepairTicket {
@@ -114,6 +123,11 @@ model RepairTicket {
   partsCost        Decimal?       @db.Decimal(10, 2) // what the shop spent
   paidAmount       Decimal?       @db.Decimal(10, 2) // what the customer paid
   duration         String? // e.g. "2 Hours", "1 Day"
+  // PartEntry[] = [{ part, supplier?, cost? }] — one row per part, because a
+  // repair needing several parts often sources them from different suppliers.
+  // partsUsed/partsSupplier below are kept in sync as flat summaries so older
+  // reads (and the legacy bill line) keep working.
+  parts            Json?
   partsUsed        String? // e.g. "Display, Battery"
   partsSupplier    String? // e.g. "Trans Asia Cellular"
   forgottenParts   String? // QA tracking, e.g. "3 Screws"
@@ -131,6 +145,7 @@ model RepairTicket {
   paidMethod          String? // e.g. "Cash", "Bank transfer" — printed on the paid receipt
   warrantyPeriod      String? // e.g. "3 months" — only shown when the warranty field is enabled
   warrantyParts       String? // e.g. "Display, Battery" — what the warranty covers
+  issueWarranty       String? // warranty offered on a free fix after an issue during the repair
   billShow            Json? // BillShow — per-field visibility toggles for the bill
   // Issues during repair — see the RepairIssue model. A repair can hit more
   // than one (another mishap after the first was fixed), so they're rows.
@@ -138,6 +153,7 @@ model RepairTicket {
   refunded         Boolean        @default(false) // a refund was agreed for damage
   statusUpdates    StatusUpdate[]
   payments         Payment[]
+  testimonials     Testimonial[]
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   completedAt      DateTime?
@@ -158,6 +174,10 @@ model RepairIssue {
   status     RepairIssueStatus @default(PENDING)
   note       String // what went wrong
   solution   String? // the proposed free fix; null = no fix possible
+  // PartEntry[] = [{ part, supplier?, cost? }] — what the shop had to buy to
+  // put its own mistake right. Pure shop expense: it feeds partsCost/profit
+  // and the error reports, and is never printed on the customer's bill.
+  parts      Json?
   reportedAt DateTime          @default(now())
   resolvedAt DateTime? // when the customer (or shop on their behalf) decided
   createdAt  DateTime          @default(now())
@@ -242,6 +262,34 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   quantity  Int
   unitPrice Decimal @db.Decimal(10, 2)
+}
+
+// ─── Customer feedback (home-page testimonials) ──────────────────────
+
+// A customer's review of the shop. Submitted from /feedback (or added by an
+// admin for walk-ins), moderated under Admin → Reviews, and shown on the
+// marketing home page once APPROVED.
+model Testimonial {
+  id          String            @id @default(cuid())
+  userId      String? // the account that wrote it — null for admin-added walk-ins
+  user        User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ticketId    String? // the repair it's about, when the customer picked one
+  ticket      RepairTicket?     @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  name        String // display name shown on the site (customer can shorten it)
+  deviceLabel String? // e.g. "iPhone 13 · Screen replacement" — the caption under the name
+  rating      Int // 1–5 stars
+  message     String
+  avatarUrl   String? // snapshot of the author's avatar at submit time
+  status      TestimonialStatus @default(PENDING)
+  featured    Boolean           @default(false) // pinned to the front of the home-page rail
+  sortOrder   Int               @default(0) // admin ordering within the approved list
+  adminNote   String? // internal moderation note — never shown publicly
+  reviewedAt  DateTime? // when an admin approved or hid it
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status, featured, sortOrder])
+  @@index([userId])
 }
 
 // ─── Loyalty & notifications ─────────────────────────────────────────

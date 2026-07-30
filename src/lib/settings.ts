@@ -4,6 +4,10 @@ import { DEFAULT_BILL_SHOW, resolveBillShow, type BillShow } from "@/lib/bill";
 
 export const PHONES_VISIBLE_KEY = "phones_storefront_visible";
 
+// Whether the home-page testimonial rail is shown. Defaults to on — the
+// section hides itself anyway when there is nothing approved to show.
+export const TESTIMONIALS_VISIBLE_KEY = "testimonials_section_visible";
+
 // The bill field show/hide choices carried over to the NEXT bill — saved
 // every time a bill is generated, so the shop sets its layout once and new
 // bills open the same way. A bill that already has its own billShow keeps it.
@@ -139,4 +143,9 @@ export async function setSetting(key: string, value: string) {
 
 export async function phonesVisible(): Promise<boolean> {
   return (await getSetting(PHONES_VISIBLE_KEY)) === "true";
+}
+
+// Unlike phones, this one is opt-out: only an explicit "false" hides it.
+export async function testimonialsVisible(): Promise<boolean> {
+  return (await getSetting(TESTIMONIALS_VISIBLE_KEY)) !== "false";
 }

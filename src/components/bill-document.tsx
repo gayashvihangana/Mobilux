@@ -40,6 +40,10 @@ export function BillDocument({
   const showIssue = show.issue && !!ticket.issueTitle;
   const showSolution = show.solution && !!ticket.solution;
   const showWarranty = show.warranty && !!ticket.warrantyPeriod;
+  // Only issues the customer was actually told about belong on the bill —
+  // a withdrawn report never existed as far as the invoice is concerned.
+  const billIssues = ticket.issues.filter((i) => i.note.trim().length > 0);
+  const showRepairIssue = show.repairIssue && billIssues.length > 0;
   const phone = ticket.customer?.phone ?? null;
   const paidMeta = [paidMethod, paidDate ? formatDate(paidDate) : null]
     .filter(Boolean)
@@ -174,6 +178,54 @@ export function BillDocument({
                 </p>
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {/* ── Issue during the repair (free-of-charge work) ─── */}
+        {showRepairIssue ? (
+          <div className="mt-6 break-inside-avoid border-l-2 border-neutral-800 bg-neutral-50 py-3 pr-4 pl-4">
+            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
+              Issue during the repair
+            </p>
+            <div className="mt-2 space-y-3">
+              {billIssues.map((issue, i) => (
+                <div key={i} className="text-sm">
+                  <p className="leading-relaxed whitespace-pre-wrap text-neutral-700">
+                    <span className="font-semibold text-neutral-800">
+                      What happened:{" "}
+                    </span>
+                    {issue.note}
+                  </p>
+                  {issue.solution ? (
+                    <p className="mt-1 leading-relaxed whitespace-pre-wrap text-neutral-700">
+                      <span className="font-semibold text-neutral-800">
+                        Put right at no charge:{" "}
+                      </span>
+                      {issue.solution}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {issue.status === "ACCEPTED"
+                      ? "Free fix approved by the customer and completed."
+                      : issue.status === "DECLINED"
+                        ? "The customer chose not to continue — a refund was agreed."
+                        : "Awaiting the customer's decision."}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {ticket.issueWarranty ? (
+              <p className="mt-3 text-sm text-neutral-700">
+                <span className="font-semibold text-neutral-800">
+                  Warranty on this work:{" "}
+                </span>
+                {ticket.issueWarranty}
+              </p>
+            ) : null}
+            <p className="mt-3 text-xs text-neutral-500">
+              Nothing above has been charged on this invoice — replacement parts
+              and labour for it were covered by us.
+            </p>
           </div>
         ) : null}
 

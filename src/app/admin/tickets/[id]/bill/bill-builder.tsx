@@ -15,11 +15,14 @@ import {
   Plus,
   Receipt,
   Trash2,
+  TriangleAlert,
   Undo2,
 } from "lucide-react";
+import type { RepairIssueStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -57,6 +60,12 @@ type PayTo = {
   branch: string;
   accountName: string;
   accountNumber: string;
+};
+
+const ISSUE_STATUS_LABEL: Record<RepairIssueStatus, string> = {
+  PENDING: "Awaiting the customer's decision",
+  ACCEPTED: "Free fix accepted",
+  DECLINED: "Declined — refund agreed",
 };
 
 const PRESETS = [
@@ -144,39 +153,51 @@ function useSuccessToast(state: TicketFormState, message: string) {
   }, [state, message]);
 }
 
-// The show/hide switch that sits beside every field's label. Says what it
-// IS ("Shown" / "Hidden"), not what clicking will do, so the current state
-// of the bill is readable at a glance down the form.
+// The show/hide control beside every field's label — a real switch, so its
+// state reads at a glance down the form. The wording says what the field IS
+// ("Shown" / "Hidden"), not what flipping it would do, and the two words
+// cross-fade so the change is felt rather than just seen.
 function ShowToggle({
   on,
   label,
-  onClick,
+  onToggle,
 }: {
   on: boolean;
   label: string;
-  onClick: () => void;
+  onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      aria-label={`${label} — ${on ? "shown on bill" : "hidden from bill"}`}
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
-        on
-          ? "border-primary/40 bg-primary/10 text-primary"
-          : "border-border bg-muted/50 text-muted-foreground",
-      )}
-    >
-      {on ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
-      {on ? "Shown" : "Hidden"}
-    </button>
+    <span className="flex shrink-0 items-center gap-2">
+      <span className="relative hidden h-4 w-12 text-right text-[11px] font-medium sm:block">
+        <span
+          className={cn(
+            "absolute inset-0 flex items-center justify-end gap-1 transition-all duration-200",
+            on ? "translate-y-0 text-primary opacity-100" : "-translate-y-1 opacity-0",
+          )}
+        >
+          <Eye className="size-3" /> Shown
+        </span>
+        <span
+          className={cn(
+            "absolute inset-0 flex items-center justify-end gap-1 text-muted-foreground transition-all duration-200",
+            on ? "translate-y-1 opacity-0" : "translate-y-0 opacity-100",
+          )}
+        >
+          <EyeOff className="size-3" /> Hidden
+        </span>
+      </span>
+      <Switch
+        checked={on}
+        onCheckedChange={onToggle}
+        aria-label={`${label} — ${on ? "shown on bill" : "hidden from bill"}`}
+      />
+    </span>
   );
 }
 
-// A label row with its toggle on the right. Hidden fields dim so the eye
-// skips them, but stay editable — hiding a field never wipes its value.
+// A label row with its toggle on the right. Hidden fields dim and settle back
+// slightly so the eye skips them, but stay editable — hiding a field never
+// wipes its value.
 function FieldHeader({
   htmlFor,
   label,
@@ -191,8 +212,16 @@ function FieldHeader({
   return (
     <div className="flex items-center justify-between gap-2">
       <Label htmlFor={htmlFor}>{label}</Label>
-      <ShowToggle on={on} label={label} onClick={onToggle} />
+      <ShowToggle on={on} label={label} onToggle={onToggle} />
     </div>
+  );
+}
+
+// Shared look for a toggleable block: dims and eases back when hidden.
+function fieldBlockClass(on: boolean) {
+  return cn(
+    "space-y-2 transition-all duration-300 ease-out",
+    !on && "scale-[0.995] opacity-55",
   );
 }
 
@@ -213,8 +242,8 @@ function ReadonlyField({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-muted/30 px-3 py-2.5 transition-opacity",
-        !on && "opacity-60",
+        "rounded-xl border bg-muted/30 px-3 py-2.5 transition-all duration-300 ease-out",
+        on ? "border-primary/25" : "scale-[0.995] border-border opacity-60",
       )}
     >
       <div className="flex items-center justify-between gap-3">
@@ -222,7 +251,7 @@ function ReadonlyField({
           <p className="text-sm font-medium">{label}</p>
           <p className="truncate text-sm text-muted-foreground">{value}</p>
         </div>
-        <ShowToggle on={on} label={label} onClick={onToggle} />
+        <ShowToggle on={on} label={label} onToggle={onToggle} />
       </div>
       <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     </div>
@@ -268,6 +297,7 @@ export function BillBuilder({
     bill.warrantyPeriod ?? "",
   );
   const [warrantyParts, setWarrantyParts] = useState(bill.warrantyParts ?? "");
+  const [issueWarranty, setIssueWarranty] = useState(bill.issueWarranty ?? "");
   // This bill's own layout if it has one, otherwise the layout carried over
   // from the last bill generated, otherwise the built-in defaults.
   const [show, setShow] = useState<BillShow>(
@@ -339,6 +369,7 @@ export function BillBuilder({
       if (typeof d.warrantyPeriod === "string")
         setWarrantyPeriod(d.warrantyPeriod);
       if (typeof d.warrantyParts === "string") setWarrantyParts(d.warrantyParts);
+      if (typeof d.issueWarranty === "string") setIssueWarranty(d.issueWarranty);
       if (d.show) setShow((s) => ({ ...s, ...d.show }));
       if (d.discountMode) setDiscountMode(d.discountMode);
       if (typeof d.discountValue === "string") setDiscountValue(d.discountValue);
@@ -365,6 +396,7 @@ export function BillBuilder({
           solution,
           warrantyPeriod,
           warrantyParts,
+          issueWarranty,
           show,
           discountMode,
           discountValue,
@@ -383,6 +415,7 @@ export function BillBuilder({
     solution,
     warrantyPeriod,
     warrantyParts,
+    issueWarranty,
     show,
     discountMode,
     discountValue,
@@ -496,6 +529,7 @@ export function BillBuilder({
           : bill.billGeneratedAt,
     warrantyPeriod: warrantyPeriod.trim() || null,
     warrantyParts: warrantyParts.trim() || null,
+    issueWarranty: issueWarranty.trim() || null,
     billShow: show,
   };
 
@@ -527,6 +561,7 @@ export function BillBuilder({
           <input type="hidden" name="issueTitle" value={issueTitle} />
           <input type="hidden" name="solution" value={solution} />
           <input type="hidden" name="warrantyPeriod" value={warrantyPeriod} />
+          <input type="hidden" name="issueWarranty" value={issueWarranty} />
           <input type="hidden" name="warrantyParts" value={warrantyParts} />
           <input type="hidden" name="discountMode" value={discountMode} />
           <input type="hidden" name="discountValue" value={discountValue} />
@@ -704,7 +739,7 @@ export function BillBuilder({
               <Separator />
 
               {/* Repair details */}
-              <div className={cn("space-y-2", !show.issue && "opacity-60")}>
+              <div className={fieldBlockClass(show.issue)}>
                 <FieldHeader
                   htmlFor="issueTitle"
                   label="Issue"
@@ -720,7 +755,7 @@ export function BillBuilder({
                   className="resize-none"
                 />
               </div>
-              <div className={cn("space-y-2", !show.solution && "opacity-60")}>
+              <div className={fieldBlockClass(show.solution)}>
                 <FieldHeader
                   htmlFor="solution"
                   label="What we did"
@@ -738,7 +773,7 @@ export function BillBuilder({
               </div>
 
               {/* Technician */}
-              <div className={cn("space-y-2", !show.technician && "opacity-60")}>
+              <div className={fieldBlockClass(show.technician)}>
                 <FieldHeader
                   htmlFor="technician"
                   label="Technician"
@@ -754,7 +789,7 @@ export function BillBuilder({
               </div>
 
               {/* Warranty */}
-              <div className={cn("space-y-2", !show.warranty && "opacity-60")}>
+              <div className={fieldBlockClass(show.warranty)}>
                 <FieldHeader
                   label="Warranty"
                   on={show.warranty}
@@ -776,10 +811,61 @@ export function BillBuilder({
                 </div>
               </div>
 
+              {/* Issue during the repair — only when the ticket has one */}
+              {bill.issues.length > 0 ? (
+                <>
+                  <Separator />
+                  <div className={fieldBlockClass(show.repairIssue)}>
+                    <FieldHeader
+                      label="Issue during the repair"
+                      on={show.repairIssue}
+                      onToggle={() => toggle("repairIssue")}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      What went wrong on our side and the fix we did free of
+                      charge — taken straight from the ticket, so the bill always
+                      matches what the customer was told. Nothing here is
+                      charged on the invoice.
+                    </p>
+                    <ul className="space-y-2">
+                      {bill.issues.map((issue, i) => (
+                        <li
+                          key={i}
+                          className="rounded-xl border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm"
+                        >
+                          <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+                            <TriangleAlert className="size-3.5" />
+                            {ISSUE_STATUS_LABEL[issue.status]}
+                          </p>
+                          <p className="mt-1.5 whitespace-pre-wrap">
+                            {issue.note}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {issue.solution
+                              ? `Free fix: ${issue.solution}`
+                              : "No free fix was offered."}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                    <Input
+                      aria-label="Warranty on the free fix"
+                      value={issueWarranty}
+                      onChange={(e) => setIssueWarranty(e.target.value)}
+                      placeholder="Warranty on this work — e.g. 1 month on the replaced back glass"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional. To change what happened or the fix itself, edit
+                      the issue on the ticket page.
+                    </p>
+                  </div>
+                </>
+              ) : null}
+
               <Separator />
 
               {/* Pay-to (bank details) */}
-              <div className={cn("space-y-2", !show.payment && "opacity-60")}>
+              <div className={fieldBlockClass(show.payment)}>
                 <FieldHeader
                   label="How to pay"
                   on={show.payment}

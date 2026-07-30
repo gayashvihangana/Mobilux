@@ -1,4 +1,5 @@
 import type { RepairIssueStatus, TicketStatus } from "@prisma/client";
+import type { PartEntry } from "@/lib/parts";
 
 // Statuses where the device is physically at the shop and the repair isn't
 // handed back yet — the only window in which an issue can be reported.
@@ -21,6 +22,10 @@ export type IssueSummary = {
   reportedAt: Date;
   resolvedAt: Date | null;
 };
+
+// An issue plus what putting it right cost the shop in parts. Only the admin
+// side carries this — the customer never sees what our mistake cost us.
+export type IssueWithParts = IssueSummary & { parts: PartEntry[] };
 
 // The one issue waiting on the customer, if any. Only ever one at a time —
 // reportRepairIssue refuses to open a second while this is unresolved.

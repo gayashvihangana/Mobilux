@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { TicketStatus } from "@prisma/client";
+import { Prisma, type TicketStatus } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { computeBill, resolveBillShow } from "@/lib/bill";
@@ -20,6 +20,14 @@ import {
   statusRank,
 } from "@/lib/status";
 import { receivedItemsNote, type ReceivedItem } from "@/lib/received-items";
+import {
+  issuePartsCostOf,
+  parseParts,
+  partsSummary,
+  partsTotalCost,
+  suppliersSummary,
+  type PartEntry,
+} from "@/lib/parts";
 import { ISSUE_REPORTABLE_STATUSES } from "@/lib/repair-issue";
 import {
   BILL_SHOW_DEFAULT_KEY,
@@ -165,14 +173,56 @@ const adminTicketSchema = z.object({
   completedAt: optionalText(20),
   estimatedCost: optionalMoney(),
   finalCost: optionalMoney(),
-  partsCost: optionalMoney(),
   paidAmount: optionalMoney(),
   duration: optionalText(60),
-  partsUsed: optionalText(200),
-  partsSupplier: optionalText(200),
   adminNotes: optionalText(4000),
   forgottenParts: optionalText(200),
 });
+
+// The parts list arrives as JSON from <PartsEditor>. Anything unparseable is
+// treated as "no parts" rather than failing the whole save — the flat legacy
+// columns are then cleared alongside it.
+const partEntrySchema = z.object({
+  part: z.string().trim().min(1).max(120),
+  supplier: z.string().trim().max(120).optional().or(z.literal("")),
+  cost: z.coerce.number().min(0).optional(),
+});
+
+function parsePartsField(formData: FormData): PartEntry[] {
+  const raw = formData.get("partsJson");
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const parsed = z.array(partEntrySchema).max(40).safeParse(JSON.parse(raw));
+    if (!parsed.success) return [];
+    return parsed.data.map((p) => ({
+      part: p.part,
+      ...(p.supplier ? { supplier: p.supplier } : {}),
+      ...(p.cost !== undefined ? { cost: p.cost } : {}),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// Every parts column moves together: the JSON list is the source of truth,
+// the two flat strings are derived summaries, and partsCost is the sum of all
+// the part costs — the repair's own parts plus whatever the shop had to buy to
+// put its own mistakes right. Derived rather than typed, so the money figure
+// can never disagree with the parts log behind it.
+function partsColumns(
+  parts: PartEntry[],
+  opts?: { issuePartsCost?: number; existingPartsCost?: number | null },
+) {
+  const total = partsTotalCost(parts) + (opts?.issuePartsCost ?? 0);
+  return {
+    parts: parts.length > 0 ? parts : Prisma.DbNull,
+    partsUsed: partsSummary(parts),
+    partsSupplier: suppliersSummary(parts),
+    // A repair logged before per-part costs existed has a hand-typed total and
+    // nothing to add up — keep it instead of zeroing the books.
+    partsCost: total > 0 ? total : (opts?.existingPartsCost ?? null),
+  };
+}
 
 function parseAdminTicketForm(formData: FormData) {
   return adminTicketSchema.safeParse({
@@ -188,11 +238,8 @@ function parseAdminTicketForm(formData: FormData) {
     completedAt: formData.get("completedAt"),
     estimatedCost: formData.get("estimatedCost") ?? "",
     finalCost: formData.get("finalCost") ?? "",
-    partsCost: formData.get("partsCost") ?? "",
     paidAmount: formData.get("paidAmount") ?? "",
     duration: formData.get("duration"),
-    partsUsed: formData.get("partsUsed"),
-    partsSupplier: formData.get("partsSupplier"),
     adminNotes: formData.get("adminNotes"),
     forgottenParts: formData.get("forgottenParts"),
   });
@@ -219,11 +266,8 @@ function parseTicketDetailsForm(formData: FormData) {
     completedAt: formData.get("completedAt"),
     estimatedCost: formData.get("estimatedCost") ?? "",
     finalCost: formData.get("finalCost") ?? "",
-    partsCost: formData.get("partsCost") ?? "",
     paidAmount: formData.get("paidAmount") ?? "",
     duration: formData.get("duration"),
-    partsUsed: formData.get("partsUsed"),
-    partsSupplier: formData.get("partsSupplier"),
     adminNotes: formData.get("adminNotes"),
     forgottenParts: formData.get("forgottenParts"),
   });
@@ -295,11 +339,9 @@ export async function adminCreateTicket(
         status: data.status,
         estimatedCost: data.estimatedCost,
         finalCost: data.finalCost,
-        partsCost: data.partsCost,
         paidAmount: data.paidAmount,
         duration: data.duration ?? null,
-        partsUsed: data.partsUsed ?? null,
-        partsSupplier: data.partsSupplier ?? null,
+        ...partsColumns(parsePartsField(formData)),
         adminNotes: data.adminNotes ?? null,
         forgottenParts: data.forgottenParts ?? null,
         completedAt,
@@ -344,7 +386,12 @@ export async function updateTicketDetails(
 
   const existing = await prisma.repairTicket.findUnique({
     where: { id: ticketId },
-    select: { id: true, completedAt: true },
+    select: {
+      id: true,
+      completedAt: true,
+      partsCost: true,
+      issues: { select: { parts: true } },
+    },
   });
   if (!existing) return { error: "Ticket not found." };
 
@@ -359,11 +406,12 @@ export async function updateTicketDetails(
       solution: data.solution ?? null,
       estimatedCost: data.estimatedCost ?? null,
       finalCost: data.finalCost ?? null,
-      partsCost: data.partsCost ?? null,
       paidAmount: data.paidAmount ?? null,
       duration: data.duration ?? null,
-      partsUsed: data.partsUsed ?? null,
-      partsSupplier: data.partsSupplier ?? null,
+      ...partsColumns(parsePartsField(formData), {
+        issuePartsCost: issuePartsCostOf(existing.issues),
+        existingPartsCost: existing.partsCost ? Number(existing.partsCost) : null,
+      }),
       adminNotes: data.adminNotes ?? null,
       forgottenParts: data.forgottenParts ?? null,
       ...(data.completedAt
@@ -423,6 +471,7 @@ const generateBillSchema = z.object({
   solution: optionalText(2000),
   warrantyPeriod: optionalText(60),
   warrantyParts: optionalText(200),
+  issueWarranty: optionalText(200),
   discountMode: z.enum(["none", "percent", "amount"]),
   discountValue: optionalMoney(),
   billDate: optionalText(40),
@@ -446,6 +495,7 @@ export async function generateBill(
     solution: formData.get("solution"),
     warrantyPeriod: formData.get("warrantyPeriod"),
     warrantyParts: formData.get("warrantyParts"),
+    issueWarranty: formData.get("issueWarranty"),
     discountMode: formData.get("discountMode"),
     discountValue: formData.get("discountValue") ?? "",
     billDate: formData.get("billDate"),
@@ -546,6 +596,7 @@ export async function generateBill(
       solution: data.solution ?? null,
       warrantyPeriod: data.warrantyPeriod ?? null,
       warrantyParts: data.warrantyParts ?? null,
+      issueWarranty: data.issueWarranty ?? null,
       billShow,
     },
   });
@@ -1388,6 +1439,66 @@ export async function withdrawRepairIssue(
   revalidatePath(`/repairs/${ticket.id}`);
   revalidatePath("/dashboard");
   revalidatePath("/track");
+  return { success: true };
+}
+
+// ── Admin: what fixing our own mistake cost ──────────────────────
+// The parts bought to put an issue right, with their supplier and price.
+// Purely internal: it rolls into the ticket's parts cost (and so the profit
+// figure) and the error reports, and never reaches the customer's bill.
+export async function updateIssueParts(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  const session = await auth();
+  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+
+  const issueId = formData.get("issueId");
+  if (typeof issueId !== "string" || !issueId) return { error: "Invalid issue." };
+
+  const issue = await prisma.repairIssue.findUnique({
+    where: { id: issueId },
+    select: { id: true, ticketId: true },
+  });
+  if (!issue) return { error: "Issue not found." };
+
+  const parts = parsePartsField(formData);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.repairIssue.update({
+      where: { id: issueId },
+      data: { parts: parts.length > 0 ? parts : Prisma.DbNull },
+    });
+
+    // Re-derive the ticket's parts cost from every part on it: the repair's
+    // own parts plus each issue's fix.
+    const ticket = await tx.repairTicket.findUnique({
+      where: { id: issue.ticketId },
+      select: {
+        parts: true,
+        partsCost: true,
+        issues: { select: { parts: true } },
+      },
+    });
+    if (!ticket) return;
+
+    const total =
+      partsTotalCost(parseParts(ticket.parts)) +
+      issuePartsCostOf(ticket.issues);
+    await tx.repairTicket.update({
+      where: { id: issue.ticketId },
+      data: {
+        partsCost:
+          total > 0 ? total : ticket.partsCost ? Number(ticket.partsCost) : null,
+      },
+    });
+  });
+
+  revalidatePath(`/admin/tickets/${issue.ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin/errors");
+  revalidatePath("/admin/reports");
+  revalidatePath("/admin");
   return { success: true };
 }
 

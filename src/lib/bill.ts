@@ -1,4 +1,4 @@
-import type { TicketStatus } from "@prisma/client";
+import type { RepairIssueStatus, TicketStatus } from "@prisma/client";
 import { BANK_DETAILS } from "@/lib/config";
 
 // One line on the itemised bill, e.g. { label: "Battery", amount: 4500 }.
@@ -62,6 +62,8 @@ export type BillShow = {
   solution: boolean;
   technician: boolean;
   warranty: boolean;
+  /** The "issue during the repair" block — what happened and the free fix. */
+  repairIssue: boolean;
   notes: boolean;
   payment: boolean;
   track: boolean;
@@ -74,6 +76,7 @@ export const DEFAULT_BILL_SHOW: BillShow = {
   solution: true,
   technician: true,
   warranty: false,
+  repairIssue: true,
   notes: true,
   payment: true,
   track: true,
@@ -88,6 +91,16 @@ export function resolveBillShow(raw: unknown): BillShow {
   }
   return out;
 }
+
+// Something that went wrong at the shop while the device was in its hands,
+// as printed on the bill: what happened, the fix done free of charge, and
+// where the customer's decision landed.
+export type BillIssue = {
+  note: string;
+  solution: string | null;
+  status: RepairIssueStatus;
+  reportedAt: Date;
+};
 
 export type BillTicket = {
   id: string;
@@ -118,6 +131,11 @@ export type BillTicket = {
   paidMethod: string | null;
   warrantyPeriod: string | null;
   warrantyParts: string | null;
+  // Issue-during-repair block: the issues themselves come from the ticket
+  // (so the bill can never disagree with what the customer was told), the
+  // warranty line on the free fix is typed in the bill builder.
+  issues: BillIssue[];
+  issueWarranty: string | null;
   billShow: BillShow | null;
   customer: { name: string; email: string; phone: string | null } | null;
   paidPayment: { amount: string; createdAt: Date } | null;

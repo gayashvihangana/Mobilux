@@ -30,6 +30,7 @@ export default async function AppLayout({
                 { href: "/repairs", label: "My repairs" },
                 { href: "/orders", label: "My orders" },
                 { href: "/shop", label: "Shop" },
+                { href: "/feedback", label: "Feedback" },
               ]}
               homeHref="/dashboard"
               triggerClassName="-ml-2 sm:hidden"
@@ -41,6 +42,7 @@ export default async function AppLayout({
                 { href: "/repairs", label: "My repairs" },
                 { href: "/orders", label: "My orders" },
                 { href: "/shop", label: "Shop" },
+                { href: "/feedback", label: "Feedback" },
               ]}
             />
           </div>

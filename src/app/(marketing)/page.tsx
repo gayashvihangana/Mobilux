@@ -20,6 +20,7 @@ import { HeroVisual } from "@/components/hero-visual";
 import { Parallax } from "@/components/parallax";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { ProductCard } from "@/components/product-card";
+import { TestimonialsSection } from "@/components/testimonials-section";
 import { cn } from "@/lib/utils";
 
 const services = [
@@ -354,6 +355,9 @@ export default async function HomePage() {
           </ol>
         </div>
       </section>
+
+      {/* ── Testimonials — animated rails of approved feedback ─ */}
+      <TestimonialsSection />
 
       {/* ── CTA ──────────────────────────────────────────────── */}
       <section className="relative overflow-hidden py-20 sm:py-24">

@@ -5,7 +5,9 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Receipt } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { DONE_TICKET_STATUSES } from "@/lib/completed-repairs";
 import { StatusBadge } from "@/components/status-badge";
+import { FeedbackPrompt } from "@/components/feedback-prompt";
 import { StatusHistory, StatusStepper } from "@/components/status-timeline";
 import {
   Card,
@@ -77,6 +79,14 @@ export default async function RepairDetailPage({
   const issueCards = [...ticket.issues].reverse();
   const issuePending = ticket.issues.some((i) => i.status === "PENDING");
 
+  // Ask for a review once the repair is done — but only the first time.
+  const done = DONE_TICKET_STATUSES.includes(ticket.status);
+  const alreadyReviewed = done
+    ? (await prisma.testimonial.count({
+        where: { userId: session.user.id, ticketId: ticket.id },
+      })) > 0
+    : false;
+
   return (
     <div className="space-y-6">
       <Link
@@ -129,6 +139,11 @@ export default async function RepairDetailPage({
           issue={issue}
         />
       ))}
+
+      {/* How did we do? — only on finished repairs not yet reviewed */}
+      {done && !alreadyReviewed && !issuePending ? (
+        <FeedbackPrompt ticketId={ticket.id} />
+      ) : null}
 
       {/* Pipeline stepper */}
       <Card>
