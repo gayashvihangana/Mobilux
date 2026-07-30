@@ -12,6 +12,7 @@ import type { TestimonialStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { testimonialsVisible } from "@/lib/settings";
 import { APPROVED_ORDER, averageRating, initialsOf } from "@/lib/testimonials";
+import { FilterMenu } from "@/components/filter-menu";
 import { StarRating } from "@/components/star-rating";
 import { cn, formatDateTime } from "@/lib/utils";
 import {
@@ -148,27 +149,28 @@ export default async function AdminTestimonialsPage({
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => {
-          const active = filter.value === f.value;
-          const count = f.status ? countOf(f.status) : counts.reduce((n, c) => n + c._count._all, 0);
-          return (
-            <Link
-              key={f.value}
-              href={`/admin/testimonials?filter=${f.value}`}
-              className={cn(
-                "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-                active
-                  ? "border-primary/40 bg-primary/15 font-medium text-primary"
-                  : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground",
-              )}
-            >
-              {f.label}
-              <span className="ml-1.5 tabular-nums opacity-70">{count}</span>
-            </Link>
-          );
-        })}
-      </div>
+      <FilterMenu
+        basePath="/admin/testimonials"
+        params={{ filter: filterParam }}
+        groups={[
+          {
+            param: "filter",
+            label: "Show",
+            // "pending" is where moderation starts, so it's the landing view
+            // and the one that stays out of the URL.
+            defaultValue: "pending",
+            value: filter.value,
+            options: FILTERS.map((f) => ({
+              value: f.value,
+              label: f.label,
+              count: f.status
+                ? countOf(f.status)
+                : counts.reduce((n, c) => n + c._count._all, 0),
+              tone: f.value === "pending" ? "warning" : undefined,
+            })),
+          },
+        ]}
+      />
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/50 p-10 text-center">

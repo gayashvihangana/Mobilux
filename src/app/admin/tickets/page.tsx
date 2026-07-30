@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, Plus, Receipt } from "lucide-react"
 import type { TicketStatus } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
+import { FilterMenu } from "@/components/filter-menu";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
 import { DEVICE_TYPES, doneLabel, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
@@ -54,6 +55,33 @@ type SortKey = keyof typeof SORTS;
 
 const DEFAULT_SORT: SortKey = "date";
 const DEFAULT_DIR: "asc" | "desc" = "desc";
+
+// "Descending" means nothing on its own — each column gets wording that says
+// what you'll actually see at the top.
+const DIR_LABEL: Record<SortKey, { asc: string; desc: string }> = {
+  ticket: { asc: "Oldest ticket first", desc: "Newest ticket first" },
+  customer: { asc: "A → Z", desc: "Z → A" },
+  device: { asc: "A → Z", desc: "Z → A" },
+  issue: { asc: "A → Z", desc: "Z → A" },
+  status: { asc: "Earliest stage first", desc: "Latest stage first" },
+  profit: { asc: "Lowest first", desc: "Highest first" },
+  date: { asc: "Oldest first", desc: "Newest first" },
+  bill: { asc: "Smallest first", desc: "Largest first" },
+};
+
+// Statuses that share the "Ready for pickup" filter — the pipeline dropped
+// its separate ready step, but legacy tickets still sit at READY_FOR_PICKUP.
+const PICKUP_STATUSES: TicketStatus[] = ["COMPLETED", "READY_FOR_PICKUP"];
+
+// A repair is owed money when it's been billed and nothing has been recorded
+// against it — no manual paid amount, no verified online payment.
+const UNPAID_WHERE = {
+  finalCost: { not: null },
+  paidAt: null,
+  paidAmount: null,
+  status: { not: "CANCELLED" },
+  payments: { none: { status: "PAID" } },
+} as const;
 
 type Row = {
   id: string;
@@ -205,29 +233,42 @@ export default async function AdminTicketsPage({
     sort && sort in SORTS ? (sort as SortKey) : DEFAULT_SORT;
   const sortDir: "asc" | "desc" = dir === "asc" || dir === "desc" ? dir : DEFAULT_DIR;
 
-  const tickets = await prisma.repairTicket.findMany({
-    // Legacy tickets may still sit at READY_FOR_PICKUP — same shelf as
-    // COMPLETED now that the pipeline has no separate ready step.
-    where: unpaidView
-      ? {
-          // Billed but nothing recorded against it yet.
-          finalCost: { not: null },
-          paidAt: null,
-          paidAmount: null,
-          status: { not: "CANCELLED" },
-          payments: { none: { status: "PAID" } },
-        }
-      : filter
-        ? filter === "COMPLETED"
-          ? { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } }
-          : { status: filter }
-        : undefined,
-    orderBy: { createdAt: "desc" },
-    include: {
-      customer: { select: { name: true, email: true } },
-      issues: { select: { id: true, status: true } },
-    },
-  });
+  const [tickets, statusCounts, unpaidCount, totalCount] = await Promise.all([
+    prisma.repairTicket.findMany({
+      where: unpaidView
+        ? UNPAID_WHERE
+        : filter
+          ? filter === "COMPLETED"
+            ? { status: { in: PICKUP_STATUSES } }
+            : { status: filter }
+          : undefined,
+      orderBy: { createdAt: "desc" },
+      include: {
+        customer: { select: { name: true, email: true } },
+        issues: { select: { id: true, status: true } },
+      },
+    }),
+    // Counts sit beside each option in the filter menu, so the shop can see
+    // where the work is without opening every view.
+    prisma.repairTicket.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.repairTicket.count({ where: UNPAID_WHERE }),
+    prisma.repairTicket.count(),
+  ]);
+
+  const countByStatus = Object.fromEntries(
+    statusCounts.map((s) => [s.status, s._count._all]),
+  ) as Record<string, number | undefined>;
+  const counts: Record<string, number> = {
+    all: totalCount,
+    unpaid: unpaidCount,
+    COMPLETED: PICKUP_STATUSES.reduce(
+      (sum, s) => sum + (countByStatus[s] ?? 0),
+      0,
+    ),
+  };
+  for (const f of FILTERS) {
+    if (counts[f.value] === undefined) counts[f.value] = countByStatus[f.value] ?? 0;
+  }
 
   const deviceLabel = Object.fromEntries(
     DEVICE_TYPES.map((d) => [d.value, d.label]),
@@ -293,32 +334,53 @@ export default async function AdminTicketsPage({
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => {
-          const active = (status ?? "all") === f.value;
-          const params = new URLSearchParams();
-          if (f.value !== "all") params.set("status", f.value);
-          if (sort) params.set("sort", sort);
-          if (dir) params.set("dir", dir);
-          const query = params.toString();
-          return (
-            <Link
-              key={f.value}
-              href={query ? `/admin/tickets?${query}` : "/admin/tickets"}
-              className={cn(
-                "rounded-full border px-3.5 py-1.5 text-sm transition-all duration-200",
-                active
-                  ? "border-primary/40 bg-primary/15 font-medium text-primary"
-                  : "border-border bg-card text-muted-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground",
-                f.value === "unpaid" &&
-                  !active &&
-                  "border-warning/30 text-warning hover:border-warning/50",
-              )}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterMenu
+          basePath="/admin/tickets"
+          params={{ status, sort, dir }}
+          groups={[
+            {
+              param: "status",
+              label: "Show",
+              defaultValue: "all",
+              value: status ?? "all",
+              options: FILTERS.map((f) => ({
+                value: f.value,
+                label: f.label,
+                count: counts[f.value],
+                tone: f.value === "unpaid" ? "warning" : undefined,
+              })),
+            },
+          ]}
+        />
+        <FilterMenu
+          basePath="/admin/tickets"
+          params={{ status, sort, dir }}
+          label="Sort"
+          icon="sort"
+          groups={[
+            {
+              param: "sort",
+              label: "Order by",
+              defaultValue: DEFAULT_SORT,
+              value: sortKey,
+              options: (Object.keys(SORTS) as SortKey[]).map((key) => ({
+                value: key,
+                label: SORTS[key],
+              })),
+            },
+            {
+              param: "dir",
+              label: "Direction",
+              defaultValue: DEFAULT_DIR,
+              value: sortDir,
+              options: [
+                { value: "desc", label: DIR_LABEL[sortKey].desc },
+                { value: "asc", label: DIR_LABEL[sortKey].asc },
+              ],
+            },
+          ]}
+        />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">

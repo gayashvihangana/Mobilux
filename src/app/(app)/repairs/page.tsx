@@ -7,8 +7,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DONE_TICKET_STATUSES } from "@/lib/completed-repairs";
 import { Button } from "@/components/ui/button";
+import { FilterMenu } from "@/components/filter-menu";
 import { TicketCard } from "@/components/ticket-card";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "My repairs",
@@ -54,10 +54,28 @@ export default async function RepairsPage({
         ? { status: { in: DONE_TICKET_STATUSES } }
         : {};
 
-  const tickets = await prisma.repairTicket.findMany({
-    where: { customerId: session.user.id, ...statusWhere },
-    orderBy: { createdAt: "desc" },
-  });
+  const [tickets, allCount, activeCount, completedCount] = await Promise.all([
+    prisma.repairTicket.findMany({
+      where: { customerId: session.user.id, ...statusWhere },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.repairTicket.count({ where: { customerId: session.user.id } }),
+    prisma.repairTicket.count({
+      where: { customerId: session.user.id, status: { in: ACTIVE_STATUSES } },
+    }),
+    prisma.repairTicket.count({
+      where: {
+        customerId: session.user.id,
+        status: { in: DONE_TICKET_STATUSES },
+      },
+    }),
+  ]);
+
+  const counts: Record<string, number> = {
+    all: allCount,
+    active: activeCount,
+    completed: completedCount,
+  };
 
   return (
     <div className="space-y-6">
@@ -77,23 +95,23 @@ export default async function RepairsPage({
         </Button>
       </div>
 
-      {/* Filter chips */}
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.key}
-            href={f.key === "all" ? "/repairs" : `/repairs?filter=${f.key}`}
-            className={cn(
-              "rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-              active === f.key
-                ? "border-primary bg-primary/10 font-medium text-primary"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
-            )}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </div>
+      <FilterMenu
+        basePath="/repairs"
+        params={{ filter }}
+        groups={[
+          {
+            param: "filter",
+            label: "Show",
+            defaultValue: "all",
+            value: active,
+            options: FILTERS.map((f) => ({
+              value: f.key,
+              label: f.label,
+              count: counts[f.key],
+            })),
+          },
+        ]}
+      />
 
       {tickets.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
