@@ -188,8 +188,8 @@ const partEntrySchema = z.object({
   cost: z.coerce.number().min(0).optional(),
 });
 
-function parsePartsField(formData: FormData): PartEntry[] {
-  const raw = formData.get("partsJson");
+function parsePartsField(formData: FormData, field = "partsJson"): PartEntry[] {
+  const raw = formData.get(field);
   if (typeof raw !== "string" || !raw) return [];
   try {
     const parsed = z.array(partEntrySchema).max(40).safeParse(JSON.parse(raw));
@@ -202,6 +202,21 @@ function parsePartsField(formData: FormData): PartEntry[] {
   } catch {
     return [];
   }
+}
+
+// The edit form submits one parts list per issue, keyed `issueParts:<id>`.
+function parseIssuePartsFields(
+  formData: FormData,
+): { issueId: string; parts: PartEntry[] }[] {
+  const out: { issueId: string; parts: PartEntry[] }[] = [];
+  for (const key of formData.keys()) {
+    if (!key.startsWith("issueParts:")) continue;
+    const issueId = key.slice("issueParts:".length);
+    if (!issueId) continue;
+    if (out.some((e) => e.issueId === issueId)) continue;
+    out.push({ issueId, parts: parsePartsField(formData, key) });
+  }
+  return out;
 }
 
 // Every parts column moves together: the JSON list is the source of truth,
@@ -390,38 +405,66 @@ export async function updateTicketDetails(
       id: true,
       completedAt: true,
       partsCost: true,
-      issues: { select: { parts: true } },
+      issues: { select: { id: true, parts: true } },
     },
   });
   if (!existing) return { error: "Ticket not found." };
 
-  await prisma.repairTicket.update({
-    where: { id: ticketId },
-    data: {
-      deviceType: data.deviceType,
-      brand: data.brand ?? null,
-      model: data.model ?? null,
-      issueTitle: data.issueTitle,
-      issueDescription: data.issueDescription ?? null,
-      solution: data.solution ?? null,
-      estimatedCost: data.estimatedCost ?? null,
-      finalCost: data.finalCost ?? null,
-      paidAmount: data.paidAmount ?? null,
-      duration: data.duration ?? null,
-      ...partsColumns(parsePartsField(formData), {
-        issuePartsCost: issuePartsCostOf(existing.issues),
-        existingPartsCost: existing.partsCost ? Number(existing.partsCost) : null,
-      }),
-      adminNotes: data.adminNotes ?? null,
-      forgottenParts: data.forgottenParts ?? null,
-      ...(data.completedAt
-        ? { completedAt: resolveCompletedAt("COMPLETED", data.completedAt) }
-        : {}),
-    },
+  // The form edits the parts bought to fix each bench error alongside the
+  // repair's own parts, so both are saved — and costed — together.
+  const issueIds = new Set(existing.issues.map((i) => i.id));
+  const issueParts = parseIssuePartsFields(formData).filter((e) =>
+    issueIds.has(e.issueId),
+  );
+  const issueCost = existing.issues.reduce((sum, issue) => {
+    const submitted = issueParts.find((e) => e.issueId === issue.id);
+    return (
+      sum +
+      partsTotalCost(submitted ? submitted.parts : parseParts(issue.parts))
+    );
+  }, 0);
+
+  await prisma.$transaction(async (tx) => {
+    for (const entry of issueParts) {
+      await tx.repairIssue.update({
+        where: { id: entry.issueId },
+        data: { parts: entry.parts.length > 0 ? entry.parts : Prisma.DbNull },
+      });
+    }
+
+    await tx.repairTicket.update({
+      where: { id: ticketId },
+      data: {
+        deviceType: data.deviceType,
+        brand: data.brand ?? null,
+        model: data.model ?? null,
+        issueTitle: data.issueTitle,
+        issueDescription: data.issueDescription ?? null,
+        solution: data.solution ?? null,
+        estimatedCost: data.estimatedCost ?? null,
+        finalCost: data.finalCost ?? null,
+        paidAmount: data.paidAmount ?? null,
+        duration: data.duration ?? null,
+        ...partsColumns(parsePartsField(formData), {
+          issuePartsCost: issueCost,
+          existingPartsCost: existing.partsCost
+            ? Number(existing.partsCost)
+            : null,
+        }),
+        adminNotes: data.adminNotes ?? null,
+        forgottenParts: data.forgottenParts ?? null,
+        ...(data.completedAt
+          ? { completedAt: resolveCompletedAt("COMPLETED", data.completedAt) }
+          : {}),
+      },
+    });
   });
 
   revalidatePath(`/admin/tickets/${ticketId}`);
   revalidatePath("/admin/tickets");
+  revalidatePath("/admin/errors");
+  revalidatePath("/admin/reports");
+  revalidatePath("/admin");
   revalidatePath(`/repairs/${ticketId}`);
   return { success: true };
 }
@@ -1439,66 +1482,6 @@ export async function withdrawRepairIssue(
   revalidatePath(`/repairs/${ticket.id}`);
   revalidatePath("/dashboard");
   revalidatePath("/track");
-  return { success: true };
-}
-
-// ── Admin: what fixing our own mistake cost ──────────────────────
-// The parts bought to put an issue right, with their supplier and price.
-// Purely internal: it rolls into the ticket's parts cost (and so the profit
-// figure) and the error reports, and never reaches the customer's bill.
-export async function updateIssueParts(
-  _prev: TicketFormState,
-  formData: FormData,
-): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
-
-  const issueId = formData.get("issueId");
-  if (typeof issueId !== "string" || !issueId) return { error: "Invalid issue." };
-
-  const issue = await prisma.repairIssue.findUnique({
-    where: { id: issueId },
-    select: { id: true, ticketId: true },
-  });
-  if (!issue) return { error: "Issue not found." };
-
-  const parts = parsePartsField(formData);
-
-  await prisma.$transaction(async (tx) => {
-    await tx.repairIssue.update({
-      where: { id: issueId },
-      data: { parts: parts.length > 0 ? parts : Prisma.DbNull },
-    });
-
-    // Re-derive the ticket's parts cost from every part on it: the repair's
-    // own parts plus each issue's fix.
-    const ticket = await tx.repairTicket.findUnique({
-      where: { id: issue.ticketId },
-      select: {
-        parts: true,
-        partsCost: true,
-        issues: { select: { parts: true } },
-      },
-    });
-    if (!ticket) return;
-
-    const total =
-      partsTotalCost(parseParts(ticket.parts)) +
-      issuePartsCostOf(ticket.issues);
-    await tx.repairTicket.update({
-      where: { id: issue.ticketId },
-      data: {
-        partsCost:
-          total > 0 ? total : ticket.partsCost ? Number(ticket.partsCost) : null,
-      },
-    });
-  });
-
-  revalidatePath(`/admin/tickets/${issue.ticketId}`);
-  revalidatePath("/admin/tickets");
-  revalidatePath("/admin/errors");
-  revalidatePath("/admin/reports");
-  revalidatePath("/admin");
   return { success: true };
 }
 

@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { FileInput } from "@/components/forms/file-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -187,10 +188,9 @@ export function ProductDialog({ product }: { product?: Product }) {
                 {editing ? "(leave empty to keep current)" : "(optional, up to 4)"}
               </span>
             </Label>
-            <Input
+            <FileInput
               id="images"
               name="images"
-              type="file"
               accept="image/jpeg,image/png,image/webp"
               multiple
               className="cursor-pointer file:text-primary"

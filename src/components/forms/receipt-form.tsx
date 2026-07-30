@@ -6,6 +6,7 @@ import { FileUp, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FileInput } from "@/components/forms/file-input";
 import { submitReceipt, type PaymentFormState } from "@/lib/actions/payments";
 
 export function ReceiptForm({
@@ -49,16 +50,16 @@ export function ReceiptForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="receipt">Transfer receipt</Label>
-        <Input
+        <FileInput
           id="receipt"
           name="receipt"
-          type="file"
           accept="image/jpeg,image/png,image/webp,application/pdf"
           required
           className="cursor-pointer file:text-primary"
         />
         <p className="text-xs text-muted-foreground">
-          Photo or PDF of your bank transfer slip — max 5 MB.
+          Photo or PDF of your bank transfer slip — photos are shrunk
+          automatically, PDFs must be under 4 MB.
         </p>
       </div>
       <Button type="submit" className="w-full" disabled={pending}>

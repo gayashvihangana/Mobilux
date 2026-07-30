@@ -452,7 +452,13 @@ export default async function AdminTicketDetailPage({
                       paidAmount: ticket.paidAmount?.toString() ?? null,
                       duration: ticket.duration,
                       parts: partsList,
-                      issuePartsCost,
+                      issues: issuesWithParts.map((issue) => ({
+                        id: issue.id,
+                        note: issue.note,
+                        status: issue.status,
+                        reportedAt: issue.reportedAt,
+                        parts: issue.parts,
+                      })),
                       adminNotes: ticket.adminNotes,
                       forgottenParts: ticket.forgottenParts,
                     }}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/forms/field-error";
+import { FileInput } from "@/components/forms/file-input";
 import {
   changePassword,
   updateProfile,
@@ -72,15 +73,15 @@ export function ProfileDetailsForm({
         </Avatar>
         <div className="flex-1 space-y-2">
           <Label htmlFor="avatar">Profile photo</Label>
-          <Input
+          <FileInput
             id="avatar"
             name="avatar"
-            type="file"
             accept="image/jpeg,image/png,image/webp"
             className="cursor-pointer file:text-primary"
           />
           <p className="text-xs text-muted-foreground">
-            JPG, PNG or WebP. Leave empty to keep your current photo.
+            JPG, PNG or WebP. Large photos are shrunk automatically. Leave empty
+            to keep your current photo.
           </p>
         </div>
       </div>

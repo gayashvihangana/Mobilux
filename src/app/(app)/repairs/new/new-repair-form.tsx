@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FieldError } from "@/components/forms/field-error";
+import { FileInput } from "@/components/forms/file-input";
 import { FormAutosave } from "@/components/forms/form-autosave";
 import { createTicket } from "@/lib/actions/tickets";
 import { DEVICE_TYPES } from "@/lib/status";
@@ -102,17 +103,16 @@ export function NewRepairForm() {
           <ImagePlus className="size-4 text-muted-foreground" />
           Photos <span className="text-muted-foreground">(optional, up to 4)</span>
         </Label>
-        <Input
+        <FileInput
           id="photos"
           name="photos"
-          type="file"
           accept="image/jpeg,image/png,image/webp"
           multiple
           className="h-11 cursor-pointer pt-2.5 file:text-primary"
         />
         <p className="text-xs text-muted-foreground">
-          JPG, PNG or WebP — max 5 MB each. Photos of the damage help us quote
-          faster.
+          JPG, PNG or WebP — large photos are shrunk automatically. Photos of
+          the damage help us quote faster.
         </p>
       </div>
 

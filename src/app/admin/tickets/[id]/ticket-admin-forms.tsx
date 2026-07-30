@@ -16,7 +16,11 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import type { DeviceType, TicketStatus } from "@prisma/client";
+import type {
+  DeviceType,
+  RepairIssueStatus,
+  TicketStatus,
+} from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,16 +49,15 @@ import {
   undoRepairIssueDecision,
   withdrawRepairIssue,
   updateBillNotes,
-  updateIssueParts,
   updateTicketDetails,
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
 import {
   ISSUE_REPORTABLE_STATUSES,
-  type IssueSummary,
   type IssueWithParts,
 } from "@/lib/repair-issue";
+import { FileInput } from "@/components/forms/file-input";
 import { PartsEditor } from "@/components/forms/parts-editor";
 import type { PartEntry } from "@/lib/parts";
 import { cn, formatDateTime, formatLKR } from "@/lib/utils";
@@ -163,11 +166,10 @@ export function StatusUpdateForm({
               Handover photo{" "}
               <span className="text-muted-foreground">(optional)</span>
             </Label>
-            <Input
+            <FileInput
               id="photo"
               name="photo"
-              type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               className="cursor-pointer text-sm file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1 file:text-sm"
             />
             <p className="text-xs text-muted-foreground">
@@ -653,24 +655,46 @@ export type TicketDetailsValues = {
   paidAmount: string | null;
   duration: string | null;
   parts: PartEntry[];
-  /** What fixing our own mistakes on this repair cost — read-only here. */
-  issuePartsCost: number;
+  /** Issues raised on this repair, each with the parts bought to fix it. */
+  issues: {
+    id: string;
+    note: string;
+    status: RepairIssueStatus;
+    reportedAt: Date;
+    parts: PartEntry[];
+  }[];
   adminNotes: string | null;
   forgottenParts: string | null;
+};
+
+const ISSUE_STATUS_LABEL: Record<RepairIssueStatus, string> = {
+  PENDING: "Awaiting the customer",
+  ACCEPTED: "Fixed free of charge",
+  DECLINED: "Cancelled with a refund",
 };
 
 export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
   const [state, formAction, pending] = useActionState(updateTicketDetails, null);
   useSuccessToast(state, "Repair details saved.");
 
-  // Live sum of the parts rows, so the read-only parts cost tracks what's
+  // Live sums of the parts rows, so the read-only parts cost tracks what's
   // being typed instead of waiting for the save.
   const [partsTotal, setPartsTotal] = useState(() =>
     values.parts.reduce((sum, p) => sum + (p.cost ?? 0), 0),
   );
+  const [issueTotals, setIssueTotals] = useState<Record<string, number>>(() =>
+    Object.fromEntries(
+      values.issues.map((issue) => [
+        issue.id,
+        issue.parts.reduce((sum, p) => sum + (p.cost ?? 0), 0),
+      ]),
+    ),
+  );
+  const issuePartsCost = Object.values(issueTotals).reduce((a, b) => a + b, 0);
+
   // A repair logged before per-part costs existed keeps its hand-typed total
   // until costs are entered below — the save follows the same rule.
-  const derivedPartsCost = partsTotal + values.issuePartsCost;
+  const derivedPartsCost = partsTotal + issuePartsCost;
   const legacyPartsCost = values.partsCost ? Number(values.partsCost) : 0;
   const usingLegacy = derivedPartsCost === 0 && legacyPartsCost > 0;
   const autoPartsCost = usingLegacy ? legacyPartsCost : derivedPartsCost;
@@ -785,8 +809,8 @@ export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
             {usingLegacy
               ? "Earlier hand-entered total — add part costs below to take over."
               : `Parts below ${formatLKR(partsTotal)}${
-                  values.issuePartsCost > 0
-                    ? ` + issue fixes ${formatLKR(values.issuePartsCost)}`
+                  issuePartsCost > 0
+                    ? ` + issue fixes ${formatLKR(issuePartsCost)}`
                     : ""
                 }`}
           </p>
@@ -823,6 +847,64 @@ export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
       </div>
 
       <PartsEditor initial={values.parts} onTotalChange={setPartsTotal} />
+
+      {/* Parts bought because something went wrong on our bench. Kept apart
+          from the repair's own parts: they're our expense, they feed the
+          error reports, and they never reach the customer's bill. */}
+      {values.issues.length > 0 ? (
+        <div className="space-y-3 rounded-xl border border-warning/30 bg-warning/5 p-4">
+          <div className="flex items-center gap-2">
+            <TriangleAlert className="size-4 shrink-0 text-warning" />
+            <p className="text-sm font-medium">Errors during the repair</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Parts we had to buy to put our own mistake right — a replacement
+            display, say. Counted in this repair&apos;s parts cost and in the
+            bench-error reports, never on the customer&apos;s bill.
+          </p>
+          {values.issues.map((issue, i) => (
+            <div
+              key={issue.id}
+              className="space-y-2 rounded-xl border border-border bg-card p-3"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-medium">
+                  {values.issues.length > 1 ? `Issue ${i + 1}: ` : ""}
+                  <span className="font-normal text-muted-foreground">
+                    {issue.note.length > 90
+                      ? `${issue.note.slice(0, 90)}…`
+                      : issue.note}
+                  </span>
+                </p>
+                <span className="text-xs whitespace-nowrap text-muted-foreground">
+                  {ISSUE_STATUS_LABEL[issue.status]} ·{" "}
+                  {formatDateTime(issue.reportedAt)}
+                </span>
+              </div>
+              <PartsEditor
+                name={`issueParts:${issue.id}`}
+                initial={issue.parts}
+                label="Parts bought to fix it"
+                hint="What this mistake cost us, with the supplier for each part."
+                partPlaceholder="e.g. Display"
+                onTotalChange={(total) =>
+                  setIssueTotals((totals) =>
+                    totals[issue.id] === total
+                      ? totals
+                      : { ...totals, [issue.id]: total },
+                  )
+                }
+              />
+            </div>
+          ))}
+          <p className="text-right text-xs text-muted-foreground">
+            Errors total{" "}
+            <span className="font-semibold text-warning tabular-nums">
+              {formatLKR(issuePartsCost)}
+            </span>
+          </p>
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="forgottenParts">Forgotten parts</Label>
@@ -1225,68 +1307,44 @@ function UndoIssueDecision({
   );
 }
 
-// What the shop had to buy to put its own mistake right. Collapsed by default
-// so the panel stays about the customer's decision; the total is on the
-// summary line so the cost is visible without opening it.
-function IssueCostForm({ issue }: { issue: IssueWithParts }) {
-  const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(updateIssueParts, null);
-  useSuccessToast(state, "Issue costs saved.");
-
-  const [total, setTotal] = useState(() =>
-    issue.parts.reduce((sum, p) => sum + (p.cost ?? 0), 0),
-  );
+// What the shop had to buy to put its own mistake right. Read-only here —
+// the parts themselves are edited under Edit details, so there's only ever
+// one place writing them.
+function IssueCostSummary({ issue }: { issue: IssueWithParts }) {
+  const total = issue.parts.reduce((sum, p) => sum + (p.cost ?? 0), 0);
 
   return (
-    <div className="rounded-xl border border-border bg-muted/30">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/40"
-      >
-        <span className="flex items-center gap-2">
+    <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-sm font-medium">
           <Package className="size-4 text-muted-foreground" />
-          <span className="font-medium">What this cost us</span>
-          <span className="text-xs text-muted-foreground">
-            {issue.parts.length > 0
-              ? `${issue.parts.length} part${issue.parts.length === 1 ? "" : "s"} · ${formatLKR(total)}`
-              : "nothing recorded"}
-          </span>
+          What this cost us
         </span>
-        <ChevronDown
-          className={cn(
-            "size-4 shrink-0 text-muted-foreground transition-transform duration-300",
-            open && "rotate-180",
-          )}
-        />
-      </button>
-      <div
-        className={cn(
-          "grid transition-all duration-300 ease-out",
-          open
-            ? "grid-rows-[1fr] opacity-100"
-            : "grid-rows-[0fr] opacity-0",
-        )}
-      >
-        <div className="overflow-hidden">
-          <form action={formAction} className="space-y-3 border-t border-border p-3">
-            <input type="hidden" name="issueId" value={issue.id} />
-            <FormError state={state} />
-            <PartsEditor
-              initial={issue.parts}
-              label="Parts bought to fix it"
-              addLabel="Add part"
-              hint="Replacement parts we paid for because of this issue, with supplier and price. Adds to the repair's parts cost and the error reports — never shown on the customer's bill."
-              onTotalChange={setTotal}
-            />
-            <Button type="submit" variant="secondary" size="sm" disabled={pending}>
-              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-              Save issue costs
-            </Button>
-          </form>
-        </div>
+        <span className="text-sm font-semibold tabular-nums">
+          {total > 0 ? formatLKR(total) : "—"}
+        </span>
       </div>
+      {issue.parts.length > 0 ? (
+        <ul className="mt-2 space-y-1">
+          {issue.parts.map((part, i) => (
+            <li
+              key={`${part.part}-${i}`}
+              className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs"
+            >
+              <span className="font-medium">{part.part}</span>
+              <span className="text-muted-foreground">
+                {part.supplier ?? "No supplier"}
+                {part.cost !== undefined ? ` · ${formatLKR(part.cost)}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">
+          No parts recorded yet — add them under Edit details. They never appear
+          on the customer&apos;s bill.
+        </p>
+      )}
     </div>
   );
 }
@@ -1329,7 +1387,7 @@ function IssueEntry({
             </p>
           )}
         </div>
-        <IssueCostForm issue={issue} />
+        <IssueCostSummary issue={issue} />
         <RecordIssueDecision issueId={issue.id} hasFix={!!issue.solution} />
         <WithdrawIssue issueId={issue.id} />
       </div>
@@ -1355,7 +1413,7 @@ function IssueEntry({
             <p className="text-muted-foreground">Agreed fix: {issue.solution}</p>
           ) : null}
         </div>
-        <IssueCostForm issue={issue} />
+        <IssueCostSummary issue={issue} />
         <UndoIssueDecision issueId={issue.id} declined={false} />
       </div>
     );
@@ -1374,7 +1432,7 @@ function IssueEntry({
         </div>
         <p className="whitespace-pre-wrap text-muted-foreground">{issue.note}</p>
       </div>
-      <IssueCostForm issue={issue} />
+      <IssueCostSummary issue={issue} />
       <UndoIssueDecision issueId={issue.id} declined />
     </div>
   );
