@@ -6,10 +6,28 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { MobileNav } from "@/components/mobile-nav";
 
-const navLinks = [
+// Visitors get the pitch; the anchors all live on the landing page.
+const guestLinks = [
   { href: "/#services", label: "Services" },
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#testimonials", label: "Reviews" },
+  { href: "/shop", label: "Shop" },
+  { href: "/track", label: "Track repair" },
+];
+
+// Signed-in visitors to the shop/track pages get their own workspace instead
+// — the landing page now redirects them away, so linking to its anchors
+// would only bounce them to the dashboard.
+const customerLinks = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/repairs", label: "My repairs" },
+  { href: "/shop", label: "Shop" },
+  { href: "/track", label: "Track repair" },
+];
+
+const adminLinks = [
+  { href: "/admin", label: "Admin" },
+  { href: "/admin/tickets", label: "Repairs" },
   { href: "/shop", label: "Shop" },
   { href: "/track", label: "Track repair" },
 ];
@@ -19,6 +37,11 @@ export async function SiteHeader() {
   const user = session?.user;
   // Logged-in users land on their dashboard, not the marketing page.
   const homeHref = user ? (user.role === "ADMIN" ? "/admin" : "/dashboard") : "/";
+  const navLinks = user
+    ? user.role === "ADMIN"
+      ? adminLinks
+      : customerLinks
+    : guestLinks;
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">

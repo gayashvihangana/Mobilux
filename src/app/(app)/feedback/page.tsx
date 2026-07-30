@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  ArrowRight,
   CheckCircle2,
   Clock,
   EyeOff,
@@ -190,12 +188,12 @@ export default async function FeedbackPage({
             </ul>
           )}
 
-          <Link
-            href="/#testimonials"
-            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-          >
-            See what other customers said <ArrowRight className="size-3.5" />
-          </Link>
+          {/* No link to the home-page rail: signed-in customers are routed
+              away from the landing page, so it would only bounce them back. */}
+          <p className="text-xs text-muted-foreground">
+            Published reviews appear on our home page for visitors looking for
+            a repair shop they can trust.
+          </p>
         </div>
       </div>
     </div>

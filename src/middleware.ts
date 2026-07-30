@@ -17,8 +17,12 @@ export default auth((req) => {
     nextUrl.pathname.startsWith("/profile") ||
     nextUrl.pathname.startsWith("/bill");
   const isAuthPage = ["/login", "/register"].includes(nextUrl.pathname);
+  // The marketing landing page is for visitors. Someone who is signed in
+  // opening the bare domain (bookmark, home-screen shortcut, typed URL)
+  // wants their own workspace, not the sales pitch.
+  const isLanding = nextUrl.pathname === "/";
 
-  if (isAuthPage && isLoggedIn) {
+  if ((isAuthPage || isLanding) && isLoggedIn) {
     return NextResponse.redirect(
       new URL(user.role === "ADMIN" ? "/admin" : "/dashboard", nextUrl),
     );
