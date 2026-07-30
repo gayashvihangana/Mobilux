@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Clock, Inbox, Users, Wrench } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Banknote,
+  Clock,
+  Inbox,
+  PackageCheck,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
@@ -38,6 +47,66 @@ const SUCCESS_STATUSES = ["COMPLETED", "READY_FOR_PICKUP", "PICKED_UP"] as const
 const pct = (value: number) => `${value.toFixed(1)}%`;
 const int = (value: number) => Math.round(value).toLocaleString("en-LK");
 
+// A repair is owed money when it has been billed and nothing has been
+// recorded against it — no manual paid amount, no verified online payment.
+const UNPAID_WHERE = {
+  finalCost: { not: null },
+  paidAt: null,
+  paidAmount: null,
+  status: { not: "CANCELLED" },
+  payments: { none: { status: "PAID" } },
+} as const;
+
+function waitingFor(date: Date | null) {
+  if (!date) return "—";
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
+}
+
+// One line in the pending-payment / pending-pickup queues.
+function QueueRow({
+  href,
+  title,
+  subtitle,
+  meta,
+  metaSub,
+  urgent,
+}: {
+  href: string;
+  title: string;
+  subtitle: string;
+  meta: string;
+  metaSub: string;
+  urgent?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card/60 px-3.5 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+    >
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium transition-colors group-hover:text-primary">
+          {title}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-semibold tabular-nums">{meta}</p>
+        <p
+          className={cn(
+            "text-[11px]",
+            urgent ? "font-medium text-warning" : "text-muted-foreground",
+          )}
+        >
+          {metaSub}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
 export default async function AdminOverviewPage() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -53,6 +122,9 @@ export default async function AdminOverviewPage() {
     paidByTicket,
     customerDates,
     issues,
+    unpaidTickets,
+    unpaidTotals,
+    pickupTickets,
   ] = await Promise.all([
     prisma.repairTicket.count({ where: { status: "SUBMITTED" } }),
     prisma.repairTicket.count({
@@ -91,6 +163,48 @@ export default async function AdminOverviewPage() {
     }),
     prisma.repairIssue.findMany({
       select: { ticketId: true, status: true, parts: true, reportedAt: true },
+    }),
+    // Billed, still owed — oldest invoice first, that's the one to chase.
+    prisma.repairTicket.findMany({
+      where: UNPAID_WHERE,
+      orderBy: { billGeneratedAt: { sort: "asc", nulls: "last" } },
+      take: 5,
+      select: {
+        id: true,
+        ticketNumber: true,
+        brand: true,
+        model: true,
+        finalCost: true,
+        billGeneratedAt: true,
+        createdAt: true,
+        customerName: true,
+        customer: { select: { name: true } },
+      },
+    }),
+    prisma.repairTicket.aggregate({
+      where: UNPAID_WHERE,
+      _count: { _all: true },
+      _sum: { finalCost: true },
+    }),
+    // Fixed and still on the shelf — longest wait first.
+    prisma.repairTicket.findMany({
+      where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
+      orderBy: { completedAt: { sort: "asc", nulls: "last" } },
+      take: 5,
+      select: {
+        id: true,
+        ticketNumber: true,
+        brand: true,
+        model: true,
+        completedAt: true,
+        createdAt: true,
+        finalCost: true,
+        paidAt: true,
+        paidAmount: true,
+        customerName: true,
+        customer: { select: { name: true } },
+        payments: { where: { status: "PAID" }, select: { id: true }, take: 1 },
+      },
     }),
   ]);
 
@@ -206,6 +320,9 @@ export default async function AdminOverviewPage() {
     (sum, s) => sum + (countByStatus[s] ?? 0),
     0,
   );
+
+  const unpaidCount = unpaidTotals._count._all;
+  const unpaidTotal = Number(unpaidTotals._sum.finalCost ?? 0);
 
   // ── Bench errors ──────────────────────────────────────────────
   const affectedTickets = new Set(issues.map((i) => i.ticketId)).size;
@@ -576,6 +693,123 @@ export default async function AdminOverviewPage() {
             </p>
           </Link>
         ))}
+      </div>
+
+      {/* Two things that need chasing: money owed, devices on the shelf */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-display flex items-center gap-2 text-lg font-semibold">
+                <Banknote className="size-5 text-warning" /> Pending payment
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {unpaidCount === 0
+                  ? "Every bill is settled."
+                  : `${unpaidCount} bill${unpaidCount === 1 ? "" : "s"} · ${formatLKR(unpaidTotal)} outstanding`}
+              </p>
+            </div>
+            {unpaidCount > 0 ? (
+              <Link
+                href="/admin/tickets?status=unpaid"
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                View all <ArrowRight className="size-3.5" />
+              </Link>
+            ) : null}
+          </div>
+
+          {unpaidTickets.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
+              <BadgeCheck className="mx-auto size-6 text-success" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nothing outstanding — every invoice has been paid.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {unpaidTickets.map((ticket) => {
+                const billed = ticket.billGeneratedAt ?? ticket.createdAt;
+                const days = Math.floor(
+                  (Date.now() - billed.getTime()) / 86_400_000,
+                );
+                return (
+                  <QueueRow
+                    key={ticket.id}
+                    href={`/admin/tickets/${ticket.id}`}
+                    title={
+                      [ticket.brand, ticket.model].filter(Boolean).join(" ") ||
+                      ticket.ticketNumber
+                    }
+                    subtitle={`${ticket.customer?.name ?? ticket.customerName ?? "Walk-in"} · ${ticket.ticketNumber}`}
+                    meta={formatLKR(Number(ticket.finalCost ?? 0))}
+                    metaSub={`waiting ${waitingFor(billed)}`}
+                    urgent={days >= 7}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-display flex items-center gap-2 text-lg font-semibold">
+                <PackageCheck className="size-5 text-primary" /> Pending pickup
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {readyCount === 0
+                  ? "The shelf is clear."
+                  : `${readyCount} device${readyCount === 1 ? "" : "s"} fixed and waiting to be collected`}
+              </p>
+            </div>
+            {readyCount > 0 ? (
+              <Link
+                href="/admin/tickets?status=COMPLETED"
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                View all <ArrowRight className="size-3.5" />
+              </Link>
+            ) : null}
+          </div>
+
+          {pickupTickets.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
+              <PackageCheck className="mx-auto size-6 text-success" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nothing waiting to be collected.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {pickupTickets.map((ticket) => {
+                const since = ticket.completedAt ?? ticket.createdAt;
+                const days = Math.floor(
+                  (Date.now() - since.getTime()) / 86_400_000,
+                );
+                const settled =
+                  ticket.payments.length > 0 ||
+                  ticket.paidAt !== null ||
+                  ticket.paidAmount !== null;
+                return (
+                  <QueueRow
+                    key={ticket.id}
+                    href={`/admin/tickets/${ticket.id}`}
+                    title={
+                      [ticket.brand, ticket.model].filter(Boolean).join(" ") ||
+                      ticket.ticketNumber
+                    }
+                    subtitle={`${ticket.customer?.name ?? ticket.customerName ?? "Walk-in"} · ${ticket.ticketNumber}`}
+                    meta={settled ? "Paid" : "Unpaid"}
+                    metaSub={`ready ${waitingFor(since)}`}
+                    urgent={days >= 5}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
 
       {/* Pipeline breakdown */}
