@@ -8,7 +8,6 @@ import {
   Inbox,
   PackageCheck,
   Users,
-  Wrench,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { LinkedTableRow } from "@/components/linked-table-row";
@@ -29,6 +28,7 @@ import {
   type Kpi,
   type MonthPoint,
 } from "./overview-dashboard";
+import { ActiveRepairsBoard, type ActiveRepair } from "./active-repairs";
 
 export const metadata: Metadata = {
   title: "Admin overview",
@@ -125,6 +125,8 @@ export default async function AdminOverviewPage() {
     unpaidTickets,
     unpaidTotals,
     pickupTickets,
+    activeTickets,
+    attentionCount,
   ] = await Promise.all([
     prisma.repairTicket.count({ where: { status: "SUBMITTED" } }),
     prisma.repairTicket.count({
@@ -204,6 +206,39 @@ export default async function AdminOverviewPage() {
         customerName: true,
         customer: { select: { name: true } },
         payments: { where: { status: "PAID" }, select: { id: true }, take: 1 },
+      },
+    }),
+    // On the bench right now — quietest first, so the repair nobody has
+    // touched in days is the first card the shop sees.
+    prisma.repairTicket.findMany({
+      where: { status: { in: [...ACTIVE_STATUSES] } },
+      orderBy: { updatedAt: "asc" },
+      take: 9,
+      select: {
+        id: true,
+        ticketNumber: true,
+        deviceType: true,
+        brand: true,
+        model: true,
+        issueTitle: true,
+        status: true,
+        technician: true,
+        estimatedCost: true,
+        finalCost: true,
+        createdAt: true,
+        updatedAt: true,
+        customerName: true,
+        customer: { select: { name: true } },
+        issues: { where: { status: "PENDING" }, select: { id: true } },
+      },
+    }),
+    prisma.repairTicket.count({
+      where: {
+        status: { in: [...ACTIVE_STATUSES] },
+        OR: [
+          { updatedAt: { lt: new Date(Date.now() - 3 * 86_400_000) } },
+          { issues: { some: { status: "PENDING" } } },
+        ],
       },
     }),
   ]);
@@ -607,6 +642,39 @@ export default async function AdminOverviewPage() {
     },
   ];
 
+  // ── The bench ─────────────────────────────────────────────────
+  // Serialised for the board: Decimals become numbers, dates ISO strings.
+  // Anything with an unanswered bench error jumps the queue, then whatever
+  // has gone quietest (the fetch already ordered by that).
+  const activeRepairs: ActiveRepair[] = activeTickets
+    .map((t) => ({
+      id: t.id,
+      ticketNumber: t.ticketNumber,
+      deviceType: t.deviceType,
+      brand: t.brand,
+      model: t.model,
+      issueTitle: t.issueTitle,
+      status: t.status,
+      customer: t.customer?.name ?? t.customerName ?? "Walk-in",
+      technician: t.technician,
+      cost: t.finalCost
+        ? Number(t.finalCost)
+        : t.estimatedCost
+          ? Number(t.estimatedCost)
+          : null,
+      costIsQuote: !t.finalCost && t.estimatedCost !== null,
+      createdAt: t.createdAt.toISOString(),
+      updatedAt: t.updatedAt.toISOString(),
+      openIssues: t.issues.length,
+    }))
+    .sort((a, b) => Number(b.openIssues > 0) - Number(a.openIssues > 0))
+    .slice(0, 6);
+
+  const activeStageCounts = ACTIVE_STATUSES.map((status) => ({
+    status,
+    count: countByStatus[status] ?? 0,
+  })).filter((s) => s.count > 0);
+
   // Small "right now" links — navigation, not insight, so they stay links.
   const todayLinks = [
     {
@@ -616,14 +684,6 @@ export default async function AdminOverviewPage() {
       icon: Inbox,
       tone: pendingCount > 0 ? "text-warning" : "text-muted-foreground",
       highlight: pendingCount > 0,
-    },
-    {
-      label: "Active repairs",
-      value: activeCount,
-      href: "/admin/tickets",
-      icon: Wrench,
-      tone: "text-primary",
-      highlight: false,
     },
     {
       label: "Awaiting pickup",
@@ -654,6 +714,15 @@ export default async function AdminOverviewPage() {
         </p>
       </div>
 
+      {/* What's on the bench right now — the first thing the shop needs. */}
+      <ActiveRepairsBoard
+        repairs={activeRepairs}
+        total={activeCount}
+        attention={attentionCount}
+        stageCounts={activeStageCounts}
+        pendingCount={pendingCount}
+      />
+
       <OverviewDashboard
         hero={{
           profit,
@@ -671,7 +740,7 @@ export default async function AdminOverviewPage() {
       />
 
       {/* Right now */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         {todayLinks.map((item) => (
           <Link
             key={item.label}
