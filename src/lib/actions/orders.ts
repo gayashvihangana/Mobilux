@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { actionAdmin, actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { phonesVisible } from "@/lib/settings";
 import { sendEmail } from "@/lib/email";
@@ -19,8 +19,8 @@ export async function createOrder(
   _prev: OrderFormState,
   formData: FormData,
 ): Promise<OrderFormState> {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const user = await actionUser();
+  if (!user) redirect("/login");
 
   const parsed = z
     .object({
@@ -61,7 +61,7 @@ export async function createOrder(
     }
     const created = await tx.order.create({
       data: {
-        userId: session.user.id,
+        userId: user.id,
         orderNumber: `TMP-${crypto.randomUUID()}`,
         total,
         items: {
@@ -104,8 +104,7 @@ export async function updateOrderStatus(
   _prev: OrderFormState,
   formData: FormData,
 ): Promise<OrderFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const parsed = z
     .object({

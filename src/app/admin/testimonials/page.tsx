@@ -196,6 +196,9 @@ export default async function AdminTestimonialsPage({
               adminNote: item.adminNote,
               status: item.status,
               featured: item.featured,
+              // Drives what the edit dialog will let the shop change — a
+              // customer's own words are read-only.
+              authored: item.userId ? "customer" : "shop",
             };
             const badge = STATUS_BADGE[item.status];
             const index = railIndex.get(item.id);

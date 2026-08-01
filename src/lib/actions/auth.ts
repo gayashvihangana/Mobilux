@@ -5,6 +5,7 @@ import { AuthError } from "next-auth";
 import { z } from "zod";
 import { signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { limitByIp, limitByKey, waitMessage } from "@/lib/rate-limit";
 
 export type AuthFormState = {
   error?: string;
@@ -41,6 +42,15 @@ export async function register(
 
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  // Stops one address bulk-creating accounts, which would otherwise flood the
+  // admin's customer list and the notification bell.
+  const throttle = await limitByIp("register");
+  if (!throttle.ok) {
+    return {
+      error: `Too many accounts created from here. Please try again in ${waitMessage(throttle.retryAfter)}.`,
+    };
   }
 
   const { name, email, phone, password } = parsed.data;
@@ -92,6 +102,22 @@ export async function login(
 
   const email = parsed.data.email.toLowerCase();
 
+  // Throttled on both axes: per IP so one machine can't grind through a
+  // password list, and per email so a botnet spread across many addresses
+  // still can't hammer one known admin account. Checked before any bcrypt
+  // work, since each hash is ~250ms of server CPU an attacker would
+  // otherwise get to spend for free.
+  const [byIp, byEmail] = await Promise.all([
+    limitByIp("login"),
+    limitByKey("login", email),
+  ]);
+  if (!byIp.ok || !byEmail.ok) {
+    const retry = Math.max(byIp.retryAfter, byEmail.retryAfter);
+    return {
+      error: `Too many sign-in attempts. Please try again in ${waitMessage(retry)}.`,
+    };
+  }
+
   // If the account is blocked, tell the customer directly (only once we've
   // confirmed the password, so we don't reveal which emails are blocked).
   const account = await prisma.user.findUnique({ where: { email } });
@@ -134,6 +160,11 @@ export async function requestUnblock(
 ): Promise<{ ok: boolean; already?: boolean }> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return { ok: false };
+
+  // Reachable without signing in and it notifies every admin, so it needs its
+  // own ceiling regardless of the idempotency guard below.
+  const throttle = await limitByIp("unblock");
+  if (!throttle.ok) return { ok: false };
 
   const user = await prisma.user.findUnique({ where: { email: normalized } });
   if (!user || !user.blocked) return { ok: false };

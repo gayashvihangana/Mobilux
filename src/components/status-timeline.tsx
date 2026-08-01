@@ -1,6 +1,18 @@
-import type { StatusUpdate, TicketStatus } from "@prisma/client";
+import type { TicketStatus } from "@prisma/client";
 import { Check, TriangleAlert, X } from "lucide-react";
 import type { IssueSummary } from "@/lib/repair-issue";
+
+// Only what the timeline actually renders — deliberately not Prisma's full
+// StatusUpdate. The public tracker queries a narrow column list that has no
+// `note` or `photo` at all, and typing it this way means the compiler proves
+// those columns never reach a signed-out page rather than trusting a flag.
+export type TimelineUpdate = {
+  id: string;
+  status: TicketStatus;
+  createdAt: Date;
+  note?: string | null;
+  photo?: string | null;
+};
 import {
   currentActivityLabel,
   doneLabel,
@@ -391,11 +403,22 @@ export function StatusHistory({
   status,
   ctx,
   issues,
+  publicView = false,
 }: {
-  updates: StatusUpdate[];
+  updates: TimelineUpdate[];
   status?: TicketStatus;
   ctx?: MilestoneContext;
   issues?: IssueSummary[] | null;
+  /**
+   * Rendering for the signed-out tracker, where the only credential is a link
+   * that may have been forwarded on. Milestones and dates still show — that is
+   * the whole point of the page — but the shop's free-text notes and handover
+   * photos do not. Admins write those notes for themselves and they routinely
+   * carry the customer's passcode, phone number or address; a photo taken at
+   * collection can show the customer. The signed-in owner sees everything on
+   * /repairs/[id].
+   */
+  publicView?: boolean;
 }) {
   // Steps after the one happening now — shown furthest-away first (top).
   let upcoming: TicketStatus[] = [];
@@ -417,7 +440,11 @@ export function StatusHistory({
       kind: "update" as const,
       update: u,
     })),
-    ...issueEvents(issues).map((e) => ({
+    // Issue rows quote what went wrong verbatim ("we cracked the back glass
+    // on this one"). The stepper still signals that a decision is pending, so
+    // a signed-out visitor learns the repair needs their attention without
+    // the dispute itself being readable from a forwarded link.
+    ...(publicView ? [] : issueEvents(issues)).map((e) => ({
       key: e.key,
       at: e.at,
       kind: "issue" as const,
@@ -477,9 +504,11 @@ export function StatusHistory({
                 </p>
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                {update.note ?? milestoneDescription(update.status, ctx)}
+                {publicView
+                  ? milestoneDescription(update.status, ctx)
+                  : (update.note ?? milestoneDescription(update.status, ctx))}
               </p>
-              {update.photo ? (
+              {update.photo && !publicView ? (
                 <a
                   href={update.photo}
                   target="_blank"

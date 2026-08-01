@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
-import { auth } from "@/auth";
+import { requireAdmin } from "@/lib/auth-guard";
 import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
 import { AdminNav, type AdminNavGroup } from "@/components/admin-nav";
@@ -48,9 +47,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-  if (session.user.role !== "ADMIN") redirect("/dashboard");
+  // Re-checked against the database, not just the JWT — a demoted or blocked
+  // admin loses the panel on their next request, not in eight hours.
+  const user = await requireAdmin();
 
   return (
     <div className="min-h-dvh">
@@ -73,11 +72,11 @@ export default async function AdminLayout({
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
             <ThemeToggle />
-            <Notifications userId={session.user.id} />
+            <Notifications userId={user.id} />
             <UserMenu
-              name={session.user.name ?? "Admin"}
-              email={session.user.email ?? ""}
-              image={session.user.image}
+              name={user.name}
+              email={user.email}
+              image={user.image ?? undefined}
               isAdmin
             />
           </div>

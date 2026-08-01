@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Newsreader } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { SITE_URL } from "@/lib/config";
+import { SHOP, SITE_URL } from "@/lib/config";
 import "./globals.css";
 
 const inter = Inter({
@@ -22,36 +22,44 @@ const newsreader = Newsreader({
   style: ["normal", "italic"],
 });
 
-const SITE_DESCRIPTION =
-  "Phone repair in Colombo you can watch happen — submit repairs online, track live status, pay securely in LKR, and shop hand-checked accessories.";
+// Shop-specific, so it follows SHOP rather than being hardcoded — a second
+// shop running this should not be publishing Mobilux's name and city.
+const SITE_TITLE = `${SHOP.name} — Phone Repair & Accessories${
+  SHOP.city ? ` in ${SHOP.city.split(",")[0]}` : ""
+}`;
+
+const SITE_DESCRIPTION = `Phone repair you can watch happen — submit repairs online, track live status, pay securely in LKR, and shop hand-checked accessories${
+  SHOP.city ? ` in ${SHOP.city}` : ""
+}.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Mobilux — Phone Repair & Accessories in Colombo",
-    template: "%s | Mobilux",
+    default: SITE_TITLE,
+    template: `%s | ${SHOP.name}`,
   },
   description: SITE_DESCRIPTION,
-  applicationName: "Mobilux",
+  applicationName: SHOP.name,
   keywords: [
-    "phone repair Colombo",
-    "mobile repair Sri Lanka",
+    "phone repair",
+    "mobile repair",
     "screen replacement",
     "battery replacement",
-    "phone accessories Sri Lanka",
+    "phone accessories",
     "repair tracking",
+    ...(SHOP.city ? [`phone repair ${SHOP.city.split(",")[0]}`] : []),
   ],
   openGraph: {
     type: "website",
-    siteName: "Mobilux",
-    title: "Mobilux — Phone Repair & Accessories in Colombo",
+    siteName: SHOP.name,
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: "/",
     locale: "en_LK",
   },
   twitter: {
     card: "summary",
-    title: "Mobilux — Phone Repair & Accessories in Colombo",
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
   },
   robots: { index: true, follow: true },

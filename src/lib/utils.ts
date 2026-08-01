@@ -58,3 +58,16 @@ export function formatDateTime(date: Date | string) {
     timeZone: "Asia/Colombo",
   }).format(new Date(date));
 }
+
+// Serialise structured data for an inline <script type="application/ld+json">.
+// JSON.stringify leaves `<` and `&` alone, so a product name or description
+// holding `</script>` would close the tag early and let whatever follows it
+// execute. Rewriting those characters as JSON unicode escapes keeps the value
+// identical to a JSON parser while leaving nothing for the HTML tokeniser to
+// act on.
+export function jsonLdScript(data: unknown): string {
+  return JSON.stringify(data).replace(
+    /[<>&]/g,
+    (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"),
+  );
+}

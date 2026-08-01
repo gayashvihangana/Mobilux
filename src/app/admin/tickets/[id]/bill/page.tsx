@@ -28,7 +28,7 @@ export default async function CreateBillPage({
 
   const totals = computeBill(result.bill);
   const [trackQr, defaultPayTo, defaultShow] = await Promise.all([
-    trackQrDataUrl(result.bill.ticketNumber),
+    trackQrDataUrl(result.trackToken),
     getShopPayTo(),
     getDefaultBillShow(),
   ]);

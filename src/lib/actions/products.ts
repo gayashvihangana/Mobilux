@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/auth";
+import { actionAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import { PHONES_VISIBLE_KEY, setSetting } from "@/lib/settings";
@@ -31,8 +31,7 @@ function slugify(name: string) {
 }
 
 async function requireAdmin() {
-  const session = await auth();
-  return session?.user?.role === "ADMIN" ? session : null;
+  return actionAdmin();
 }
 
 function revalidateShop() {

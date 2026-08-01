@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { TestimonialStatus } from "@prisma/client";
-import { auth } from "@/auth";
+import { actionAdmin, actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { DONE_TICKET_STATUSES } from "@/lib/completed-repairs";
 import {
@@ -24,13 +24,11 @@ export type TestimonialFormState = {
 } | null;
 
 async function requireUser() {
-  const session = await auth();
-  return session?.user ?? null;
+  return actionUser();
 }
 
 async function requireAdmin() {
-  const session = await auth();
-  return session?.user?.role === "ADMIN" ? session.user : null;
+  return actionAdmin();
 }
 
 // The home page renders approved testimonials, so every change has to reach
@@ -234,6 +232,10 @@ export async function createTestimonial(
   return { success: true };
 }
 
+// Edits the shop's OWN walk-in entries only. A review a customer wrote is
+// published under their name and avatar, so the shop moderates it — publish,
+// hide, pin, delete — but never rewrites their words or their star rating.
+// Enforced here rather than only in the UI: the id arrives from the client.
 export async function updateTestimonial(
   _prev: TestimonialFormState,
   formData: FormData,
@@ -242,6 +244,18 @@ export async function updateTestimonial(
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Feedback not found." };
+
+  const existing = await prisma.testimonial.findUnique({
+    where: { id },
+    select: { userId: true },
+  });
+  if (!existing) return { error: "Feedback not found." };
+  if (existing.userId) {
+    return {
+      error:
+        "This review was written by the customer — it can't be edited. You can hide or delete it instead.",
+    };
+  }
 
   const parsed = adminSchema.safeParse({
     rating: formData.get("rating"),
@@ -264,6 +278,35 @@ export async function updateTestimonial(
       adminNote: parsed.data.adminNote || null,
     },
   });
+
+  revalidateTestimonials();
+  return { success: true };
+}
+
+// The internal note is the shop's own moderation record — never rendered on
+// the site — so it stays editable on a customer's review even though nothing
+// else about it is.
+const noteSchema = z.string().trim().max(300, "Keep the note under 300 characters");
+
+export async function updateTestimonialNote(
+  _prev: TestimonialFormState,
+  formData: FormData,
+): Promise<TestimonialFormState> {
+  if (!(await requireAdmin())) return { error: "Not authorized." };
+
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) return { error: "Feedback not found." };
+
+  const parsed = noteSchema.safeParse(formData.get("adminNote") ?? "");
+  if (!parsed.success) {
+    return { fieldErrors: { adminNote: parsed.error.flatten().formErrors } };
+  }
+
+  const updated = await prisma.testimonial.updateMany({
+    where: { id },
+    data: { adminNote: parsed.data || null },
+  });
+  if (updated.count === 0) return { error: "Feedback not found." };
 
   revalidateTestimonials();
   return { success: true };

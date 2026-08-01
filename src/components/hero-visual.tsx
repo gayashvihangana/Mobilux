@@ -5,8 +5,9 @@ import {
   Smartphone,
   Wrench,
 } from "lucide-react";
+import { SHOP } from "@/lib/config";
 
-// Hero cover art: a phone running the Mobilux tracker, built from theme
+// Hero cover art: a phone running the shop's tracker, built from theme
 // tokens so it matches light and dark mode exactly — no photo needed.
 export function HeroVisual() {
   return (
@@ -34,7 +35,7 @@ export function HeroVisual() {
                 <span className="grid size-5 place-items-center rounded-md bg-primary/15">
                   <Smartphone className="size-3 text-primary" />
                 </span>
-                <span className="font-display text-xs font-bold">Mobilux</span>
+                <span className="font-display text-xs font-bold">{SHOP.name}</span>
               </div>
               <span className="relative">
                 <Bell className="size-3.5 text-muted-foreground" />

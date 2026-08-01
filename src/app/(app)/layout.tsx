@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
-import { auth } from "@/auth";
+import { requireUser } from "@/lib/auth-guard";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -15,9 +15,9 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-  if (session.user.role === "ADMIN") redirect("/admin");
+  // Database-checked, so a blocked customer is out on their next request.
+  const user = await requireUser();
+  if (user.role === "ADMIN") redirect("/admin");
 
   return (
     <div className="min-h-dvh">
@@ -54,11 +54,11 @@ export default async function AppLayout({
               </Link>
             </Button>
             <ThemeToggle />
-            <Notifications userId={session.user.id} />
+            <Notifications userId={user.id} />
             <UserMenu
-              name={session.user.name ?? "User"}
-              email={session.user.email ?? ""}
-              image={session.user.image}
+              name={user.name}
+              email={user.email}
+              image={user.image ?? undefined}
               isAdmin={false}
             />
           </div>

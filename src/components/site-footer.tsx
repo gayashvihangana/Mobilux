@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { Logo } from "@/components/logo";
+import { SHOP } from "@/lib/config";
 
 // The landing-page anchors only work for signed-out visitors — anyone with a
 // session is redirected off "/" — so the footer swaps to their own links.
@@ -60,7 +61,7 @@ export async function SiteFooter() {
           ))}
         </nav>
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Mobilux
+          © {new Date().getFullYear()} {SHOP.name}
         </p>
       </div>
     </footer>

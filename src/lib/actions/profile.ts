@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { auth, updateSession } from "@/auth";
+import { updateSession } from "@/auth";
+import { actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 
@@ -27,8 +28,8 @@ export async function updateProfile(
   _prev: ProfileFormState,
   formData: FormData,
 ): Promise<ProfileFormState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not signed in." };
+  const user = await actionUser();
+  if (!user) return { error: "Not signed in." };
 
   const parsed = profileSchema.safeParse({
     name: formData.get("name"),
@@ -51,8 +52,8 @@ export async function updateProfile(
     avatarUrl = uploaded.urls[0];
   }
 
-  const user = await prisma.user.update({
-    where: { id: session.user.id },
+  const updated = await prisma.user.update({
+    where: { id: user.id },
     data: {
       name: parsed.data.name,
       phone: parsed.data.phone || null,
@@ -62,7 +63,7 @@ export async function updateProfile(
   });
 
   await updateSession({
-    user: { name: user.name, image: user.avatarUrl },
+    user: { name: updated.name, image: updated.avatarUrl },
   });
 
   revalidatePath("/profile");
@@ -87,8 +88,8 @@ export async function changePassword(
   _prev: ProfileFormState,
   formData: FormData,
 ): Promise<ProfileFormState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not signed in." };
+  const user = await actionUser();
+  if (!user) return { error: "Not signed in." };
 
   const parsed = passwordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
@@ -99,25 +100,32 @@ export async function changePassword(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+  const account = await prisma.user.findUnique({
+    where: { id: user.id },
     select: { passwordHash: true },
   });
-  if (!user) return { error: "Account not found." };
+  if (!account) return { error: "Account not found." };
 
   const valid = await bcrypt.compare(
     parsed.data.currentPassword,
-    user.passwordHash,
+    account.passwordHash,
   );
   if (!valid) {
     return { fieldErrors: { currentPassword: ["Current password is incorrect"] } };
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+  // Changing a password is how someone reacts to a device being stolen, so it
+  // has to end the sessions on that device. sessionsValidFrom invalidates
+  // every token issued before now; re-issuing this one keeps the person who
+  // just typed their old password correctly signed in. (If the re-issue
+  // doesn't carry a fresh timestamp they simply sign in again with the new
+  // password — the revocation is what matters.)
   await prisma.user.update({
-    where: { id: session.user.id },
-    data: { passwordHash },
+    where: { id: user.id },
+    data: { passwordHash, sessionsValidFrom: new Date() },
   });
+  await updateSession({ user: { name: user.name } });
 
   return { success: true };
 }

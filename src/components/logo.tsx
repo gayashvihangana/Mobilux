@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Smartphone } from "lucide-react";
+import { SHOP } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 export function Logo({
@@ -18,7 +19,7 @@ export function Logo({
         <Smartphone className="size-4.5 text-primary" />
       </span>
       <span className="font-display text-xl font-bold tracking-tight">
-        Mobilux
+        {SHOP.name}
       </span>
     </Link>
   );

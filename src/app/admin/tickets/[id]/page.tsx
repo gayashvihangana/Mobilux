@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
+import { TrackingLink } from "@/components/tracking-link";
+import { trackUrl } from "@/lib/track-qr";
 import { StatusStepper } from "@/components/status-timeline";
 import { EditableStatusHistory } from "./editable-status-history";
 import { JournalNote } from "@/components/journal-note";
@@ -34,6 +36,7 @@ import { parseReceivedItems } from "@/lib/received-items";
 import { parseParts, partsTotalCost, partsWithFallback } from "@/lib/parts";
 import { issueChip } from "@/lib/repair-issue";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
+import { SHOP } from "@/lib/config";
 import {
   AcceptTicketForm,
   BillNotesForm,
@@ -55,10 +58,12 @@ function toDateInput(date: Date | null) {
 
 export default async function AdminTicketDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ created?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { created }] = await Promise.all([params, searchParams]);
 
   const [ticket, customers] = await Promise.all([
     prisma.repairTicket.findUnique({
@@ -204,6 +209,14 @@ export default async function AdminTicketDetailPage({
           />
         </CardContent>
       </Card>
+
+      {/* Highlighted straight after logging a repair: handing this link over
+          is the last step of taking in a walk-in device. */}
+      <TrackingLink
+        url={trackUrl(ticket.trackToken)}
+        ticketNumber={ticket.ticketNumber}
+        className={created ? "border-primary/40 bg-primary/[0.04]" : undefined}
+      />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
@@ -519,8 +532,8 @@ export default async function AdminTicketDetailPage({
                   ) : null}
                   <p className="text-muted-foreground">
                     {ticket.customer.completedRepairs} completed repair
-                    {ticket.customer.completedRepairs === 1 ? "" : "s"} with
-                    Mobilux
+                    {ticket.customer.completedRepairs === 1 ? "" : "s"} with{" "}
+                    {SHOP.name}
                   </p>
                 </>
               ) : (

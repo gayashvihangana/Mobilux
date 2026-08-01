@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { actionAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 
 export type CustomerFormState = {
@@ -13,8 +13,7 @@ export type CustomerFormState = {
 } | null;
 
 async function requireAdmin() {
-  const session = await auth();
-  return session?.user?.role === "ADMIN" ? session : null;
+  return actionAdmin();
 }
 
 function revalidateCustomers() {
@@ -99,7 +98,15 @@ export async function setCustomerBlocked(
 
   await prisma.user.update({
     where: { id },
-    data: { blocked, unblockRequested: false },
+    data: {
+      blocked,
+      unblockRequested: false,
+      // Blocking has to take effect now, not whenever their cookie expires.
+      // currentUser() rejects the account outright while `blocked` is set, and
+      // moving the cut-off means even unblocking later won't revive the old
+      // token — they sign in fresh.
+      ...(blocked ? { sessionsValidFrom: new Date() } : {}),
+    },
   });
 
   revalidateCustomers();

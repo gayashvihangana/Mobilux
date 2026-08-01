@@ -126,7 +126,7 @@ export function BankAccountDialog({ account }: { account?: BankAccount }) {
                 id="accountName"
                 name="accountName"
                 defaultValue={account?.accountName ?? ""}
-                placeholder="e.g. Mobilux (Pvt) Ltd"
+                placeholder="e.g. Your Shop (Pvt) Ltd"
                 required
               />
               <FieldError errors={state?.fieldErrors?.accountName} />

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma, type TicketStatus } from "@prisma/client";
-import { auth } from "@/auth";
+import { actionAdmin, actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { computeBill, resolveBillShow } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
@@ -95,8 +95,8 @@ export async function createTicket(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const user = await actionUser();
+  if (!user) redirect("/login");
 
   const parsed = createTicketSchema.safeParse({
     deviceType: formData.get("deviceType"),
@@ -120,7 +120,7 @@ export async function createTicket(
     const created = await tx.repairTicket.create({
       data: {
         ...parsed.data,
-        customerId: session.user.id,
+        customerId: user.id,
         photos: uploaded.urls ?? [],
         ticketNumber,
         // Online submissions wait for shop acceptance before entering the
@@ -323,8 +323,7 @@ export async function adminCreateTicket(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const parsed = parseAdminTicketForm(formData);
   if (!parsed.success) {
@@ -378,7 +377,10 @@ export async function adminCreateTicket(
 
   revalidatePath("/admin/tickets");
   revalidatePath("/admin");
-  redirect(`/admin/tickets/${ticket.id}`);
+  // ?created=1 highlights the customer tracking link on the detail page —
+  // for a walk-in with no account, sending that link is the last step of
+  // booking the device in.
+  redirect(`/admin/tickets/${ticket.id}?created=1`);
 }
 
 // ── Admin: edit full repair details ──────────────────────────────
@@ -387,8 +389,7 @@ export async function updateTicketDetails(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -475,8 +476,7 @@ export async function updateBillNotes(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -528,8 +528,7 @@ export async function generateBill(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const parsed = generateBillSchema.safeParse({
     ticketId: formData.get("ticketId"),
@@ -665,8 +664,7 @@ export async function markBillPaid(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const parsed = markPaidSchema.safeParse({
     ticketId: formData.get("ticketId"),
@@ -702,8 +700,7 @@ export async function markBillUnpaid(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -728,8 +725,7 @@ export async function linkTicketCustomer(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const ticketId = formData.get("ticketId");
   const userId = formData.get("userId");
@@ -799,8 +795,7 @@ export async function updateStatusNote(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const parsed = updateNoteSchema.safeParse({
     updateId: formData.get("updateId"),
@@ -831,8 +826,7 @@ export async function deleteStatusUpdate(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const updateId = formData.get("updateId");
   if (typeof updateId !== "string" || !updateId) {
@@ -997,8 +991,7 @@ export async function updateTicketStatus(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
+  if (!(await actionAdmin())) {
     return { error: "Not authorized." };
   }
 
@@ -1168,8 +1161,7 @@ export async function deleteTicket(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -1223,8 +1215,7 @@ export async function reportRepairIssue(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const parsed = reportIssueSchema.safeParse({
     ticketId: formData.get("ticketId"),
@@ -1329,8 +1320,7 @@ export async function undoRepairIssueDecision(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const issueId = formData.get("issueId");
   if (typeof issueId !== "string") return { error: "Invalid issue." };
@@ -1431,8 +1421,7 @@ export async function withdrawRepairIssue(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const issueId = formData.get("issueId");
   if (typeof issueId !== "string") return { error: "Invalid issue." };
@@ -1494,8 +1483,8 @@ export async function respondRepairIssue(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  const session = await auth();
-  if (!session?.user) return { error: "Not authorized." };
+  const user = await actionUser();
+  if (!user) return { error: "Not authorized." };
 
   const parsed = respondIssueSchema.safeParse({
     issueId: formData.get("issueId"),
@@ -1522,8 +1511,8 @@ export async function respondRepairIssue(
   if (!issue) return { error: "Issue not found." };
 
   const ticket = issue.ticket;
-  const isAdmin = session.user.role === "ADMIN";
-  if (!isAdmin && ticket.customerId !== session.user.id) {
+  const isAdmin = user.role === "ADMIN";
+  if (!isAdmin && ticket.customerId !== user.id) {
     return { error: "Not authorized." };
   }
   if (issue.status !== "PENDING") {

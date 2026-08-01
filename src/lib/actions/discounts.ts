@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/auth";
+import { actionAdmin } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 
 export type DiscountFormState = {
@@ -25,8 +25,7 @@ const ruleSchema = z.object({
 });
 
 async function requireAdmin() {
-  const session = await auth();
-  return session?.user?.role === "ADMIN" ? session : null;
+  return actionAdmin();
 }
 
 function revalidateLoyalty() {

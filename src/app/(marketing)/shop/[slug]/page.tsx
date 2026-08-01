@@ -6,11 +6,11 @@ import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { phonesVisible } from "@/lib/settings";
-import { SITE_URL, whatsappLink } from "@/lib/config";
+import { SHOP, SITE_URL, WHATSAPP_ENABLED, whatsappLink } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp";
 import { productPlaceholder } from "@/components/product-card";
-import { cn, formatLKR } from "@/lib/utils";
+import { cn, formatLKR, jsonLdScript } from "@/lib/utils";
 import { BuyForm } from "./buy-form";
 
 export async function generateMetadata({
@@ -77,7 +77,7 @@ export default async function ProductPage({
     <div className="mx-auto max-w-6xl px-4 pt-32 pb-20">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }}
       />
       <Link
         href="/shop"
@@ -166,25 +166,27 @@ export default async function ProductPage({
                 </p>
               </div>
             )}
-            <Button
-              asChild
-              variant="outline"
-              size="lg"
-              className="mt-3 h-11 sm:px-8"
-            >
-              <a
-                href={whatsappLink(
-                  out
-                    ? `Hi Mobilux! When will "${product.name}" be back in stock? ${SITE_URL}/shop/${product.slug}`
-                    : `Hi Mobilux! I'd like to order "${product.name}" (${formatLKR(product.price.toString())}). ${SITE_URL}/shop/${product.slug}`,
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
+            {WHATSAPP_ENABLED ? (
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="mt-3 h-11 sm:px-8"
               >
-                <WhatsAppIcon className="size-4 text-[#25D366]" />
-                {out ? "Ask when it's back" : "Order via WhatsApp"}
-              </a>
-            </Button>
+                <a
+                  href={whatsappLink(
+                    out
+                      ? `Hi ${SHOP.name}! When will "${product.name}" be back in stock? ${SITE_URL}/shop/${product.slug}`
+                      : `Hi ${SHOP.name}! I'd like to order "${product.name}" (${formatLKR(product.price.toString())}). ${SITE_URL}/shop/${product.slug}`,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <WhatsAppIcon className="size-4 text-[#25D366]" />
+                  {out ? "Ask when it's back" : "Order via WhatsApp"}
+                </a>
+              </Button>
+            ) : null}
           </div>
 
           <div className="mt-10 space-y-2.5 border-t border-border pt-6 text-sm text-muted-foreground">

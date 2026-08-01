@@ -21,7 +21,7 @@ import { Parallax } from "@/components/parallax";
 import { ScrollReveal } from "@/components/scroll-reveal";
 import { ProductCard } from "@/components/product-card";
 import { TestimonialsSection } from "@/components/testimonials-section";
-import { cn } from "@/lib/utils";
+import { cn, jsonLdScript } from "@/lib/utils";
 
 const services = [
   {
@@ -115,7 +115,7 @@ export default async function HomePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }}
       />
 
       {/* ── Hero — full-bleed cover with parallax depth ──────── */}

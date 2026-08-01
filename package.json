@@ -17,6 +17,10 @@
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
+  "overrides": {
+    "postcss": "^8.5.25",
+    "sharp": "^0.35.3"
+  },
   "dependencies": {
     "@prisma/client": "^6.10.0",
     "@react-pdf/renderer": "^4.5.1",

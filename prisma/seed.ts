@@ -10,20 +10,57 @@ const daysAgo = (n: number, hours = 10) => {
   return d;
 };
 
+// The seed's default logins are published in a public repo, so they are a
+// development convenience only. Seeding a real deployment must supply its own
+// admin credentials — otherwise every shop that runs `db:seed` and forgets
+// ends up with a documented admin login on a live URL.
+const DEV_ADMIN_PASSWORD = "Admin@123";
+
+function resolveAdminCredentials() {
+  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  const isProduction =
+    process.env.NODE_ENV === "production" || !!process.env.VERCEL;
+
+  if (isProduction && (!email || !password)) {
+    throw new Error(
+      "Refusing to seed a production database with the public default admin login.\n" +
+        "Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD (min 12 characters) and run again.",
+    );
+  }
+  if (password && password.length < 12) {
+    throw new Error("SEED_ADMIN_PASSWORD must be at least 12 characters.");
+  }
+
+  return {
+    email: email || "admin@mobilux.lk",
+    password: password || DEV_ADMIN_PASSWORD,
+    name: process.env.SEED_ADMIN_NAME?.trim() || "Gayash",
+    usedDefault: !password,
+  };
+}
+
 async function main() {
   // ── Users ──────────────────────────────────────────────
-  const adminPassword = await bcrypt.hash("Admin@123", 12);
+  const creds = resolveAdminCredentials();
+  const adminPassword = await bcrypt.hash(creds.password, 12);
   const admin = await prisma.user.upsert({
-    where: { email: "admin@mobilux.lk" },
+    where: { email: creds.email },
     update: {},
     create: {
-      name: "Gayash",
-      email: "admin@mobilux.lk",
+      name: creds.name,
+      email: creds.email,
       passwordHash: adminPassword,
       role: "ADMIN",
       phone: "0771234567",
     },
   });
+  if (creds.usedDefault) {
+    console.warn(
+      `\n⚠  Admin seeded with the PUBLIC default password (${DEV_ADMIN_PASSWORD}).\n` +
+        "   Fine for local development. Never expose this database to the internet.\n",
+    );
+  }
 
   const customerPassword = await bcrypt.hash("Customer@123", 12);
   const customer = await prisma.user.upsert({
@@ -271,7 +308,11 @@ async function main() {
   }
 
   console.log(`Seeded ${tickets.length} tickets for ${customer.email}`);
-  console.log("Admin login:    admin@mobilux.lk / Admin@123");
+  console.log(
+    `Admin login:    ${creds.email} / ${
+      creds.usedDefault ? DEV_ADMIN_PASSWORD : "(the SEED_ADMIN_PASSWORD you set)"
+    }`,
+  );
   console.log("Customer login: kasun@example.com / Customer@123");
   void admin;
 }

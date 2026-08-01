@@ -11,6 +11,9 @@ declare module "next-auth" {
       id: string;
       role: Role;
     } & DefaultSession["user"];
+    // Token issued-at, in seconds. Compared against the account's
+    // sessionsValidFrom in lib/auth-guard to reject revoked sessions.
+    iat?: number;
   }
 }
 

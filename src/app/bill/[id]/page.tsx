@@ -67,7 +67,7 @@ export default async function BillPage({
     ? `/admin/tickets/${result.bill.id}`
     : `/repairs/${result.bill.id}`;
 
-  const trackQr = await trackQrDataUrl(result.bill.ticketNumber);
+  const trackQr = await trackQrDataUrl(result.trackToken);
 
   return (
     <div className="min-h-dvh bg-neutral-100 py-10 print:bg-white print:py-0">

@@ -39,6 +39,7 @@ import {
   setTestimonialsVisibility,
   toggleTestimonialFeatured,
   updateTestimonial,
+  updateTestimonialNote,
   type TestimonialFormState,
 } from "@/lib/actions/testimonials";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,10 @@ export type TestimonialRow = {
   adminNote: string | null;
   status: "PENDING" | "APPROVED" | "HIDDEN";
   featured: boolean;
+  // "customer" = they wrote it themselves and it carries their name and
+  // avatar, so only the internal note is ours to edit. "shop" = a walk-in
+  // review we typed in, which we own outright.
+  authored: "customer" | "shop";
 };
 
 function useFormToast(
@@ -112,13 +117,104 @@ function StarPicker({ defaultValue = 0 }: { defaultValue?: number }) {
 export function TestimonialDialog({ row }: { row?: TestimonialRow }) {
   const [open, setOpen] = useState(false);
   const editing = !!row;
+  // A customer's own review is theirs — the dialog drops to the internal
+  // note alone, and the action behind it can't touch anything else either.
+  const noteOnly = row?.authored === "customer";
   const [state, formAction, pending] = useActionState(
-    editing ? updateTestimonial : createTestimonial,
+    !editing ? createTestimonial : noteOnly ? updateTestimonialNote : updateTestimonial,
     null,
   );
-  useFormToast(state, editing ? "Feedback updated." : "Feedback published.", () =>
-    setOpen(false),
+  useFormToast(
+    state,
+    !editing
+      ? "Feedback published."
+      : noteOnly
+        ? "Internal note saved."
+        : "Feedback updated.",
+    () => setOpen(false),
   );
+
+  if (noteOnly) {
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" className="size-8">
+            <Pencil className="size-4" />
+            <span className="sr-only">Add an internal note</span>
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-lg">
+          <form action={formAction} className="space-y-4">
+            <input type="hidden" name="id" value={row.id} />
+            <DialogHeader>
+              <DialogTitle>{row.name}&apos;s review</DialogTitle>
+              <DialogDescription>
+                Written by the customer, so it stays in their words. You can
+                publish, hide, pin or delete it — and keep a note for yourself.
+              </DialogDescription>
+            </DialogHeader>
+
+            {state?.error ? (
+              <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <TriangleAlert className="size-4 shrink-0" />
+                {state.error}
+              </div>
+            ) : null}
+
+            <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={cn(
+                      "size-4",
+                      star <= row.rating
+                        ? "fill-warning text-warning"
+                        : "text-muted-foreground/35",
+                    )}
+                  />
+                ))}
+              </div>
+              {row.deviceLabel ? (
+                <p className="text-xs text-muted-foreground">
+                  {row.deviceLabel}
+                </p>
+              ) : null}
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {row.message}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="adminNote">Internal note (optional)</Label>
+              <Input
+                id="adminNote"
+                name="adminNote"
+                defaultValue={row.adminNote ?? ""}
+                placeholder="Never shown on the site"
+                maxLength={300}
+              />
+              <FieldError errors={state?.fieldErrors?.adminNote} />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                Save note
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -143,7 +239,7 @@ export function TestimonialDialog({ row }: { row?: TestimonialRow }) {
             </DialogTitle>
             <DialogDescription>
               {editing
-                ? "Fix typos or trim the wording — the customer's meaning should stay intact."
+                ? "Your own record of what a walk-in customer told you — edit it freely."
                 : "Type in what a walk-in customer told you. It publishes straight away."}
             </DialogDescription>
           </DialogHeader>

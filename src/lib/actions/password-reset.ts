@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { emailConfigured, sendEmail } from "@/lib/email";
+import { limitByIp, limitByKey, waitMessage } from "@/lib/rate-limit";
 import { SHOP } from "@/lib/config";
 
 export type ResetFormState = {
@@ -33,6 +34,16 @@ export async function requestPasswordReset(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
   const { email } = parsed.data;
+
+  // Per IP and per address: without this, anyone can send a victim a reset
+  // code every 60 seconds indefinitely and burn the shop's Resend quota
+  // doing it. Reported as success so the form still can't be used to probe
+  // which addresses have accounts.
+  const [byIp, byEmail] = await Promise.all([
+    limitByIp("resetRequest"),
+    limitByKey("resetRequest", email),
+  ]);
+  if (!byIp.ok || !byEmail.ok) return { sent: true, email };
 
   if (!emailConfigured()) {
     return {
@@ -124,6 +135,15 @@ export async function resetPassword(
     error: message,
   });
 
+  // The per-code attempts counter below caps guesses against one code; this
+  // caps how fast someone can cycle through codes from a single machine.
+  const throttle = await limitByIp("resetSubmit");
+  if (!throttle.ok) {
+    return failed(
+      `Too many attempts. Please try again in ${waitMessage(throttle.retryAfter)}.`,
+    );
+  }
+
   const reset = await prisma.passwordReset.findUnique({ where: { email } });
   if (!reset || reset.expiresAt.getTime() < Date.now()) {
     return failed("This code has expired. Request a new one below.");
@@ -153,7 +173,15 @@ export async function resetPassword(
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
   await prisma.$transaction([
-    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        // A reset is usually "I've lost control of this account" — so every
+        // session opened with the old password ends here.
+        sessionsValidFrom: new Date(),
+      },
+    }),
     prisma.passwordReset.delete({ where: { email } }),
   ]);
 

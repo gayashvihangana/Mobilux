@@ -8,6 +8,12 @@ export const authConfig = {
   },
   session: {
     strategy: "jwt",
+    // Roughly one shift. The live database check in lib/auth-guard is what
+    // actually revokes access (block, demote, password change take effect
+    // immediately); this bounds how long a token stolen off a shop counter
+    // stays useful before it needs the password again.
+    maxAge: 60 * 60 * 8,
+    updateAge: 60 * 60,
   },
   providers: [],
   callbacks: {
@@ -26,6 +32,9 @@ export const authConfig = {
     session({ session, token }) {
       session.user.id = token.id as string;
       session.user.role = token.role as Role;
+      // Surfaced so lib/auth-guard can reject tokens minted before an
+      // account's sessionsValidFrom cut-off.
+      session.iat = token.iat;
       return session;
     },
   },

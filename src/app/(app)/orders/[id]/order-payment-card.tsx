@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ReceiptForm } from "@/components/forms/receipt-form";
-import { BANK_DETAILS } from "@/lib/config";
+import { BANK_DETAILS, SHOP } from "@/lib/config";
 import { formatDateTime, formatLKR } from "@/lib/utils";
 
 export function OrderPaymentCard({
@@ -45,7 +45,7 @@ export function OrderPaymentCard({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Order complete — thank you for shopping with Mobilux!
+            Order complete — thank you for shopping with {SHOP.name}!
           </p>
         </CardContent>
       </Card>

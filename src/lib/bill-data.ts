@@ -10,7 +10,11 @@ import {
 // render from identical data.
 export async function fetchBillTicket(
   id: string,
-): Promise<{ bill: BillTicket; customerId: string | null } | null> {
+): Promise<{
+  bill: BillTicket;
+  customerId: string | null;
+  trackToken: string;
+} | null> {
   const ticket = await prisma.repairTicket.findUnique({
     where: { id },
     include: {
@@ -28,6 +32,9 @@ export async function fetchBillTicket(
 
   return {
     customerId: ticket.customerId,
+    // Drives the bill's QR code — the unguessable tracking link, not the
+    // sequential ticket number.
+    trackToken: ticket.trackToken,
     bill: {
       id: ticket.id,
       ticketNumber: ticket.ticketNumber,

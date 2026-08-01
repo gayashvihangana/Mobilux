@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { actionAdmin } from "@/lib/auth-guard";
 import {
   SHOP_BANK_ACCOUNTS_KEY,
   SHOP_INFO_KEYS,
@@ -18,8 +18,7 @@ export type SettingsFormState = {
 } | null;
 
 async function requireAdmin() {
-  const session = await auth();
-  return session?.user?.role === "ADMIN";
+  return !!(await actionAdmin());
 }
 
 function revalidateSettings() {

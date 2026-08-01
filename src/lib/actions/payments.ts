@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { actionAdmin, actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
@@ -43,8 +43,8 @@ export async function submitReceipt(
   _prev: PaymentFormState,
   formData: FormData,
 ): Promise<PaymentFormState> {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  const user = await actionUser();
+  if (!user) redirect("/login");
 
   const parsed = z
     .object({
@@ -78,7 +78,7 @@ export async function submitReceipt(
         customer: { select: { completedRepairs: true } },
       },
     });
-    if (!ticket || ticket.customerId !== session.user.id) {
+    if (!ticket || ticket.customerId !== user.id) {
       return { error: "Ticket not found." };
     }
     if (!ticket.finalCost) {
@@ -115,7 +115,7 @@ export async function submitReceipt(
         },
       },
     });
-    if (!order || order.userId !== session.user.id) {
+    if (!order || order.userId !== user.id) {
       return { error: "Order not found." };
     }
     if (order.status !== "PENDING") {
@@ -140,7 +140,7 @@ export async function submitReceipt(
   await prisma.$transaction(async (tx) => {
     await tx.payment.create({
       data: {
-        userId: session.user.id,
+        userId: user.id,
         ticketId: ticketId ?? null,
         orderId: orderId ?? null,
         amount,
@@ -178,8 +178,7 @@ async function reviewPayment(
   formData: FormData,
   outcome: "PAID" | "REJECTED",
 ): Promise<PaymentFormState> {
-  const session = await auth();
-  if (session?.user?.role !== "ADMIN") return { error: "Not authorized." };
+  if (!(await actionAdmin())) return { error: "Not authorized." };
 
   const parsed = reviewSchema.safeParse({
     paymentId: formData.get("paymentId"),
