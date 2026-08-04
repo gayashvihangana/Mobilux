@@ -10,7 +10,7 @@ Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [PROPOSAL.md](PROPOSAL.md) · [RE
 
 | | |
 |---|---|
-| **Business model** | One-off  install + setup fee per shop. Optional monthly maintenance. Not SaaS. |
+| **Business model** | One-off install + setup fee per shop. Optional monthly maintenance. Not SaaS. |
 | **Actors** | Customer · Staff (repairman) · Admin (shop owner) — three roles, see [ARCHITECTURE.md](ARCHITECTURE.md#2-actors--permissions) |
 | **Staff powers** | Bench work **plus billing**. No reports, no settings, no deletions. |
 | **Sign-in** | Separate `/staff/login` for the shop team; `/login` stays customer-only. |
