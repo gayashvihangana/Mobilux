@@ -2,7 +2,10 @@
 
 **Written:** 31 July 2026 · **Pace assumed:** ~20 hrs/week · **Target:** first paying shop by week 6
 
-Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) · `SECURITY-AUDIT.md` (repo root, gitignored)
+Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [OPERATIONS.md](OPERATIONS.md) ·
+[INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) · [HANDOVER.md](HANDOVER.md) ·
+[PRIVACY.md](PRIVACY.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) ·
+`SECURITY-AUDIT.md` (repo root, gitignored)
 
 ---
 
@@ -387,32 +390,49 @@ attempt while signed in is refused with the expected message.
 
 ---
 
-## Week 5 — Documentation and handover (~20 h)
+## Week 5 — Documentation and handover (~20 h) — **partly done 7 Aug 2026**
 
 ### 5.1 Finish the three documents (8 h)
 
-- [ ] [ARCHITECTURE.md](ARCHITECTURE.md) — update with roles + staff login as built
-- [ ] [PROPOSAL.md](PROPOSAL.md) — fill in **your** pricing and support terms
-- [ ] [REPORT.md](REPORT.md) — fill the sections only you can write (testing,
-      evaluation, reflection)
+- [x] [ARCHITECTURE.md](ARCHITECTURE.md) — audited section by section against
+      the actual code (not just the parts touched this week). Bumped to
+      v1.4, retired the now-stale 🔜 legend (weeks 2–4 are all done, nothing
+      left to mark), fixed the §7.1 lifecycle diagram — it still showed
+      `READY_FOR_PICKUP` as a live pipeline step between `COMPLETED` and
+      `PICKED_UP`, when `lib/status.ts` has treated it as a legacy alias for
+      `COMPLETED` since before this week — and added the audit log, the demo
+      instance, `/api/cron/reset-demo` and the three newer verify scripts to
+      the code-layout and route-groups sections.
+- [ ] [PROPOSAL.md](PROPOSAL.md) — still needs **your** pricing, contact
+      details and support terms in the `[[…]]` markers. Not filled in here —
+      inventing a price or a phone number isn't mine to do.
+- [ ] [REPORT.md](REPORT.md) — the ✍️-marked sections (literature review,
+      methodology, evaluation, references, conclusion) need your own
+      research, your own usage data and your own reflection. Same reason —
+      genuinely not fillable by anyone but you.
 
-### 5.2 Shop handover pack (6 h)
+### 5.2 Shop handover pack (6 h) — **English done, Sinhala/Tamil not attempted**
 
-One page per shop, plain language, ideally Sinhala or Tamil as well as English:
-what each Settings field does, how to log a repair, how to issue a bill, how to
-add a technician, who to call. **This is the difference between one support call
-and twenty.**
+- [x] [HANDOVER.md](HANDOVER.md) — Settings fields, logging a repair, issuing
+      a bill, adding/deactivating a technician, who to call. Template with
+      `[[…]]` markers for the shop-specific and installer-specific bits.
+- [ ] Sinhala / Tamil translation — deliberately not machine-translated here.
+      Wrong instructional copy for shop staff is worse than English-only;
+      this needs a native speaker's review, not a guess.
 
-### 5.3 Install runbook (3 h)
+### 5.3 Install runbook (3 h) — **done**
 
-The exact steps you follow per shop: Vercel project → Neon DB → Blob store →
-`AUTH_SECRET` → env vars → migrate → seed admin → hand over. Write it down now,
-while you still remember; automate it in Phase 6.
+- [x] [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) — the exact per-shop checklist:
+      Vercel project → Neon DB → Blob store → `AUTH_SECRET` → env vars →
+      migrate → seed admin → verify → hand over, each step linked to the
+      relevant [OPERATIONS.md](OPERATIONS.md) section for the "why."
 
-### 5.4 Privacy note (3 h)
+### 5.4 Privacy note (3 h) — **done**
 
-Each shop is the data controller for its customers; you're the processor. One
-page: what's stored, where (Neon/Vercel region), for how long.
+- [x] [PRIVACY.md](PRIVACY.md) — what's stored (including that internal notes
+      sometimes carry a phone number or address), where, retention, and the
+      controller/processor split. `[[…]]` markers for the two things that are
+      genuinely per-shop: Neon region and backup retention days.
 
 ---
 

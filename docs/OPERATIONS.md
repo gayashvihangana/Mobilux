@@ -2,7 +2,10 @@
 
 **Written:** 6 August 2026 · **Audience:** whoever keeps a deployed shop running
 
-Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [README](../README.md) for local setup
+Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [SHIPPING-PLAN.md](SHIPPING-PLAN.md) ·
+[INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) — the step-by-step checklist that
+follows this reference · [HANDOVER.md](HANDOVER.md) · [PRIVACY.md](PRIVACY.md) ·
+[README](../README.md) for local setup
 
 Every shop is a separate deployment with its own database, blob store and signing
 secret. This document covers what to set, how to prove it works, and what to do
