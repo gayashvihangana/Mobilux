@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Newsreader } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { SITE_URL } from "@/lib/config";
+import { DemoBanner } from "@/components/demo-banner";
+import { DEMO_MODE, SITE_URL } from "@/lib/config";
 import { getShopInfo } from "@/lib/settings";
 import "./globals.css";
 
@@ -92,6 +93,7 @@ export default async function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} ${newsreader.variable} min-h-dvh font-sans antialiased`}
       >
         <ThemeProvider>
+          {DEMO_MODE ? <DemoBanner /> : null}
           {children}
           <Toaster richColors position="top-center" />
         </ThemeProvider>

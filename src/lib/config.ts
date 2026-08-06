@@ -37,6 +37,12 @@ export const WARRANTY_DAYS = Number(
   process.env.NEXT_PUBLIC_WARRANTY_DAYS || 30,
 );
 
+// True only on the second, throwaway Vercel project — see
+// docs/OPERATIONS.md §6. Gates the banner, the one-click login buttons,
+// hiding Register, and blocking password changes. Read in client components
+// and Edge middleware too, hence the literal access.
+export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 // A short, warm line printed at the foot of every bill. Takes the shop name
 // rather than reading SHOP.name, because the live name comes from Settings —
 // see lib/settings.ts. The env var still wins when a shop has written its own.

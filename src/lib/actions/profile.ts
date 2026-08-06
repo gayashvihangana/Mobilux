@@ -7,6 +7,7 @@ import { updateSession } from "@/auth";
 import { actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
+import { DEMO_MODE } from "@/lib/config";
 
 export type ProfileFormState = {
   error?: string;
@@ -90,6 +91,10 @@ export async function changePassword(
 ): Promise<ProfileFormState> {
   const user = await actionUser();
   if (!user) return { error: "Not signed in." };
+
+  // One visitor changing the demo owner's password would lock out the
+  // one-click login button for everyone after — see demo-login-buttons.tsx.
+  if (DEMO_MODE) return { error: "Password changes are disabled in the demo." };
 
   const parsed = passwordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),

@@ -338,26 +338,52 @@ in the table check, one entry added for `audit:read`).
       build the control; `verify:audit` greps the app for `auditLog.delete(`
       and fails the build if one ever appears
 
-### 4.2 Demo instance (10 h)
+### 4.2 Demo instance (10 h) — **code done 7 Aug 2026, provisioning pending**
 
 - [ ] Second Vercel project + second Neon DB + fresh `AUTH_SECRET`, same repo
-- [ ] `prisma/seed-demo.ts` — a **fictional** shop, ~8 customers, ~25 repairs
-      across every status, paid bills, products, reviews, one open dispute.
-      An empty app sells nothing; make it look busy.
-- [ ] `NEXT_PUBLIC_DEMO_MODE=true` → banner, one-click login buttons on
-      `/login` and `/staff/login`, "Register" hidden
-- [ ] Leave `RESEND_API_KEY` **unset** so the demo can never email a stranger
-- [ ] Block password changes in demo mode, or one visitor locks everyone out
+      — this step is a Vercel/Neon dashboard action, not code; runbook is
+      [OPERATIONS.md §6.1](OPERATIONS.md#61-provisioning-once)
+- [x] `prisma/seed-demo.ts` — a **fictional** shop ("Ceylon Device Care"),
+      8 customers, 25 repairs across all 10 `TicketStatus` values, several
+      paid bills, 7 products, 4 reviews, one open dispute (`RepairIssue`
+      left `PENDING`), 3 storefront orders. Shared with the reset route via
+      `src/lib/demo-data.ts`'s `seedDemoData()`, so there's exactly one
+      version of the data, not two that can drift.
+- [x] `NEXT_PUBLIC_DEMO_MODE=true` → banner (`components/demo-banner.tsx`,
+      rendered once from the root layout), one-click login buttons on
+      `/login` and `/staff/login` (`components/demo-login-buttons.tsx`,
+      reuses the real `login`/`staffLogin` actions — no new sign-in path),
+      "Register" hidden three independent ways (the link, `middleware.ts`,
+      and `register()`'s own guard)
+- [x] Leave `RESEND_API_KEY` **unset** so the demo can never email a stranger
+      — no code needed, `emailConfigured()` already no-ops without it
+- [x] Block password changes in demo mode — `changePassword()` and
+      `resetPassword()` both refuse outright, or one visitor locks the
+      one-click buttons out for everyone until the next reset
 
-### 4.3 Nightly reset (3 h)
+### 4.3 Nightly reset (3 h) — **done 7 Aug 2026**
 
 A Vercel Cron hitting a reset route. **Three independent guards** — this is the
 one endpoint in the project that must never misfire against a real shop:
 
-- [ ] Verify `CRON_SECRET` in the `Authorization` header
-- [ ] Refuse unless `NEXT_PUBLIC_DEMO_MODE === "true"`
-- [ ] Refuse unless `DATABASE_URL` matches the demo host
-- [ ] Then truncate + re-seed
+- [x] Verify `CRON_SECRET` in the `Authorization` header
+- [x] Refuse unless `NEXT_PUBLIC_DEMO_MODE === "true"`
+- [x] Refuse unless `DATABASE_URL` matches the demo host (`DEMO_DATABASE_HOST`)
+- [x] Then truncate + re-seed — `src/app/api/cron/reset-demo/route.ts`,
+      `vercel.json` schedules it for 21:30 UTC (3 AM Asia/Colombo) daily
+
+Verified: **29/29** via `npm run verify:demo` — 20 static (guard order,
+`vercel.json`, `.env.example`, `ALL_TABLES` matches every model in
+`schema.prisma`, Register/password guards, the buttons reuse the real
+sign-in actions) plus 9 live against a disposable scratch database and a
+throwaway server instance (never local dev — this truncates everything):
+wrong secret → 401, missing header → 401, correct secret → 200 with a real
+reset, then the reseeded row counts confirmed directly (8 customers, 25
+tickets across all 10 statuses, exactly one open dispute, 7 products, 4
+reviews). Also hand-verified: `npm run db:seed:demo` is idempotent (ran
+twice clean) and refuses outright without `NEXT_PUBLIC_DEMO_MODE=true`; a
+real one-click customer sign-in reaches `/dashboard`; a password-change
+attempt while signed in is refused with the expected message.
 
 ---
 

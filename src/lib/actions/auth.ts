@@ -7,6 +7,7 @@ import { signIn, signOut } from "@/auth";
 import { isShopStaff } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { limitByIp, limitByKey, waitMessage } from "@/lib/rate-limit";
+import { DEMO_MODE } from "@/lib/config";
 
 export type AuthFormState = {
   error?: string;
@@ -36,6 +37,13 @@ export async function register(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  // Hiding the "Sign up" link and redirecting /register in middleware.ts is
+  // presentation — this is a public HTTP endpoint regardless of what the UI
+  // offers, same reasoning as every permission check in lib/auth-guard.ts.
+  if (DEMO_MODE) {
+    return { error: "New accounts are disabled on this demo. Use one of the sign-in buttons instead." };
+  }
+
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),

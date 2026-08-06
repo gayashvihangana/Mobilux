@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
 import { homePathFor, isShopStaff } from "@/lib/permissions";
+import { DEMO_MODE } from "@/lib/config";
 
 const { auth } = NextAuth(authConfig);
 
@@ -24,6 +25,14 @@ export default auth((req) => {
   // opening the bare domain (bookmark, home-screen shortcut, typed URL)
   // wants their own workspace, not the sales pitch.
   const isLanding = nextUrl.pathname === "/";
+
+  // No new accounts on the demo instance — one visitor signing up for real
+  // wouldn't break anything on its own, but the point is to have people try
+  // the three seeded roles, not create a fourth. Belt-and-braces with the
+  // hidden link in login-form.tsx and register()'s own guard.
+  if (nextUrl.pathname === "/register" && DEMO_MODE) {
+    return NextResponse.redirect(new URL("/login", nextUrl));
+  }
 
   if ((isAuthPage || isLanding) && isLoggedIn) {
     return NextResponse.redirect(new URL(homePathFor(user), nextUrl));

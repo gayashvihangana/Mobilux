@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { limitByIp, limitByKey, waitMessage } from "@/lib/rate-limit";
 import { getShopInfo } from "@/lib/settings";
+import { DEMO_MODE } from "@/lib/config";
 
 export type ResetFormState = {
   error?: string;
@@ -117,6 +118,18 @@ export async function resetPassword(
   _prev: ResetFormState,
   formData: FormData,
 ): Promise<ResetFormState> {
+  // Defense in depth: requestPasswordReset() is already inert in demo mode
+  // (emailConfigured() is false with no RESEND_API_KEY set, so no code is
+  // ever sent), but this closes the completion step too rather than relying
+  // on that alone.
+  if (DEMO_MODE) {
+    return {
+      sent: true,
+      email: String(formData.get("email") ?? ""),
+      error: "Password resets are disabled in the demo.",
+    };
+  }
+
   const parsed = resetSchema.safeParse({
     email: formData.get("email"),
     code: formData.get("code"),

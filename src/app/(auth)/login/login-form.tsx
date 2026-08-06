@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/forms/field-error";
+import { DemoLoginButtons } from "@/components/demo-login-buttons";
 import { login, requestUnblock } from "@/lib/actions/auth";
+import { DEMO_MODE } from "@/lib/config";
 
 export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, formAction, pending] = useActionState(login, null);
@@ -42,6 +44,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       {callbackUrl ? (
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
       ) : null}
+      {DEMO_MODE ? <DemoLoginButtons action={login} roles={["customer"]} /> : null}
       {state?.wrongEntrance === "staff" ? (
         // A shop account with the right password. The staff entrance isn't
         // advertised anywhere, so this is the one place it gets named — and
@@ -129,15 +132,17 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
         {pending ? "Logging in…" : "Log in"}
       </Button>
-      <p className="text-center text-sm text-muted-foreground">
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/register"
-          className="font-medium text-primary hover:underline"
-        >
-          Sign up
-        </Link>
-      </p>
+      {!DEMO_MODE ? (
+        <p className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-primary hover:underline"
+          >
+            Sign up
+          </Link>
+        </p>
+      ) : null}
     </form>
   );
 }

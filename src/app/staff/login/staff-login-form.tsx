@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/forms/field-error";
+import { DemoLoginButtons } from "@/components/demo-login-buttons";
 import { staffLogin } from "@/lib/actions/auth";
+import { DEMO_MODE } from "@/lib/config";
 
 export function StaffLoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, formAction, pending] = useActionState(staffLogin, null);
@@ -16,6 +18,10 @@ export function StaffLoginForm({ callbackUrl }: { callbackUrl?: string }) {
     <form action={formAction} className="space-y-5">
       {callbackUrl ? (
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
+      ) : null}
+
+      {DEMO_MODE ? (
+        <DemoLoginButtons action={staffLogin} roles={["owner", "staff"]} />
       ) : null}
 
       {state?.wrongEntrance === "customer" ? (

@@ -77,6 +77,21 @@ guard stopping a public default admin login from being created. The same check
 is what stops the development technician account (`tech@mobilux.lk`) from ever
 being seeded into a real shop — create those under **Admin → Staff**.
 
+### Demo instance only
+
+Leave all three of these **unset** on a real shop's project. They belong only
+on the second, throwaway Vercel project — see [§6](#6-demo-instance-and-nightly-reset).
+
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_DEMO_MODE` | `"true"` turns on the banner, the one-click login buttons, hides Register, and blocks password changes. Requires a redeploy. |
+| `CRON_SECRET` | Shared secret the nightly reset checks in its `Authorization` header. `openssl rand -base64 32`. |
+| `DEMO_DATABASE_HOST` | The demo Neon database's hostname, copied from its `DATABASE_URL`. A second, independent check that the reset route is talking to the demo database before it truncates anything. |
+
+Also leave `RESEND_API_KEY` unset here — with no key, email silently no-ops
+(see Optional, above), which is what stops the demo from ever emailing a
+stranger.
+
 ---
 
 ## 2. Deploying
@@ -238,3 +253,62 @@ accident.
 | Before any migration on a live shop | Take a manual Neon branch first — it's free and instant |
 | After any auth, tracker or rate-limit change | Re-run `npm run verify:security` |
 | After adding a server action or an admin page | Re-run `npm run verify:permissions` |
+| After touching a delete/money action | Re-run `npm run verify:audit` |
+| After touching demo-mode code or the reset route | Re-run `npm run verify:demo` |
+
+---
+
+## 6. Demo instance and nightly reset
+
+A second, complete copy of the deployment — same repo, its own Vercel project
+and Neon database — a buyer can click through without touching a real shop's
+data. `NEXT_PUBLIC_DEMO_MODE=true` is what makes it behave differently: a
+banner, one-click sign-in as the owner/technician/customer, no registration,
+no password changes, no email. See [ARCHITECTURE.md §9.1](ARCHITECTURE.md#91-per-instance-resources).
+
+### 6.1 Provisioning (once)
+
+1. New Vercel project, same GitHub repo, different name (e.g. `mobilux-demo`).
+2. New Neon database — its own `DATABASE_URL`.
+3. A **fresh** `AUTH_SECRET` (`npx auth secret`) — never reuse the real shop's.
+4. Set every variable in [§1](#1-environment-variables) as normal for a fresh
+   install, **plus** the three [demo-only variables](#demo-instance-only).
+   Leave `RESEND_API_KEY` unset.
+5. Deploy, then `npm run db:migrate` against the new `DATABASE_URL` (or let
+   `vercel-build` run it — same as any other install).
+6. Seed it once by hand: `NEXT_PUBLIC_DEMO_MODE=true npm run db:seed:demo`
+   (with `DATABASE_URL` pointed at the demo database). The cron in step 7
+   keeps it fresh after that — this is just so it isn't empty until 3 AM.
+7. `vercel.json`'s `crons` entry is already in the repo and picked up
+   automatically on deploy — nothing to configure here. It fires at
+   21:30 UTC (3:00 AM Asia/Colombo) daily.
+8. Open `/login` and `/staff/login` on the new deployment and confirm the
+   banner and the one-click buttons are there.
+
+### 6.2 Why three guards on the reset route
+
+`src/app/api/cron/reset-demo/route.ts` truncates and reseeds every table. The
+cron config is part of the shared repo, so it also gets registered — pointing
+at its own copy of the same path — on the **real** Mobilux project. Three
+independent checks, in order:
+
+1. `Authorization: Bearer $CRON_SECRET` — proves the caller is Vercel Cron
+   (which adds this header automatically once `CRON_SECRET` is set on the
+   project), not a random visitor who found the URL.
+2. `NEXT_PUBLIC_DEMO_MODE === "true"` — proves *this deployment* is flagged
+   as the demo build. Unset on the real project, so the route 403s there by
+   default with no further configuration needed.
+3. The live `DATABASE_URL`'s hostname matches `DEMO_DATABASE_HOST` — proves
+   the *actual database connection*, independent of (2). Two separate pieces
+   of configuration have to agree before anything is truncated.
+
+### 6.3 Testing the reset by hand
+
+```bash
+curl -i -H "Authorization: Bearer $CRON_SECRET" \
+  "https://<demo-project>.vercel.app/api/cron/reset-demo"
+```
+
+Expect `{"ok":true,"resetAt":"..."}`. A wrong or missing secret returns 401; a
+non-demo deployment or a mismatched database returns 403 — either is the
+route refusing correctly, not a bug.

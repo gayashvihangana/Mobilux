@@ -489,6 +489,10 @@ let a token minted at one shop validate at another.
 | `AUTH_SECRET` | `npx auth secret`, unique |
 | Resend key | Optional — email silently no-ops without it |
 
+The demo instance is a second, complete set of the above —
+`NEXT_PUBLIC_DEMO_MODE=true`, no Resend key, reset nightly by a Vercel Cron
+guarded three independent ways. [OPERATIONS.md §6](OPERATIONS.md#6-demo-instance-and-nightly-reset).
+
 ### 9.2 Configuration layers
 
 | Layer | Where | Changed by | Takes effect |
