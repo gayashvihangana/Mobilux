@@ -14,19 +14,22 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Logo } from "@/components/logo";
+import { Logo, type ShopBrand } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
 export type NavLink = { href: string; label: string };
 export type NavGroup = { label: string; links: NavLink[] };
 
 export function MobileNav({
+  brand,
   links,
   groups,
   homeHref = "/",
   triggerClassName,
   children,
 }: {
+  /** Passed down from the server layout — this component can't read the DB. */
+  brand: ShopBrand;
   links: NavLink[];
   /** Secondary sections, listed under headings below the main links. */
   groups?: NavGroup[];
@@ -67,7 +70,7 @@ export function MobileNav({
       <SheetContent side="right" className="w-72 gap-0 sm:w-80">
         <SheetHeader className="border-b border-border">
           <SheetTitle asChild>
-            <Logo href={homeHref} />
+            <Logo brand={brand} href={homeHref} />
           </SheetTitle>
           <SheetDescription className="sr-only">
             Site navigation

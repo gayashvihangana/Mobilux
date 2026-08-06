@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { getShopInfo } from "@/lib/settings";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -33,7 +34,12 @@ const adminLinks = [
 ];
 
 export async function SiteHeader() {
-  const session = await auth();
+  const [session, shop] = await Promise.all([auth(), getShopInfo()]);
+  const brand = {
+    name: shop.name,
+    logoUrl: shop.logoUrl,
+    logoEmoji: shop.logoEmoji,
+  };
   const user = session?.user;
   // Logged-in users land on their dashboard, not the marketing page.
   const homeHref = user ? (user.role === "ADMIN" ? "/admin" : "/dashboard") : "/";
@@ -47,7 +53,7 @@ export async function SiteHeader() {
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="mx-auto max-w-6xl px-4 pt-4">
         <div className="glass flex h-14 items-center justify-between rounded-2xl px-4 sm:px-5">
-          <Logo href={homeHref} />
+          <Logo brand={brand} href={homeHref} />
           <nav className="hidden items-center gap-1 md:flex">
             {navLinks.map((link) => (
               <Link
@@ -85,7 +91,12 @@ export async function SiteHeader() {
                 </Button>
               </>
             )}
-            <MobileNav links={navLinks} homeHref={homeHref} triggerClassName="md:hidden">
+            <MobileNav
+              brand={brand}
+              links={navLinks}
+              homeHref={homeHref}
+              triggerClassName="md:hidden"
+            >
               {user ? (
                 <Button asChild variant="outline">
                   <Link href={user.role === "ADMIN" ? "/admin" : "/dashboard"}>

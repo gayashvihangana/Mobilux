@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { Logo } from "@/components/logo";
-import { SHOP } from "@/lib/config";
+import { getShopInfo } from "@/lib/settings";
 
 // The landing-page anchors only work for signed-out visitors — anyone with a
 // session is redirected off "/" — so the footer swaps to their own links.
@@ -30,7 +30,7 @@ const adminLinks = [
 ];
 
 export async function SiteFooter() {
-  const session = await auth();
+  const [session, shop] = await Promise.all([auth(), getShopInfo()]);
   const user = session?.user;
   const links = user
     ? user.role === "ADMIN"
@@ -38,16 +38,25 @@ export async function SiteFooter() {
       : customerLinks
     : guestLinks;
 
+  // Tagline and address both come from Settings and either can be blank, so
+  // build the strapline from whatever is actually set.
+  const strapline = [shop.tagline, shop.address].filter(Boolean).join(" — ");
+
   return (
     <footer className="border-t border-border">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-10 sm:flex-row sm:justify-between">
         <div className="flex flex-col items-center gap-2 sm:items-start">
           <Logo
+            brand={{
+              name: shop.name,
+              logoUrl: shop.logoUrl,
+              logoEmoji: shop.logoEmoji,
+            }}
             href={user ? (user.role === "ADMIN" ? "/admin" : "/dashboard") : "/"}
           />
-          <p className="text-sm text-muted-foreground">
-            Fix. Track. Trust. — Colombo, Sri Lanka
-          </p>
+          {strapline ? (
+            <p className="text-sm text-muted-foreground">{strapline}</p>
+          ) : null}
         </div>
         <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
           {links.map((link) => (
@@ -61,7 +70,7 @@ export async function SiteFooter() {
           ))}
         </nav>
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} {SHOP.name}
+          © {new Date().getFullYear()} {shop.name}
         </p>
       </div>
     </footer>

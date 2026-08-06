@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth-guard";
+import { getShopInfo } from "@/lib/settings";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/user-menu";
@@ -19,12 +20,20 @@ export default async function AppLayout({
   const user = await requireUser();
   if (user.role === "ADMIN") redirect("/admin");
 
+  const shop = await getShopInfo();
+  const brand = {
+    name: shop.name,
+    logoUrl: shop.logoUrl,
+    logoEmoji: shop.logoEmoji,
+  };
+
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-8">
             <MobileNav
+              brand={brand}
               links={[
                 { href: "/dashboard", label: "Dashboard" },
                 { href: "/repairs", label: "My repairs" },
@@ -35,7 +44,7 @@ export default async function AppLayout({
               homeHref="/dashboard"
               triggerClassName="-ml-2 sm:hidden"
             />
-            <Logo href="/dashboard" />
+            <Logo brand={brand} href="/dashboard" />
             <AppNavLinks
               links={[
                 { href: "/dashboard", label: "Dashboard" },

@@ -1,5 +1,6 @@
 import { ShieldCheck } from "lucide-react";
 import { requireAdmin } from "@/lib/auth-guard";
+import { getShopInfo } from "@/lib/settings";
 import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
 import { AdminNav, type AdminNavGroup } from "@/components/admin-nav";
@@ -50,6 +51,12 @@ export default async function AdminLayout({
   // Re-checked against the database, not just the JWT — a demoted or blocked
   // admin loses the panel on their next request, not in eight hours.
   const user = await requireAdmin();
+  const shop = await getShopInfo();
+  const brand = {
+    name: shop.name,
+    logoUrl: shop.logoUrl,
+    logoEmoji: shop.logoEmoji,
+  };
 
   return (
     <div className="min-h-dvh">
@@ -57,13 +64,14 @@ export default async function AdminLayout({
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:gap-4">
           <div className="flex min-w-0 items-center gap-2 md:gap-4">
             <MobileNav
+              brand={brand}
               links={PRIMARY_LINKS}
               groups={NAV_GROUPS}
               homeHref="/admin"
               triggerClassName="-ml-2 shrink-0 md:hidden"
             />
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <Logo href="/admin" />
+              <Logo brand={brand} href="/admin" />
               <span className="hidden shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary xl:inline-flex">
                 <ShieldCheck className="size-3" /> Admin
               </span>
