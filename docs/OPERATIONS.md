@@ -73,7 +73,9 @@ error, just wrong. Read in `src/lib/config.ts`.
 
 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` are for the one-time admin seed only.
 Without them `npm run db:seed` refuses to run against production, which is the
-guard stopping a public default admin login from being created.
+guard stopping a public default admin login from being created. The same check
+is what stops the development technician account (`tech@mobilux.lk`) from ever
+being seeded into a real shop — create those under **Admin → Staff**.
 
 ---
 
@@ -123,6 +125,26 @@ staging database, never at a shop's live one.** It refuses accounts that are not
 
 One check stays manual: sign in with the wrong password nine times, confirm the
 "too many sign-in attempts" message, then confirm it clears after the window.
+
+### The role split
+
+```bash
+BASE_URL=http://localhost:3000 VERIFY_WRITES=1 npm run verify:permissions
+```
+
+Asserts the `can(user, action)` table, audits that every server action is
+guarded — the failure this catches is someone adding an action next year and
+forgetting — and drives a real technician session against every back-office
+route, checking that the owner's pages turn them away, the nav hides what they
+can't use, the overview shows them no profit figures, each sign-in door
+redirects the wrong role to the right one, and deactivating ends their session
+on the next click.
+
+Without `VERIFY_WRITES=1` it still runs the table and the static audit, which
+need no server and no database — worth wiring into CI.
+
+It uses the dev seed logins and briefly deactivates the staff account, so point
+it at a development database.
 
 ---
 
@@ -215,3 +237,4 @@ accident.
 | Monthly | Confirm retention is still on; skim Vercel logs for repeated errors |
 | Before any migration on a live shop | Take a manual Neon branch first — it's free and instant |
 | After any auth, tracker or rate-limit change | Re-run `npm run verify:security` |
+| After adding a server action or an admin page | Re-run `npm run verify:permissions` |

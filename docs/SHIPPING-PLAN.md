@@ -206,40 +206,106 @@ WhatsApp number and the bill's "pay to" block.
 
 ---
 
-## Week 3 — Three roles and a staff login (~20 h)
+## Week 3 — Three roles and a staff login (~20 h) — **done 6 Aug 2026**
 
 `Role.STAFF` already exists in the schema and is completely unused. This week it
 becomes real. See [ARCHITECTURE.md](ARCHITECTURE.md#2-actors--permissions) for the
 full permission matrix.
 
+Verified: **51/51** via `npm run verify:permissions`, plus week 1's 33/33 still
+green. No schema change was needed.
+
 ### 3.1 Permission layer (5 h)
 
-- [ ] `lib/permissions.ts` — a single `can(user, action)` table, not scattered
-      `role === "ADMIN"` checks
-- [ ] Actions: `repair:write`, `repair:delete`, `bill:write`, `payment:verify`,
+- [x] `lib/permissions.ts` — a single `can(user, action)` table, not scattered
+      `role === "ADMIN"` checks. There were ~60 of them; there are now none.
+- [x] Actions: `repair:write`, `repair:delete`, `bill:write`, `payment:verify`,
       `report:read`, `settings:write`, `staff:manage`, `customer:block`
-- [ ] Staff get bench + billing; admin gets everything
+- [x] Staff get bench + billing; admin gets everything
+
+Seven more permissions than the list above, because the list didn't cover
+everything that already existed: `repair:issue` and `repair:issue-resolve`,
+`product:write`, `order:write`, `review:moderate`, `discount:write` and
+`customer:manage`.
+
+The `repair:issue` split is the one worth arguing with. A technician can
+**report** a bench error — that's them owning their own mistake, and it should
+be as frictionless as possible — but cannot **withdraw** one, because
+report-then-withdraw would erase the record Admin → Bench errors is built on.
+Recording a customer's accept/decline on their behalf is also the owner's, since
+it can cancel a repair and agree a refund.
+
+The module is pure (no Prisma, no `server-only`), so `middleware.ts` uses the
+same table for its edge pass.
 
 ### 3.2 Enforce it (6 h)
 
-- [ ] Extend `lib/auth-guard.ts` with `requirePermission()` / `actionPermission()`
-- [ ] Apply to every admin server action — **server-side, not just hidden buttons**
-- [ ] Hide the nav items staff can't use (Reports, Settings, Customers)
-- [ ] `middleware.ts` lets STAFF into `/admin`, still blocks CUSTOMER
+- [x] Extend `lib/auth-guard.ts` with `requirePermission()` / `actionPermission()`
+      — plus `requireStaff()` for the admin layout as a whole
+- [x] Apply to every admin server action — **server-side, not just hidden buttons**.
+      53 actions audited; the verification fails the build if a new one lands
+      without a guard, which is the mistake that will actually happen.
+- [x] Hide the nav items staff can't use (Reports, Settings, Customers) — and
+      Bench errors, Notes, Loyalty, Staff
+- [x] `middleware.ts` lets STAFF into `/admin`, still blocks CUSTOMER
+
+Also: the admin **overview** is a technician's landing page, and it led with a
+profit dashboard. That is now behind `report:read`, the Customers card is behind
+`customer:manage`, and the page's subtitle changes from "How the shop is doing"
+to "What's on the bench today".
 
 ### 3.3 Separate staff sign-in (6 h)
 
-- [ ] `/staff/login` — its own screen, its own copy, `noindex`, not linked from
-      the public site
-- [ ] A customer account entered at `/staff/login` is rejected, and a staff
+- [x] `/staff/login` — its own screen, its own copy, `noindex`, not linked from
+      the public site, and disallowed in `robots.txt`
+- [x] A customer account entered at `/staff/login` is rejected, and a staff
       account at `/login` is redirected to the staff entrance
-- [ ] Remove the admin path from the customer login page
+- [x] Remove the admin path from the customer login page — a signed-out
+      technician hitting `/admin/*` is now sent to `/staff/login`, not `/login`
+
+The wrong-door message only appears **after the password checks out**, so
+neither entrance can be used to discover which addresses belong to the shop's
+staff. A wrong password says "invalid email or password" at both doors.
 
 ### 3.4 Staff management (3 h)
 
-- [ ] Admin → Staff: create a technician account, deactivate one
-- [ ] Deactivating **must** bump `sessionsValidFrom` so they're out immediately
-- [ ] Only ADMIN can reach it
+- [x] Admin → Staff: create a technician account, deactivate one
+- [x] Deactivating **must** bump `sessionsValidFrom` so they're out immediately
+- [x] Only ADMIN can reach it
+
+Two things the plan didn't call for but the feature needs:
+
+- **Password handoff.** Staff have no self-service reset — a technician may not
+  have an email the shop controls. The owner sets the password, sees it once
+  with a copy button, and reads it out. Resetting also signs them out everywhere.
+- **The owner's own row isn't manageable from here.** Deactivating the last
+  admin would lock everyone out of settings with no way back in.
+
+Deactivation reuses the existing `blocked` column rather than adding a second
+"can this account sign in" flag — two flags is two places to get it wrong. A
+deactivated technician is told plainly and is **not** offered the customer
+unblock-request flow, which notifies every admin; that's an employment matter,
+not a support ticket.
+
+---
+
+### 3.5 Verify (not in the original plan)
+
+`npm run verify:permissions` — 51 checks:
+
+- the table itself: owner gets everything, customer and anonymous get nothing,
+  technician gets exactly the bench and the counter, and every permission in
+  the table is covered by the test (so adding one fails until it's classified)
+- a static audit that all 53 server actions are guarded, and that no
+  `role === "ADMIN"` remains
+- a real technician session: 6 back-office routes open, 7 turn them away, 5 nav
+  links hidden, no profit figures on the overview — then the same routes as the
+  owner to prove the test isn't passing vacuously
+- both sign-in doors, in all four combinations
+- deactivation ending a live session on the next click
+
+Without `VERIFY_WRITES=1` the table and static audit still run with no server
+and no database, so they can go in CI.
 
 ---
 
