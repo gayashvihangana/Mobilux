@@ -8,6 +8,9 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: [
         "/admin",
+        // The shop team's entrance. Listing it here is a hint to crawlers, not
+        // a secret — /staff/login also sets robots: noindex on the page itself.
+        "/staff",
         "/dashboard",
         "/repairs",
         "/orders",

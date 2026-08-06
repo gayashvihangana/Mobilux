@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Ban, Loader2, TriangleAlert } from "lucide-react";
+import { Ban, Loader2, TriangleAlert, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +42,26 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       {callbackUrl ? (
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
       ) : null}
-      {state?.blocked ? (
+      {state?.wrongEntrance === "staff" ? (
+        // A shop account with the right password. The staff entrance isn't
+        // advertised anywhere, so this is the one place it gets named — and
+        // only to someone who has already proved they own the account.
+        <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3.5 text-sm">
+          <div className="flex items-start gap-2.5">
+            <Wrench className="mt-0.5 size-4 shrink-0 text-primary" />
+            <div>
+              <p className="font-semibold">Use the staff entrance</p>
+              <p className="mt-0.5 text-muted-foreground">
+                This is the customer sign-in. Your account belongs to the shop
+                team.
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm" className="w-full">
+            <Link href="/staff/login">Go to staff sign-in</Link>
+          </Button>
+        </div>
+      ) : state?.blocked ? (
         <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3.5 text-sm text-destructive">
           <div className="flex items-start gap-2.5">
             <Ban className="mt-0.5 size-4 shrink-0" />
