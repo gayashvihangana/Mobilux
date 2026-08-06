@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { actionPermission } from "@/lib/auth-guard";
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import { PHONES_VISIBLE_KEY, setSetting } from "@/lib/settings";
@@ -30,9 +31,10 @@ function slugify(name: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-// Catalogue and stock are counter work.
+// Catalogue and stock are counter work. Returns the actor (not a bare
+// boolean) so callers that need to audit-log can reuse it.
 async function allowed() {
-  return !!(await actionPermission("product:write"));
+  return actionPermission("product:write");
 }
 
 function revalidateShop() {
@@ -122,13 +124,24 @@ export async function deleteProduct(
   _prev: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  if (!(await allowed())) return { error: "Not authorized." };
+  const actor = await allowed();
+  if (!actor) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string") return { error: "Invalid product." };
 
+  const product = await prisma.product.findUnique({ where: { id } });
+  if (!product) return { error: "Product not found." };
+
   try {
-    await prisma.product.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.product.delete({ where: { id } });
+      await logAudit(tx, actor, "product.delete", "Product", id, {
+        name: product.name,
+        price: Number(product.price),
+        stock: product.stock,
+      });
+    });
   } catch (e) {
     if (
       e instanceof Prisma.PrismaClientKnownRequestError &&

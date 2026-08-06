@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Prisma, type TicketStatus } from "@prisma/client";
 import { actionPermission, actionUser } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { computeBill, resolveBillShow } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
@@ -673,9 +674,8 @@ export async function markBillPaid(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionPermission("bill:write"))) {
-    return { error: "Not authorized." };
-  }
+  const actor = await actionPermission("bill:write");
+  if (!actor) return { error: "Not authorized." };
 
   const parsed = markPaidSchema.safeParse({
     ticketId: formData.get("ticketId"),
@@ -691,13 +691,27 @@ export async function markBillPaid(
     return { error: "Generate the bill (with a total) before marking it paid." };
   }
 
-  await prisma.repairTicket.update({
-    where: { id: parsed.data.ticketId },
-    data: {
-      paidAmount: total,
-      paidAt: new Date(),
-      paidMethod: parsed.data.method,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.repairTicket.update({
+      where: { id: parsed.data.ticketId },
+      data: {
+        paidAmount: total,
+        paidAt: new Date(),
+        paidMethod: parsed.data.method,
+      },
+    });
+    await logAudit(
+      tx,
+      actor,
+      "bill.markPaid",
+      "RepairTicket",
+      parsed.data.ticketId,
+      {
+        ticketNumber: result.bill.ticketNumber,
+        amount: total,
+        method: parsed.data.method,
+      },
+    );
   });
 
   revalidatePath(`/admin/tickets/${parsed.data.ticketId}/bill`);
@@ -711,18 +725,30 @@ export async function markBillUnpaid(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionPermission("bill:write"))) {
-    return { error: "Not authorized." };
-  }
+  const actor = await actionPermission("bill:write");
+  if (!actor) return { error: "Not authorized." };
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
 
+  const before = await prisma.repairTicket.findUnique({
+    where: { id: ticketId },
+    select: { ticketNumber: true, paidAmount: true, paidMethod: true },
+  });
+  if (!before) return { error: "Ticket not found." };
+
   // Clears only the manual paid record — a verified online payment (if any)
   // still keeps the bill settled, by design.
-  await prisma.repairTicket.update({
-    where: { id: ticketId },
-    data: { paidAmount: null, paidAt: null, paidMethod: null },
+  await prisma.$transaction(async (tx) => {
+    await tx.repairTicket.update({
+      where: { id: ticketId },
+      data: { paidAmount: null, paidAt: null, paidMethod: null },
+    });
+    await logAudit(tx, actor, "bill.markUnpaid", "RepairTicket", ticketId, {
+      ticketNumber: before.ticketNumber,
+      previousAmount: before.paidAmount ? Number(before.paidAmount) : null,
+      previousMethod: before.paidMethod,
+    });
   });
 
   revalidatePath(`/admin/tickets/${ticketId}/bill`);
@@ -843,9 +869,8 @@ export async function deleteStatusUpdate(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionPermission("repair:delete"))) {
-    return { error: "Not authorized." };
-  }
+  const actor = await actionPermission("repair:delete");
+  if (!actor) return { error: "Not authorized." };
 
   const updateId = formData.get("updateId");
   if (typeof updateId !== "string" || !updateId) {
@@ -854,7 +879,7 @@ export async function deleteStatusUpdate(
 
   const update = await prisma.statusUpdate.findUnique({
     where: { id: updateId },
-    select: { id: true, ticketId: true },
+    select: { id: true, ticketId: true, status: true },
   });
   if (!update) return { error: "Timeline entry not found." };
 
@@ -862,6 +887,7 @@ export async function deleteStatusUpdate(
     where: { id: update.ticketId },
     select: {
       id: true,
+      ticketNumber: true,
       customerId: true,
       statusUpdates: {
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -904,6 +930,14 @@ export async function deleteStatusUpdate(
         await syncCompletedRepairs(tx, ticket.customerId);
       }
     }
+    await logAudit(
+      tx,
+      actor,
+      "ticket.statusUpdate.delete",
+      "StatusUpdate",
+      update.id,
+      { ticketNumber: ticket.ticketNumber, deletedStatus: update.status, rollbackTo },
+    );
   });
 
   revalidatePath(`/admin/tickets/${update.ticketId}`);
@@ -1181,16 +1215,23 @@ export async function deleteTicket(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionPermission("repair:delete"))) {
-    return { error: "Not authorized." };
-  }
+  const actor = await actionPermission("repair:delete");
+  if (!actor) return { error: "Not authorized." };
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
 
   const ticket = await prisma.repairTicket.findUnique({
     where: { id: ticketId },
-    select: { id: true, ticketNumber: true, customerId: true },
+    select: {
+      id: true,
+      ticketNumber: true,
+      customerId: true,
+      brand: true,
+      model: true,
+      finalCost: true,
+      paidAmount: true,
+    },
   });
   if (!ticket) return { error: "Ticket not found." };
 
@@ -1199,6 +1240,13 @@ export async function deleteTicket(
     if (ticket.customerId) {
       await syncCompletedRepairs(tx, ticket.customerId);
     }
+    await logAudit(tx, actor, "ticket.delete", "RepairTicket", ticket.id, {
+      ticketNumber: ticket.ticketNumber,
+      deviceName: [ticket.brand, ticket.model].filter(Boolean).join(" ") || null,
+      customerId: ticket.customerId,
+      finalCost: ticket.finalCost ? Number(ticket.finalCost) : null,
+      paidAmount: ticket.paidAmount ? Number(ticket.paidAmount) : null,
+    });
   });
 
   revalidatePath("/admin/tickets");
@@ -1344,9 +1392,8 @@ export async function undoRepairIssueDecision(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionPermission("repair:issue-resolve"))) {
-    return { error: "Not authorized." };
-  }
+  const actor = await actionPermission("repair:issue-resolve");
+  if (!actor) return { error: "Not authorized." };
 
   const issueId = formData.get("issueId");
   if (typeof issueId !== "string") return { error: "Invalid issue." };
@@ -1428,6 +1475,14 @@ export async function undoRepairIssueDecision(
         },
       });
     }
+    await logAudit(
+      tx,
+      actor,
+      "repairIssue.undoDecision",
+      "RepairIssue",
+      issueId,
+      { ticketNumber: ticket.ticketNumber, wasDeclined },
+    );
   });
 
   revalidatePath(`/admin/tickets/${ticket.id}`);
@@ -1447,9 +1502,8 @@ export async function withdrawRepairIssue(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionPermission("repair:issue-resolve"))) {
-    return { error: "Not authorized." };
-  }
+  const actor = await actionPermission("repair:issue-resolve");
+  if (!actor) return { error: "Not authorized." };
 
   const issueId = formData.get("issueId");
   if (typeof issueId !== "string") return { error: "Invalid issue." };
@@ -1491,6 +1545,9 @@ export async function withdrawRepairIssue(
         },
       });
     }
+    await logAudit(tx, actor, "repairIssue.withdraw", "RepairIssue", issueId, {
+      ticketNumber: ticket.ticketNumber,
+    });
   });
 
   revalidatePath(`/admin/tickets/${ticket.id}`);
@@ -1625,6 +1682,13 @@ export async function respondRepairIssue(
           })),
         });
       }
+      // Logged regardless of who declined — the customer on their own issue,
+      // or staff recording it on their behalf — because "where's the refund"
+      // has to stay answerable either way.
+      await logAudit(tx, user, "repairIssue.declined", "RepairIssue", issueId, {
+        ticketNumber: ticket.ticketNumber,
+        onBehalf,
+      });
     });
   }
 

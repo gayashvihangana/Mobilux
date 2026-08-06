@@ -140,6 +140,7 @@ this is decided. The permission name is what a page or action actually asks for.
 | Block / unblock a customer | `customer:block` | — | ❌ | ✅ |
 | Shop settings & bank accounts | `settings:write` | — | ❌ | ✅ |
 | Create / deactivate staff | `staff:manage` | — | ❌ | ✅ |
+| Activity log (who deleted what, who moved money) | `audit:read` | — | ❌ | ✅ |
 
 Enforcement is **server-side in every case**. Hiding a nav item is presentation,
 not security — see [§6](#6-authorisation).
@@ -230,7 +231,7 @@ discounts) is a pure function in `lib/` so it can't drift between the two.
 
 ## 4. Data model
 
-14 models. Full definitions in `prisma/schema.prisma`.
+15 models. Full definitions in `prisma/schema.prisma`.
 
 ```
 User ──┬─< RepairTicket ──┬─< StatusUpdate
@@ -240,12 +241,14 @@ User ──┬─< RepairTicket ──┬─< StatusUpdate
        ├─< Order ──< OrderItem >── Product
        ├─< Payment
        ├─< Notification
-       └─< Testimonial
+       ├─< Testimonial
+       └─< AuditLog  (actor, optional — SetNull if the account is ever gone)
 
 Setting        key-value shop configuration
 DiscountRule   loyalty tiers
 PasswordReset  one active reset code per email
 RateLimit      fixed-window counters
+AuditLog       who deleted what, who moved money — see §6, week 4.1
 ```
 
 ### 4.1 Notable decisions
@@ -382,6 +385,15 @@ Three entry points, all in `lib/auth-guard`:
 
 A technician who types `/admin/reports` lands back on the admin overview rather
 than a 403 — they haven't done anything wrong, the page simply isn't theirs.
+
+**`can()` answers what a role may do; `AuditLog` answers what an account
+actually did.** `lib/audit.ts`'s `logAudit()` is called from inside the same
+transaction as the mutation it records — deleting a repair, marking a bill
+paid, verifying or rejecting a payment, deleting a loyalty tier or product,
+and every bank-account change — so a failed audit write rolls the mutation
+back rather than the action silently going unlogged. Read-only in the UI
+(Admin → Activity, `audit:read`, owner-only); nothing deletes an entry.
+`npm run verify:audit` checks the wiring.
 
 ---
 
@@ -535,27 +547,24 @@ Honest list. None are secret; all are either accepted trade-offs or scheduled.
    `next build` cannot prerender without `DATABASE_URL` reachable. Fine on
    Vercel (migrations already run first); worth knowing if a build ever fails
    with a Prisma connection error rather than a code error.
-3. **No audit log — now the urgent one.** Nothing records who deleted a repair
-   or marked a bill paid. That was tolerable when the owner was the only
-   account; with technicians signing in under their own names it is the gap
-   that matters most. Week 4.
-4. **A technician's permissions are fixed.** There is one STAFF role, not
+3. **A technician's permissions are fixed.** There is one STAFF role, not
    per-person permissions. A shop that wants "Nimal can bill but Sunil can't"
    needs a second role; the table in `lib/permissions.ts` is where that would
    go, and nothing else would have to change.
-5. **Uploaded files are permanent public URLs.** Unguessable, but not revocable;
+4. **Uploaded files are permanent public URLs.** Unguessable, but not revocable;
    anyone who obtains one keeps access. Accepted for now.
-6. **No 2FA**, and password policy is length-only (min 8, no breach check).
-7. **`next-auth` is a beta dependency.** Pin it exactly before selling.
-8. **English only.** Sinhala/Tamil is probably the biggest adoption lever in this
+5. **No 2FA**, and password policy is length-only (min 8, no breach check).
+6. **`next-auth` is a beta dependency.** Pin it exactly before selling.
+7. **English only.** Sinhala/Tamil is probably the biggest adoption lever in this
    market, and a bigger job than it looks.
-9. **Almost no automated tests.** `scripts/verify-security.mjs` and
-   `scripts/verify-permissions.ts` cover the security-critical paths — tracker
-   exposure, ticket enumeration, the rate limiter, blocking, session
-   revocation, and the whole role split — against a live server and database.
-   Everything else is typecheck + build + manual click-through. There are no
-   unit tests around bill computation, loyalty tiers or status transitions,
-   which is where a silent money bug would live.
-10. **Login lockout is not covered by the verification script.** It runs through
-    a `useActionState` form action the script cannot invoke over HTTP. The
-    limiter underneath it is proven; the wiring is checked by hand.
+8. **Almost no automated tests.** `scripts/verify-security.mjs`,
+   `scripts/verify-permissions.ts` and `scripts/verify-audit.ts` cover the
+   security-critical paths — tracker exposure, ticket enumeration, the rate
+   limiter, blocking, session revocation, the whole role split, and who's
+   accountable for a deletion or a payment — against a live server and
+   database. Everything else is typecheck + build + manual click-through.
+   There are no unit tests around bill computation, loyalty tiers or status
+   transitions, which is where a silent money bug would live.
+9. **Login lockout is not covered by the verification script.** It runs through
+   a `useActionState` form action the script cannot invoke over HTTP. The
+   limiter underneath it is proven; the wiring is checked by hand.

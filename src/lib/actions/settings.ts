@@ -3,6 +3,8 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { actionPermission } from "@/lib/auth-guard";
+import { logAudit } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import {
   SHOP_BANK_ACCOUNTS_KEY,
@@ -22,8 +24,16 @@ export type SettingsFormState = {
 } | null;
 
 // Changing where money is paid is the highest-value attack on a repair shop.
+// Returns the actor (not a bare boolean) so callers that need to audit-log
+// can reuse it.
 async function allowed() {
-  return !!(await actionPermission("settings:write"));
+  return actionPermission("settings:write");
+}
+
+// Never log the full account number — the last 4 digits are enough to tell
+// entries apart in Admin → Activity without repeating the whole secret there.
+function last4(accountNumber: string) {
+  return accountNumber.slice(-4);
 }
 
 function revalidateSettings() {
@@ -66,16 +76,22 @@ export async function addBankAccount(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!(await allowed())) return { error: "Not authorized." };
+  const actor = await allowed();
+  if (!actor) return { error: "Not authorized." };
 
   const parsed = parseAccount(formData);
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
+  const account = { id: crypto.randomUUID(), ...normalize(parsed.data) };
   const accounts = await getShopBankAccounts();
-  accounts.push({ id: crypto.randomUUID(), ...normalize(parsed.data) });
+  accounts.push(account);
   await persistAccounts(accounts);
+  await logAudit(prisma, actor, "bankAccount.add", "BankAccount", account.id, {
+    bankName: account.bankName,
+    accountNumberLast4: last4(account.accountNumber),
+  });
   return { success: true };
 }
 
@@ -83,7 +99,8 @@ export async function updateBankAccount(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!(await allowed())) return { error: "Not authorized." };
+  const actor = await allowed();
+  if (!actor) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Account not found." };
@@ -99,6 +116,10 @@ export async function updateBankAccount(
 
   accounts[idx] = { id: accounts[idx].id, ...normalize(parsed.data) };
   await persistAccounts(accounts);
+  await logAudit(prisma, actor, "bankAccount.update", "BankAccount", id, {
+    bankName: accounts[idx].bankName,
+    accountNumberLast4: last4(accounts[idx].accountNumber),
+  });
   return { success: true };
 }
 
@@ -106,7 +127,8 @@ export async function deleteBankAccount(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!(await allowed())) return { error: "Not authorized." };
+  const actor = await allowed();
+  if (!actor) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Account not found." };
@@ -115,10 +137,15 @@ export async function deleteBankAccount(
   if (accounts.length <= 1) {
     return { error: "Keep at least one account — it's used on bills." };
   }
+  const removed = accounts.find((a) => a.id === id);
   const next = accounts.filter((a) => a.id !== id);
   if (next.length === accounts.length) return { error: "Account not found." };
 
   await persistAccounts(next);
+  await logAudit(prisma, actor, "bankAccount.delete", "BankAccount", id, {
+    bankName: removed?.bankName ?? null,
+    accountNumberLast4: removed ? last4(removed.accountNumber) : null,
+  });
   return { success: true };
 }
 
@@ -127,7 +154,8 @@ export async function deleteBankAccount(
 export async function makePrimaryBankAccount(
   id: string,
 ): Promise<SettingsFormState> {
-  if (!(await allowed())) return { error: "Not authorized." };
+  const actor = await allowed();
+  if (!actor) return { error: "Not authorized." };
 
   const accounts = await getShopBankAccounts();
   const target = accounts.find((a) => a.id === id);
@@ -135,6 +163,10 @@ export async function makePrimaryBankAccount(
 
   const reordered = [target, ...accounts.filter((a) => a.id !== id)];
   await persistAccounts(reordered);
+  await logAudit(prisma, actor, "bankAccount.makePrimary", "BankAccount", id, {
+    bankName: target.bankName,
+    accountNumberLast4: last4(target.accountNumber),
+  });
   return { success: true };
 }
 

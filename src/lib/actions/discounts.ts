@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { actionPermission } from "@/lib/auth-guard";
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 
 export type DiscountFormState = {
@@ -24,9 +25,10 @@ const ruleSchema = z.object({
   active: z.coerce.boolean(),
 });
 
-// Loyalty tiers are pricing, so they stay with the owner.
+// Loyalty tiers are pricing, so they stay with the owner. Returns the actor
+// (not a bare boolean) so callers that need to audit-log can reuse it.
 async function allowed() {
-  return !!(await actionPermission("discount:write"));
+  return actionPermission("discount:write");
 }
 
 function revalidateLoyalty() {
@@ -114,12 +116,22 @@ export async function deleteDiscountRule(
   _prev: DiscountFormState,
   formData: FormData,
 ): Promise<DiscountFormState> {
-  if (!(await allowed())) return { error: "Not authorized." };
+  const actor = await allowed();
+  if (!actor) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Missing rule id." };
 
-  await prisma.discountRule.delete({ where: { id } });
+  const rule = await prisma.discountRule.findUnique({ where: { id } });
+  if (!rule) return { error: "Rule not found." };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.discountRule.delete({ where: { id } });
+    await logAudit(tx, actor, "discountRule.delete", "DiscountRule", id, {
+      minRepairs: rule.minRepairs,
+      discountPercent: Number(rule.discountPercent),
+    });
+  });
 
   revalidateLoyalty();
   return { success: true };

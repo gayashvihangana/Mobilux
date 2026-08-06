@@ -41,6 +41,7 @@ const NAV_GROUPS: (Omit<AdminNavGroup, "links"> & { links: GuardedLink[] })[] = 
       { href: "/admin/reports", label: "Reports", hint: "Revenue & repair trends", need: "report:read" },
       { href: "/admin/errors", label: "Bench errors", hint: "What went wrong, and its cost", need: "report:read" },
       { href: "/admin/notes", label: "Notes", hint: "Lessons from the bench", need: "report:read" },
+      { href: "/admin/activity", label: "Activity", hint: "Who did what", need: "audit:read" },
     ],
   },
   {

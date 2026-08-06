@@ -14,7 +14,8 @@
     "db:pull": "node scripts/db-pull.mjs",
     "db:studio": "prisma studio",
     "verify:security": "node scripts/verify-security.mjs",
-    "verify:permissions": "tsx scripts/verify-permissions.ts"
+    "verify:permissions": "tsx scripts/verify-permissions.ts",
+    "verify:audit": "tsx scripts/verify-audit.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

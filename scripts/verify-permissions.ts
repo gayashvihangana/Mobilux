@@ -61,6 +61,7 @@ function checkTable() {
     "discount:write",
     "settings:write",
     "staff:manage",
+    "audit:read",
   ];
 
   check(
@@ -251,6 +252,7 @@ const OWNER_ONLY = [
   "/admin/customers",
   "/admin/settings",
   "/admin/staff",
+  "/admin/activity",
 ];
 
 async function checkRoutes() {
@@ -273,7 +275,7 @@ async function checkRoutes() {
   }
 
   // Nav: the links they can't use aren't offered.
-  for (const label of ["Reports", "Bench errors", "Settings", "Staff", "Customers"]) {
+  for (const label of ["Reports", "Bench errors", "Settings", "Staff", "Customers", "Activity"]) {
     check(!overviewHtml.includes(`>${label}<`),
       `the ${label} nav link is hidden from a technician`);
   }

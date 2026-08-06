@@ -55,6 +55,8 @@ export const PERMISSIONS = [
   "settings:write",
   /** Create and deactivate staff accounts. */
   "staff:manage",
+  /** Who did what — Admin → Activity. */
+  "audit:read",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

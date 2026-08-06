@@ -311,16 +311,32 @@ and no database, so they can go in CI.
 
 ## Week 4 — Audit log and the demo instance (~20 h)
 
-### 4.1 Audit log (7 h)
+### 4.1 Audit log (7 h) — **done 7 Aug 2026**
 
 Highest-value item in the whole plan. Nothing currently records who deleted a
 repair or marked a bill paid. With staff accounts arriving in week 3, "where did
 that LKR 20,000 repair go?" must be answerable.
 
-- [ ] `AuditLog { id, actorId, action, targetType, targetId, meta, createdAt }`
-- [ ] Write from every action that deletes, or moves money
-- [ ] Admin → Activity, filterable by person and date
-- [ ] Never deletable from the UI
+Verified: **20/20** via `npm run verify:audit` (schema, the `audit:read`
+permission, wiring, and — with `VERIFY_WRITES=1` — a real write against the
+table), plus week 3's `verify:permissions` still green at 8/8 static (16/16
+in the table check, one entry added for `audit:read`).
+
+- [x] `AuditLog { id, actorId, actorName, actorRole, action, entityType, entityId, meta, createdAt }`
+      — the two snapshot fields (`actorName`/`actorRole`) so an entry still
+      reads correctly if the account's name changes later
+- [x] Write from every action that deletes, or moves money — 14 call sites
+      across `tickets.ts`, `payments.ts`, `discounts.ts`, `products.ts` and
+      `settings.ts`. Extended past the letter of this line to all four
+      bank-account actions (add/update/delete/make-primary), not just delete —
+      `settings.ts` already called that "the highest-value attack on a repair
+      shop" and add/update change *where money is paid* just as much as
+      deleting an account does.
+- [x] Admin → Activity, filterable by person and date (`FilterMenu`, the same
+      component the Repairs list already uses)
+- [x] Never deletable from the UI — the honest way to guarantee that is to not
+      build the control; `verify:audit` greps the app for `auditLog.delete(`
+      and fails the build if one ever appears
 
 ### 4.2 Demo instance (10 h)
 
