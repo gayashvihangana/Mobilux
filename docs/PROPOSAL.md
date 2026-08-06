@@ -78,6 +78,20 @@ shop's name, logo, phone number and bank details on it.
 | **Hosting** | Included and configured. Nothing to install on your computers. |
 | **Works on phones** | Your team can update a repair from the bench on their phone |
 
+### What you are actually buying
+
+You're buying a **licence to run this system for your shop, for as long as you
+want** — not the software itself, and not the right to pass it on. Your setup fee
+covers one installation for one business: your own site, your own private
+database, your own branding, unlimited repairs, unlimited customers, unlimited
+staff accounts. It keeps running whether or not you continue the monthly support,
+and nobody can switch it off on you. Everything your shop and your customers put
+into it is **yours** — I claim no ownership of your records, and you can ask for a
+full export at any time. What you can't do is resell it, hand it to another shop,
+or run it for a business other than your own; a second shop or a second brand
+needs its own licence. The full terms are in the licence agreement that comes with
+your installation.
+
 **Try it before you decide:** [[demo link]]
 
 ## How setting up works
