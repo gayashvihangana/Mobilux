@@ -1,9 +1,9 @@
 # Mobilux — Technical Design Document
 
-**Version:** 1.0 · **Last updated:** 31 July 2026
+**Version:** 1.2 · **Last updated:** 6 August 2026
 **Audience:** developers working on or taking over this codebase.
 
-Related: [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) · [README](../README.md) for setup
+Related: [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [OPERATIONS.md](OPERATIONS.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) · [README](../README.md) for setup
 
 > **Status legend.** Sections describing behaviour that exists today are
 > unmarked. Anything marked 🔜 is designed but **not yet built** — it lands in
@@ -166,11 +166,21 @@ photos, no damage-dispute text, no costs.
 |---|---|---|
 | `(marketing)` | Landing, storefront, repair tracker | Public |
 | `(auth)` | Login, register, forgot password | Public |
-| `(app)` | Customer workspace | `requireUser()`, redirects ADMIN to `/admin` |
-| `admin` | Shop back office | `requireAdmin()` |
-| `bill/[id]` | Printable invoice | Signed in **and** owner-or-admin |
+| `(app)` | Customer workspace | `(app)/layout.tsx` → `requireUser()`, redirects ADMIN to `/admin` |
+| `admin` | Shop back office | `admin/layout.tsx` → `requireAdmin()` |
+| `bill/[id]` | Printable invoice | **No layout above it** — the page calls `requireUser()` itself, then owner-or-admin |
 | `api/auth/[...nextauth]` | Auth.js handler | — |
 | `staff/login` 🔜 | Shop team sign-in | Public, `noindex` |
+
+⚠️ **`bill/[id]` is the odd one out and worth knowing about.** Every other
+signed-in route inherits a DB-validated guard from the layout above it, so the
+page itself can read `auth()` for the user id and trust that the account was
+re-checked. `bill/[id]` has no such layout. It read the session cookie directly
+until 6 August 2026, which meant blocking a customer — or a password change that
+was supposed to end their other sessions — did not reach it: the old cookie kept
+opening the bill until it expired. Found by the week-1 verification, fixed by
+switching the page to `requireUser()`. **Any new route added outside `(app)` and
+`admin` has the same trap.**
 
 ### 3.3 Code layout
 
@@ -189,6 +199,11 @@ src/
     bill.ts       bill computation (pure)
     track.ts      public tracker queries (deliberately narrow selects)
   middleware.ts   edge guard — cheap first pass only
+
+scripts/
+  migrate-deploy.mjs   runs before next build on Vercel
+  db-pull.mjs          copy production data into a local database
+  verify-security.mjs  post-install security verification (writes — read it first)
 ```
 
 **Convention:** business rules live in `lib/`, not in components. Anything a
@@ -278,8 +293,16 @@ request
 ```
 
 **Middleware is not a security boundary here.** It runs on the edge where Prisma
-can't, so it can only read the token. Every real check happens in a layout or a
-server action.
+can't, so it can only read the token. Every real check happens in a layout, a
+page that guards itself, or a server action.
+
+**The failure mode to watch for** is a route that reads `auth()` without a
+DB-validated guard above it. Such a route is protected against *signed-out*
+visitors (middleware catches those) but not against an account that has since
+been blocked or had its sessions revoked — the cookie is still cryptographically
+valid, and only the database knows it shouldn't be honoured. `bill/[id]` was
+exactly this ([§3.2](#32-route-groups)). Reading `auth()` inside a route that
+*does* sit under a guarded layout is fine.
 
 ### 5.3 Sign-in separation 🔜
 
@@ -301,7 +324,8 @@ pattern.
 Three layers, and only the last two are load-bearing:
 
 1. `middleware.ts` — path-based, redirects the obviously-wrong. Cheap, not trusted.
-2. **Layout guards** — `requireAdmin()` / `requireUser()`, DB-validated.
+2. **Layout guards** — `requireAdmin()` / `requireUser()`, DB-validated. A route
+   with no guarded layout above it must call one of these itself.
 3. **Server actions** — every one re-checks. An action is a public HTTP endpoint;
    it never assumes a page guard ran first.
 
@@ -383,6 +407,7 @@ place and why:
 | CSRF | Next's built-in Server Action origin check |
 | Uploads | Type + size caps, UUID filenames, `Referrer-Policy` so URLs don't leak |
 | Secrets | Never committed; `AUTH_SECRET` unique per deployment |
+| Proving it | `npm run verify:security` drives a live server + database — see [OPERATIONS.md §3](OPERATIONS.md#3-verifying-an-install) |
 
 **`script-src` still allows `'unsafe-inline'`.** Next's App Router emits inline
 bootstrap scripts and next-themes writes an inline theme script; removing it
@@ -392,6 +417,10 @@ The other directives do real work regardless.
 ---
 
 ## 9. Deployment & environments
+
+The full variable list, the deploy checklist, and the backup/restore runbook are
+in [OPERATIONS.md](OPERATIONS.md). This section is the shape; that one is the
+procedure.
 
 ### 9.1 Per-instance resources
 
@@ -410,16 +439,42 @@ let a token minted at one shop validate at another.
 
 | Layer | Where | Changed by | Takes effect |
 |---|---|---|---|
-| Identity fallback | `NEXT_PUBLIC_*` env vars | Installer | Redeploy |
+| First-run fallback | `NEXT_PUBLIC_*` env vars | Installer | Redeploy |
 | Live configuration | `Setting` table | Shop owner, in the UI | Immediately |
 
-⚠️ **These are not yet unified.** The database wins for bills, pickup messages
-and bank details; the env var still wins for the logo, footer, page title and
-emails. Week 2 of the shipping plan fixes this. Until then, renaming a shop needs
-both a Settings edit **and** an env change.
+**The database is the source of truth.** Every surface that shows the shop's
+identity — header logo, footer, browser tab title, social previews, JSON-LD,
+emails, the printed bill, the public tracker, WhatsApp links, the brand colour —
+reads `getShopInfo()`. The env vars only fill in before an owner has saved
+anything, so a fresh install looks right on day one.
 
-`NEXT_PUBLIC_*` values are inlined **at build time**, not read per request —
-changing one requires a redeploy, and Vercel does not read your local `.env`.
+`NEXT_PUBLIC_*` values are inlined **at build time**, so changing one still
+requires a redeploy — but an owner never needs to. They change it in Settings.
+
+### 9.2.1 How a rename reaches every page
+
+`getShopInfo()` is wrapped in `unstable_cache` under the tag `shop-info`, and
+memoised per request with React `cache`. It is read by the root layout, so
+without the cache it would be six settings rows on every render of every page.
+
+`unstable_cache` persists to the **filesystem** incremental cache, which
+survives a server restart. `revalidateTag("shop-info")` in `updateShopInfo` is
+therefore the only thing that clears it — restarting the process does not.
+That makes the `revalidateTag` call load-bearing, not a nicety: without it a
+rename would never appear, even after a redeploy.
+
+Components that cannot read the database — anything under `"use client"`, which
+includes the mobile nav sheet and the bill builder's live preview — take the
+identity as a prop from the nearest async layout or page.
+
+### 9.2.2 Brand colour
+
+The shop picks a **hue angle**, not a colour. `globals.css` expresses every
+branded token as a rotation of `--brand-hue`, which the root layout sets inline
+on `<html>` from Settings. Lightness and chroma stay tuned per theme, so a shop
+cannot choose something that fails contrast in dark mode. `.brand-scope`
+re-declares those tokens so the Settings page can preview a different hue than
+the page it sits on.
 
 ### 9.3 Migrations
 
@@ -434,7 +489,10 @@ Honest list. None are secret; all are either accepted trade-offs or scheduled.
 
 1. **Walk-in tickets have no phone number.** So `/track` manual lookup cannot
    verify them — those customers depend entirely on their tracking link.
-2. **Configuration is split** between env vars and the database ([§9.2](#92-configuration-layers)). Week 2.
+2. **The build needs a database.** The root layout reads shop identity, so
+   `next build` cannot prerender without `DATABASE_URL` reachable. Fine on
+   Vercel (migrations already run first); worth knowing if a build ever fails
+   with a Prisma connection error rather than a code error.
 3. **No audit log.** Nothing records who deleted a repair or marked a bill paid.
    Becomes urgent the moment staff accounts exist. Week 4.
 4. **`STAFF` is unused** — everyone shares the owner's login today. Week 3.
@@ -444,5 +502,12 @@ Honest list. None are secret; all are either accepted trade-offs or scheduled.
 7. **`next-auth` is a beta dependency.** Pin it exactly before selling.
 8. **English only.** Sinhala/Tamil is probably the biggest adoption lever in this
    market, and a bigger job than it looks.
-9. **No automated tests.** Verification is typecheck + build + manual
-   click-through. The riskiest gap as the codebase grows.
+9. **Almost no automated tests.** `scripts/verify-security.mjs` covers the
+   security-critical paths — tracker exposure, ticket enumeration, the rate
+   limiter, blocking and session revocation — against a live server and
+   database. Everything else is typecheck + build + manual click-through. There
+   are no unit tests around bill computation, loyalty tiers or status
+   transitions, which is where a silent money bug would live.
+10. **Login lockout is not covered by the verification script.** It runs through
+    a `useActionState` form action the script cannot invoke over HTTP. The
+    limiter underneath it is proven; the wiring is checked by hand.

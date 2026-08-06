@@ -40,23 +40,37 @@ legally use the software** — including someone who has paid you.
 For "I sell installs but keep ownership" you want a short proprietary EULA, not
 an open-source licence (MIT/Apache would let a buyer resell your work).
 
-- [ ] Write `LICENSE` — proprietary, grants one shop the right to run one instance
-- [ ] Write a one-paragraph "what you are buying" note for the proposal
-- [ ] Decide: does the GitHub repo stay **private**? With a one-off install model,
-      public means anyone can self-host instead of paying you.
+- [x] Write `LICENSE` — proprietary, grants one shop the right to run one instance
+- [x] Write a one-paragraph "what you are buying" note for the proposal —
+      "What you are actually buying" in [PROPOSAL.md](PROPOSAL.md)
+- [x] Decide: does the GitHub repo stay **private**? **Yes — decided 6 Aug 2026.**
+      Buyers see the demo deployment, never the source.
 
 ### 1.2 Apply and verify the security migration ⛔ (4 h)
 
 The security work is typechecked and builds, but **has never run against a
 database**. Until it does, none of it is proven.
 
-- [ ] Start Docker Desktop, `npm run db:migrate`
-- [ ] Sign in, block that customer from admin → confirm they're kicked on next click
+**Done 6 Aug 2026.** Migration applied; 33/33 checks pass via
+`npm run verify:security` ([OPERATIONS.md §3](OPERATIONS.md#3-verifying-an-install)).
+The verification found and fixed a real hole — see the note below.
+
+- [x] Start Docker Desktop, `npm run db:migrate` — 42 existing tickets each
+      backfilled with a distinct `trackToken`, nobody signed out
+- [x] Sign in, block that customer from admin → confirm they're kicked on next click
 - [ ] Wrong password 9× → confirm "too many attempts", and that it clears
-- [ ] Open a tracking link in a private window → milestones show, admin notes and photos do **not**
-- [ ] `/track` with ticket number + wrong phone digits → "couldn't find that repair"
-- [ ] Print a bill → scan the QR → confirm it opens the tracker
-- [ ] Change your password → confirm other devices are signed out
+      — **still manual**, the script can't invoke that form action
+- [x] Open a tracking link in a private window → milestones show, admin notes and photos do **not**
+- [x] `/track` with ticket number + wrong phone digits → "couldn't find that repair"
+- [ ] Print a bill → scan the QR → confirm it opens the tracker — **needs a phone**
+- [x] Change your password → confirm other devices are signed out
+
+> **Found while verifying:** `/bill/[id]` sits outside both guarded layouts and
+> read the session cookie directly, so blocking a customer — and a password
+> change that should have ended their other sessions — did not reach it. A stale
+> cookie kept opening the bill until it expired. Fixed by switching the page to
+> `requireUser()`; the verification script now checks every guarded route, not
+> just `/dashboard`. See [ARCHITECTURE.md §3.2](ARCHITECTURE.md#32-route-groups).
 
 ### 1.3 Fix the Vercel environment (2 h)
 
@@ -64,27 +78,49 @@ Your live deployment has none of the new `NEXT_PUBLIC_SHOP_*` variables, so
 deploying today would make mobiluxlk.vercel.app say "Your Shop".
 
 - [ ] Add all `NEXT_PUBLIC_SHOP_*` and `NEXT_PUBLIC_BANK_*` vars in Vercel
-      (Production + Preview + Development), raw values, no quotes
-- [ ] Deploy and check the live site + a printed bill
+      (Production + Preview + Development), raw values, no quotes —
+      full list in [OPERATIONS.md §1](OPERATIONS.md#1-environment-variables)
+- [ ] Deploy and check the live site + a printed bill —
+      checklist in [OPERATIONS.md §2](OPERATIONS.md#2-deploying)
+
+Note: `NEXT_PUBLIC_BILL_QUOTE` is read by `src/lib/config.ts` but was missing
+from `.env.example` — added 6 Aug 2026.
 
 ### 1.4 Backups, actually tested (3 h)
 
-- [ ] Turn on Neon point-in-time restore
-- [ ] **Restore once, to a scratch database, and confirm the data is there**
-- [ ] Write the recovery steps down — this becomes a selling point
+- [ ] Turn on Neon point-in-time restore — steps in
+      [OPERATIONS.md §4.2](OPERATIONS.md#42-turn-it-on)
+- [ ] **Restore once, to a scratch database, and confirm the data is there** —
+      the branch-based drill in [OPERATIONS.md §4.3](OPERATIONS.md#43-test-it--this-is-the-part-people-skip)
+- [x] Write the recovery steps down — this becomes a selling point →
+      [OPERATIONS.md §4.4](OPERATIONS.md#44-recovery-runbook)
 
 ### 1.5 Commit the security work (2 h)
 
-It's all still uncommitted. Branch, review the diff, commit in logical chunks.
+- [x] Already committed as `cf80b98` — the working tree was clean at the start
+      of week 1. Nothing to do.
 
 ### 1.6 Read the architecture doc (5 h)
 
-- [ ] Read [ARCHITECTURE.md](ARCHITECTURE.md) end to end and correct anything wrong
-- [ ] It is the reference for weeks 2–3; errors there cost you later
+- [x] Read [ARCHITECTURE.md](ARCHITECTURE.md) end to end and correct anything wrong
+- [x] It is the reference for weeks 2–3; errors there cost you later
+
+Checked against the code, not just re-read: model count, route guards, session
+`maxAge`, rate-limit policies, the security-header set, the public tracker's
+column list, and every dependency version claimed in the stack table. All held
+except the guard on `/bill/[id]` (§1.2 above). Updated for v1.1: the route-group
+table now says which guard each group actually gets, §5.2 and §6 name the
+"reads `auth()` with no guarded layout above it" trap, §10 records that the
+login-lockout path isn't covered by the script, and §9 points at the new
+[OPERATIONS.md](OPERATIONS.md).
 
 ---
 
-## Week 2 — Make Settings the real source of truth (~20 h)
+## Week 2 — Make Settings the real source of truth (~20 h) — **done 6 Aug 2026**
+
+Verified end to end: a rename saved through the real Admin → Settings form
+reaches every surface with **no redeploy and no restart** — 31/31 checks.
+Details in [ARCHITECTURE.md §9.2](ARCHITECTURE.md#92-configuration-layers).
 
 Today shop identity lives in two places that disagree:
 
@@ -99,32 +135,74 @@ Today shop identity lives in two places that disagree:
 An owner who renames their shop in Settings sees the bill update and the logo
 stay put. That's the most confusing thing a buyer hits in week one.
 
+*(The table above describes how things were before this week. The database now
+wins everywhere; the env vars are first-run fallbacks only.)*
+
 ### 2.1 Cached shop-info reader (4 h)
 
-- [ ] Wrap `getShopInfo()` in `unstable_cache` (or a request-scoped memo) —
+- [x] Wrap `getShopInfo()` in `unstable_cache` (or a request-scoped memo) —
       it's about to be called on every render, and six settings lookups per page
-      is not acceptable
-- [ ] Invalidate the cache in `updateShopInfo`
+      is not acceptable. **Both**: `unstable_cache` across requests, React
+      `cache` within one render.
+- [x] Invalidate the cache in `updateShopInfo`
+
+> **Turned out to be load-bearing, not an optimisation.** `unstable_cache`
+> persists to the filesystem incremental cache, so it survives a server
+> restart — `revalidateTag("shop-info")` is the *only* thing that clears it.
+> Found by testing: after writing new settings straight to the database and
+> restarting the server, every page still showed the old name.
 
 ### 2.2 Move each consumer onto it (10 h)
 
-- [ ] `Logo`, `site-footer`, `hero-visual` → take the name as a **prop** from the
-      layout (layouts are async and can read the DB; these components can't)
-- [ ] Root `layout.tsx` → convert the static `metadata` export to async
+- [x] `Logo`, `site-footer`, `hero-visual` → take the name as a **prop** from the
+      layout (layouts are async and can read the DB; these components can't).
+      `MobileNav` too — it's a client component that renders `Logo`.
+- [x] Root `layout.tsx` → convert the static `metadata` export to async
       `generateMetadata()` so the tab title follows the saved name
-- [ ] `lib/email.ts` → `sendEmail` reads shop info instead of importing `SHOP`
-- [ ] `lib/status.ts` → pickup/collection copy takes the shop name as an argument
-- [ ] `bill-document.tsx` → receives shop info as props
+- [x] `lib/email.ts` → `sendEmail` reads shop info instead of importing `SHOP`
+- [x] `lib/status.ts` → pickup/collection copy takes the shop name as an argument
+- [x] `bill-document.tsx` → receives shop info as props
+
+The list above turned out to be about half the real surface. Also migrated:
+
+- [x] The landing page's **JSON-LD** — it published a hardcoded "Colombo" and
+      the env name straight to Google
+- [x] `site-footer` had `"Fix. Track. Trust. — Colombo, Sri Lanka"` **hardcoded**,
+      not even an env var
+- [x] Public tracker (both entry points), storefront product page, repairs list,
+      admin ticket page, password-reset email and subject line
+- [x] **WhatsApp number** — was env-only via a build-time `WHATSAPP_ENABLED`
+      constant, so a shop changing numbers needed a redeploy. Now in Settings.
+- [x] Both customer **payment cards** showed the `NEXT_PUBLIC_BANK_*` account
+      while the bill showed the Settings one — the two disagreed in front of a
+      paying customer
+- [x] `computeBill` now falls back to the Settings default account before the
+      env value, for bills issued before the bill builder existed
 
 ### 2.3 Extend the Settings page (4 h)
 
-- [ ] Logo mark (upload or emoji) and accent colour, not just text
-- [ ] A live preview so an owner can see what they're changing
+- [x] Logo mark (upload **and** emoji — image wins, emoji is the fallback,
+      lucide phone icon if neither) and accent colour, not just text
+- [x] A live preview so an owner can see what they're changing — shows the
+      header and the bill letterhead, re-colouring as they pick
+- [x] WhatsApp number, which had no Settings field at all
+
+**Brand colour is a hue angle, not a colour picker.** Every branded token in
+`globals.css` is a rotation of `--brand-hue`; lightness and chroma stay tuned
+per theme. A shop cannot pick something unreadable in dark mode.
 
 ### 2.4 Verify (2 h)
 
-- [ ] Rename the shop in Settings → confirm logo, footer, tab title, a new email
+- [x] Rename the shop in Settings → confirm logo, footer, tab title, a new email
       and a fresh bill **all** change with no redeploy
+
+Driven through the **real form**, submitted over HTTP the way a browser with no
+JavaScript would, so the whole chain runs: `updateShopInfo` → `setSetting` →
+`revalidateTag`. 31/31 checks across the landing page, sign-in, register (the
+statically prerendered one), both tracker entry points, the customer dashboard
+and a printed bill — each asserted to show the new name **and** to no longer
+contain the old one, plus the tab title, JSON-LD, brand hue, logo emoji,
+WhatsApp number and the bill's "pay to" block.
 
 ---
 
