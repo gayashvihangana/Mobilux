@@ -5,8 +5,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { phonesVisible } from "@/lib/settings";
-import { SHOP, SITE_URL, WHATSAPP_ENABLED, whatsappLink } from "@/lib/config";
+import { getShopInfo, phonesVisible, shopWhatsappLink } from "@/lib/settings";
+import { SITE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp";
 import { productPlaceholder } from "@/components/product-card";
@@ -42,10 +42,11 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const [product, session, showPhones] = await Promise.all([
+  const [product, session, showPhones, shop] = await Promise.all([
     prisma.product.findUnique({ where: { slug } }),
     auth(),
     phonesVisible(),
+    getShopInfo(),
   ]);
 
   if (!product || !product.visible) notFound();
@@ -54,6 +55,13 @@ export default async function ProductPage({
   const image = product.images[0];
   const out = product.stock === 0;
   const low = !out && product.stock <= 3;
+
+  const orderHref = shopWhatsappLink(
+    shop,
+    out
+      ? `Hi ${shop.name}! When will "${product.name}" be back in stock? ${SITE_URL}/shop/${product.slug}`
+      : `Hi ${shop.name}! I'd like to order "${product.name}" (${formatLKR(product.price.toString())}). ${SITE_URL}/shop/${product.slug}`,
+  );
 
   // Product rich-result data for Google Shopping / search cards
   const jsonLd = {
@@ -166,7 +174,7 @@ export default async function ProductPage({
                 </p>
               </div>
             )}
-            {WHATSAPP_ENABLED ? (
+            {orderHref ? (
               <Button
                 asChild
                 variant="outline"
@@ -174,11 +182,7 @@ export default async function ProductPage({
                 className="mt-3 h-11 sm:px-8"
               >
                 <a
-                  href={whatsappLink(
-                    out
-                      ? `Hi ${SHOP.name}! When will "${product.name}" be back in stock? ${SITE_URL}/shop/${product.slug}`
-                      : `Hi ${SHOP.name}! I'd like to order "${product.name}" (${formatLKR(product.price.toString())}). ${SITE_URL}/shop/${product.slug}`,
-                  )}
+                  href={orderHref}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

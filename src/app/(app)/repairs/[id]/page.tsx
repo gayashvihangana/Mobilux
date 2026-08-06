@@ -73,6 +73,7 @@ export default async function RepairDetailPage({
       [ticket.brand, ticket.model].filter(Boolean).join(" ") || deviceLabel,
     location: shopInfo.address,
     hours: shopInfo.hours,
+    shopName: shopInfo.name,
   };
 
   // Newest first in the cards — the one that needs a decision sits on top.

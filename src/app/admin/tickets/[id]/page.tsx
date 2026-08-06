@@ -36,7 +36,7 @@ import { parseReceivedItems } from "@/lib/received-items";
 import { parseParts, partsTotalCost, partsWithFallback } from "@/lib/parts";
 import { issueChip } from "@/lib/repair-issue";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
-import { SHOP } from "@/lib/config";
+import { getShopInfo } from "@/lib/settings";
 import {
   AcceptTicketForm,
   BillNotesForm,
@@ -65,7 +65,7 @@ export default async function AdminTicketDetailPage({
 }) {
   const [{ id }, { created }] = await Promise.all([params, searchParams]);
 
-  const [ticket, customers] = await Promise.all([
+  const [ticket, customers, shop] = await Promise.all([
     prisma.repairTicket.findUnique({
       where: { id },
       include: {
@@ -88,6 +88,7 @@ export default async function AdminTicketDetailPage({
       select: { id: true, name: true, email: true },
       orderBy: { name: "asc" },
     }),
+    getShopInfo(),
   ]);
   if (!ticket) notFound();
 
@@ -533,7 +534,7 @@ export default async function AdminTicketDetailPage({
                   <p className="text-muted-foreground">
                     {ticket.customer.completedRepairs} completed repair
                     {ticket.customer.completedRepairs === 1 ? "" : "s"} with{" "}
-                    {SHOP.name}
+                    {shop.name}
                   </p>
                 </>
               ) : (

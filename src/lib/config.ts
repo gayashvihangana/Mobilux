@@ -37,10 +37,15 @@ export const WARRANTY_DAYS = Number(
   process.env.NEXT_PUBLIC_WARRANTY_DAYS || 30,
 );
 
-// A short, warm line printed at the foot of every bill.
-export const BILL_QUOTE =
-  process.env.NEXT_PUBLIC_BILL_QUOTE ||
-  `Your device, in trusted hands — thank you for choosing ${SHOP.name}.`;
+// A short, warm line printed at the foot of every bill. Takes the shop name
+// rather than reading SHOP.name, because the live name comes from Settings —
+// see lib/settings.ts. The env var still wins when a shop has written its own.
+export function billQuote(shopName: string): string {
+  return (
+    process.env.NEXT_PUBLIC_BILL_QUOTE ||
+    `Your device, in trusted hands — thank you for choosing ${shopName}.`
+  );
+}
 
 // Default warranty terms printed in the bill footer. Kept deliberately plain
 // so customers know exactly what the standard warranty does and doesn't cover.
@@ -59,11 +64,6 @@ export const SITE_URL = (
   (vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000")
 ).replace(/\/$/, "");
 
-export function whatsappLink(message?: string) {
-  const base = `https://wa.me/${SHOP.whatsapp}`;
-  return message ? `${base}?text=${encodeURIComponent(message)}` : base;
-}
-
-// True when the shop has given us a number to chat on — the WhatsApp buttons
-// hide themselves rather than linking to a broken wa.me/ URL.
-export const WHATSAPP_ENABLED = SHOP.whatsapp.length > 0;
+// WhatsApp links are built from the number saved in Settings, not from this
+// module — see `shopWhatsappLink` in lib/settings.ts. `SHOP.whatsapp` above is
+// only the fallback that reader falls back to.
