@@ -288,7 +288,7 @@ Design decisions worth defending in a viva:
   necessary to model the real business; it is the source of considerable
   branching elsewhere.
 - **Two identifiers per repair.** A sequential human-readable number
-  (`MBX-0044`) for verbal and printed use, and a cryptographically random token
+  (`REP-044`) for verbal and printed use, and a cryptographically random token
   for the public tracker. The sequential identifier is enumerable by design;
   keeping tracking on a separate unguessable key prevents that becoming a
   disclosure vector.

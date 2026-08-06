@@ -4,7 +4,8 @@
 
 Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [OPERATIONS.md](OPERATIONS.md) ·
 [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) · [HANDOVER.md](HANDOVER.md) ·
-[PRIVACY.md](PRIVACY.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) ·
+[PRIVACY.md](PRIVACY.md) · [PRICING-WORKSHEET.md](PRICING-WORKSHEET.md) ·
+[DEMO-POST.md](DEMO-POST.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) ·
 `SECURITY-AUDIT.md` (repo root, gitignored)
 
 ---
@@ -438,6 +439,20 @@ attempt while signed in is refused with the expected message.
 
 ## Week 6 — First buyer (~20 h)
 
+Mostly not code. §6.1–6.3 below are your pricing decision, your video and
+posting, and a real visit to a real shop — none of that is mine to do. What
+follows are the tools that were missing, plus one real bug this pass turned
+up while looking closely at the code these weeks lean on.
+
+**Found and fixed along the way:** `nextTicketNumber()` — what live ticket
+creation has actually generated since before this shipping plan started —
+produces `REP-###`. `schema.prisma`'s own comment, `seed.ts`'s dev tickets,
+the `/track` placeholder text, and three other code comments still said
+`MBX-####`, which is what a shop's customers would have seen described
+everywhere *except* on their actual bill. Aligned all of them to `REP-###`;
+`prisma/cleanup-demo.ts`'s filter updated to match so it still finds what
+it's meant to delete.
+
 ### 6.1 Price it (2 h)
 
 Structure: **setup fee** (install, their branding, data import, an hour of
@@ -446,11 +461,22 @@ fee against what a shop loses to a week of lost paperwork, not against your
 hours. Free tiers cover hosting until a shop is genuinely busy, so the monthly is
 mostly paying for *you being reachable* — price it for the interruption.
 
+- [ ] The actual numbers — yours to decide
+- [x] [PRICING-WORKSHEET.md](PRICING-WORKSHEET.md) — a method for reaching
+      them: what the old way costs a shop (your setup-fee anchor), your
+      actual floor cost per shop (your monthly-fee floor), and exactly which
+      `[[…]]` markers in [PROPOSAL.md](PROPOSAL.md) the results go into
+
 ### 6.2 The demo post (3 h)
 
 - [ ] 30-second screen recording: take in a repair → customer tracks it
 - [ ] Post the **demo link, not the source** — your product is the deployment
 - [ ] Sri Lankan phone-repair Facebook groups convert better than LinkedIn here
+- [x] [DEMO-POST.md](DEMO-POST.md) — a shot list for the recording, three
+      ready-to-adapt post variants, and a pre-post checklist. Needs the demo
+      instance actually provisioned first
+      ([OPERATIONS.md §6.1](OPERATIONS.md#61-provisioning-once)) — the code
+      side of that has been ready since week 4.2/4.3
 
 ### 6.3 Onboard one shop you can visit (15 h)
 
@@ -461,6 +487,13 @@ honestly what's confusing.
 - [ ] Import their existing records (`prisma/import-legacy.ts` is a starting point)
 - [ ] Sit with them for an hour while they use it
 - [ ] Write down every question they ask — that list is your week 7
+
+`prisma/import-legacy.ts` is not a template today — it's Mobilux's own 41
+real historical repairs, already imported. It's still the right pattern to
+copy for shop #2: same idempotency check, same `REP-` numbering (now that
+it matches what the app generates — see above), same "cancelled repairs get
+a note explaining why" convention. Copy it to a new file per shop rather
+than editing this one, so Mobilux's own import stays intact.
 
 ---
 

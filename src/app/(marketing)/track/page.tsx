@@ -63,7 +63,7 @@ export default async function TrackPage({
             type="text"
             name="t"
             defaultValue={query}
-            placeholder="MBX-0044"
+            placeholder="REP-044"
             autoComplete="off"
             className="h-11 font-mono uppercase placeholder:normal-case"
             required

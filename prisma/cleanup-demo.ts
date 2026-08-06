@@ -1,6 +1,7 @@
 // Removes demo seed data while keeping kasun@example.com as a test account.
-// Deletes: Kasun's fake MBX tickets (cascades status updates/payments),
-// demo orders, and related notifications. Resets Kasun's repair counter.
+// Deletes: Kasun's fake REP- tickets from seed.ts (cascades status
+// updates/payments), demo orders, and related notifications. Resets
+// Kasun's repair counter.
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -15,7 +16,7 @@ async function main() {
   }
 
   const tickets = await prisma.repairTicket.deleteMany({
-    where: { customerId: kasun.id, ticketNumber: { startsWith: "MBX-" } },
+    where: { customerId: kasun.id, ticketNumber: { startsWith: "REP-" } },
   });
 
   // Restore stock reserved by demo orders before deleting them

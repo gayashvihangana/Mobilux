@@ -269,7 +269,7 @@ the ticket carries `customerName` instead. This is why so many queries branch on
 walk-ins ([§10](#10-known-limitations)).
 
 **`ticketNumber` is sequential, `trackToken` is not.** The human-readable
-`MBX-0044` is what people say on the phone; the random `trackToken` is what the
+`REP-044` is what people say on the phone; the random `trackToken` is what the
 public tracker is keyed on, because sequential IDs can be walked.
 
 **Money is `Decimal(10,2)`, never float.** Prisma returns `Decimal` objects —
