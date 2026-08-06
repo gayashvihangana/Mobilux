@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { auth } from "@/auth";
+import { requireUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { invoiceNumber } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
@@ -51,16 +51,19 @@ export default async function BillPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  // This route sits outside both guarded layouts — there is no `bill/layout.tsx`
+  // above it — so it has to run the live account check itself. Reading the
+  // cookie alone would leave a blocked customer, or a session that a password
+  // change was supposed to end, able to open the bill until the token expires.
+  const user = await requireUser();
 
   const { id } = await params;
 
   const result = await fetchBillTicket(id);
   if (!result) notFound();
 
-  const isAdmin = session.user.role === "ADMIN";
-  const isOwner = result.customerId === session.user.id;
+  const isAdmin = user.role === "ADMIN";
+  const isOwner = result.customerId === user.id;
   if (!isAdmin && !isOwner) notFound();
 
   const backHref = isAdmin
