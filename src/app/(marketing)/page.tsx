@@ -13,8 +13,8 @@ import {
   Wrench,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { phonesVisible } from "@/lib/settings";
-import { SHOP, SITE_URL } from "@/lib/config";
+import { getShopInfo, phonesVisible, type ShopInfo } from "@/lib/settings";
+import { SITE_URL } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { HeroVisual } from "@/components/hero-visual";
 import { Parallax } from "@/components/parallax";
@@ -83,25 +83,32 @@ const steps = [
   },
 ];
 
-// LocalBusiness rich-result data so Google shows shop info in search
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "ElectronicsStore",
-  name: SHOP.name,
-  url: SITE_URL,
-  telephone: SHOP.phone,
-  email: SHOP.email,
-  address: {
-    "@type": "PostalAddress",
-    addressLocality: "Colombo",
-    addressCountry: "LK",
-  },
-  description:
-    "Phone repair and accessories shop in Colombo — screen replacement, battery service, water damage recovery, with live online repair tracking.",
-};
+// LocalBusiness rich-result data so Google shows shop info in search.
+// Built per request from Settings — this is the shop's public identity, and
+// publishing a stale name and address to Google is worse than most places a
+// wrong name can appear.
+function buildJsonLd(shop: ShopInfo) {
+  const locality = shop.address.split(",")[0]?.trim() || "";
+  return {
+    "@context": "https://schema.org",
+    "@type": "ElectronicsStore",
+    name: shop.name,
+    url: SITE_URL,
+    telephone: shop.phone,
+    email: shop.email,
+    address: {
+      "@type": "PostalAddress",
+      ...(locality ? { addressLocality: locality } : {}),
+      addressCountry: "LK",
+    },
+    description: `Phone repair and accessories shop${
+      locality ? ` in ${locality}` : ""
+    } — screen replacement, battery service, water damage recovery, with live online repair tracking.`,
+  };
+}
 
 export default async function HomePage() {
-  const showPhones = await phonesVisible();
+  const [showPhones, shop] = await Promise.all([phonesVisible(), getShopInfo()]);
   const featuredProducts = await prisma.product.findMany({
     where: {
       visible: true,
@@ -115,7 +122,7 @@ export default async function HomePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(buildJsonLd(shop)) }}
       />
 
       {/* ── Hero — full-bleed cover with parallax depth ──────── */}
@@ -210,7 +217,13 @@ export default async function HomePage() {
 
           {/* Foreground drifts slightly ahead of the scroll for depth */}
           <Parallax speed={-0.08}>
-            <HeroVisual />
+            <HeroVisual
+              brand={{
+                name: shop.name,
+                logoUrl: shop.logoUrl,
+                logoEmoji: shop.logoEmoji,
+              }}
+            />
           </Parallax>
         </div>
 

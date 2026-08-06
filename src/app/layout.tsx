@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Newsreader } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { SHOP, SITE_URL } from "@/lib/config";
+import { DemoBanner } from "@/components/demo-banner";
+import { DEMO_MODE, SITE_URL } from "@/lib/config";
+import { getShopInfo } from "@/lib/settings";
 import "./globals.css";
 
 const inter = Inter({
@@ -22,60 +24,76 @@ const newsreader = Newsreader({
   style: ["normal", "italic"],
 });
 
-// Shop-specific, so it follows SHOP rather than being hardcoded — a second
-// shop running this should not be publishing Mobilux's name and city.
-const SITE_TITLE = `${SHOP.name} — Phone Repair & Accessories${
-  SHOP.city ? ` in ${SHOP.city.split(",")[0]}` : ""
-}`;
+// Async, not a static export, so the browser tab title and social previews
+// follow the name saved under Admin → Settings. A static `metadata` object is
+// evaluated once at build time, which is why renaming a shop used to change
+// the bill but not the tab.
+export async function generateMetadata(): Promise<Metadata> {
+  const shop = await getShopInfo();
+  const city = shop.address;
 
-const SITE_DESCRIPTION = `Phone repair you can watch happen — submit repairs online, track live status, pay securely in LKR, and shop hand-checked accessories${
-  SHOP.city ? ` in ${SHOP.city}` : ""
-}.`;
+  const title = `${shop.name} — Phone Repair & Accessories${
+    city ? ` in ${city.split(",")[0]}` : ""
+  }`;
+  const description = `Phone repair you can watch happen — submit repairs online, track live status, pay securely in LKR, and shop hand-checked accessories${
+    city ? ` in ${city}` : ""
+  }.`;
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: SITE_TITLE,
-    template: `%s | ${SHOP.name}`,
-  },
-  description: SITE_DESCRIPTION,
-  applicationName: SHOP.name,
-  keywords: [
-    "phone repair",
-    "mobile repair",
-    "screen replacement",
-    "battery replacement",
-    "phone accessories",
-    "repair tracking",
-    ...(SHOP.city ? [`phone repair ${SHOP.city.split(",")[0]}`] : []),
-  ],
-  openGraph: {
-    type: "website",
-    siteName: SHOP.name,
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-    url: "/",
-    locale: "en_LK",
-  },
-  twitter: {
-    card: "summary",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-  },
-  robots: { index: true, follow: true },
-};
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: title,
+      template: `%s | ${shop.name}`,
+    },
+    description,
+    applicationName: shop.name,
+    keywords: [
+      "phone repair",
+      "mobile repair",
+      "screen replacement",
+      "battery replacement",
+      "phone accessories",
+      "repair tracking",
+      ...(city ? [`phone repair ${city.split(",")[0]}`] : []),
+    ],
+    openGraph: {
+      type: "website",
+      siteName: shop.name,
+      title,
+      description,
+      url: "/",
+      locale: "en_LK",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+    robots: { index: true, follow: true },
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const shop = await getShopInfo();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      // Every branded token in globals.css is expressed as a rotation of this
+      // hue, so one inline value re-colours the whole app. Inline beats both
+      // `:root` and `.dark`, which is what makes it work in either theme.
+      style={{ "--brand-hue": shop.accentHue } as React.CSSProperties}
+    >
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} ${newsreader.variable} min-h-dvh font-sans antialiased`}
       >
         <ThemeProvider>
+          {DEMO_MODE ? <DemoBanner /> : null}
           {children}
           <Toaster richColors position="top-center" />
         </ThemeProvider>

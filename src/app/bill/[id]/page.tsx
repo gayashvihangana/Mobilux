@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { auth } from "@/auth";
+import { requireUser } from "@/lib/auth-guard";
+import { getShopInfo, getShopPayTo } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { invoiceNumber } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
@@ -51,23 +52,30 @@ export default async function BillPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
+  // This route sits outside both guarded layouts — there is no `bill/layout.tsx`
+  // above it — so it has to run the live account check itself. Reading the
+  // cookie alone would leave a blocked customer, or a session that a password
+  // change was supposed to end, able to open the bill until the token expires.
+  const user = await requireUser();
 
   const { id } = await params;
 
   const result = await fetchBillTicket(id);
   if (!result) notFound();
 
-  const isAdmin = session.user.role === "ADMIN";
-  const isOwner = result.customerId === session.user.id;
+  const isAdmin = user.role === "ADMIN";
+  const isOwner = result.customerId === user.id;
   if (!isAdmin && !isOwner) notFound();
 
   const backHref = isAdmin
     ? `/admin/tickets/${result.bill.id}`
     : `/repairs/${result.bill.id}`;
 
-  const trackQr = await trackQrDataUrl(result.trackToken);
+  const [trackQr, shop, shopPayTo] = await Promise.all([
+    trackQrDataUrl(result.trackToken),
+    getShopInfo(),
+    getShopPayTo(),
+  ]);
 
   return (
     <div className="min-h-dvh bg-neutral-100 py-10 print:bg-white print:py-0">
@@ -91,7 +99,12 @@ export default async function BillPage({
         <DownloadBillButton />
       </div>
       <div className="px-4 print:px-0">
-        <BillDocument ticket={result.bill} trackQr={trackQr} />
+        <BillDocument
+          ticket={result.bill}
+          shop={shop}
+          shopPayTo={shopPayTo}
+          trackQr={trackQr}
+        />
       </div>
     </div>
   );

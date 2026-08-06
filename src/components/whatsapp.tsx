@@ -1,4 +1,4 @@
-import { SHOP, WHATSAPP_ENABLED, whatsappLink } from "@/lib/config";
+import { getShopInfo, shopWhatsappLink } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 // Official WhatsApp glyph — lucide has no brand icons.
@@ -17,14 +17,16 @@ export function WhatsAppIcon({ className }: { className?: string }) {
 
 // Floating chat bubble shown on public pages — the fastest path from
 // "browsing" to "talking to the shop".
-export function WhatsAppFloat() {
+export async function WhatsAppFloat() {
+  const shop = await getShopInfo();
   // A shop that hasn't set a WhatsApp number gets no bubble, rather than one
   // that opens an empty wa.me/ page.
-  if (!WHATSAPP_ENABLED) return null;
+  const href = shopWhatsappLink(shop, `Hi ${shop.name}! I have a question.`);
+  if (!href) return null;
 
   return (
     <a
-      href={whatsappLink(`Hi ${SHOP.name}! I have a question.`)}
+      href={href}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Chat with us on WhatsApp"

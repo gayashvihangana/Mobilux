@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
-import { SHOP, WHATSAPP_ENABLED, whatsappLink } from "@/lib/config";
-import { getShopInfo } from "@/lib/settings";
+import { getShopInfo, shopWhatsappLink } from "@/lib/settings";
 import type { PublicTicket } from "@/lib/track";
 import { StatusHistory, StatusStepper } from "@/components/status-timeline";
 import { StatusBadge } from "@/components/status-badge";
@@ -30,9 +29,19 @@ export async function TrackResult({ ticket }: { ticket: PublicTicket }) {
     deviceName,
     location: shopInfo.address,
     hours: shopInfo.hours,
+    shopName: shopInfo.name,
   };
 
   const issuePending = ticket.issues.some((i) => i.status === "PENDING");
+
+  const issueHref = shopWhatsappLink(
+    shopInfo,
+    `Hi ${shopInfo.name}! I got a message about an issue with my repair ${ticket.ticketNumber}.`,
+  );
+  const questionHref = shopWhatsappLink(
+    shopInfo,
+    `Hi ${shopInfo.name}! I have a question about my repair ${ticket.ticketNumber}.`,
+  );
 
   return (
     <div className="mt-10 space-y-6">
@@ -78,12 +87,10 @@ export async function TrackResult({ ticket }: { ticket: PublicTicket }) {
             <Button asChild size="sm">
               <Link href="/login">Sign in to decide</Link>
             </Button>
-            {WHATSAPP_ENABLED ? (
+            {issueHref ? (
               <Button asChild variant="outline" size="sm">
                 <a
-                  href={whatsappLink(
-                    `Hi ${SHOP.name}! I got a message about an issue with my repair ${ticket.ticketNumber}.`,
-                  )}
+                  href={issueHref}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -119,12 +126,10 @@ export async function TrackResult({ ticket }: { ticket: PublicTicket }) {
           Questions about this repair? Message us — we reply fast.
         </p>
         <div className="flex flex-wrap justify-center gap-2">
-          {WHATSAPP_ENABLED ? (
+          {questionHref ? (
             <Button asChild variant="outline" size="sm">
               <a
-                href={whatsappLink(
-                  `Hi ${SHOP.name}! I have a question about my repair ${ticket.ticketNumber}.`,
-                )}
+                href={questionHref}
                 target="_blank"
                 rel="noopener noreferrer"
               >

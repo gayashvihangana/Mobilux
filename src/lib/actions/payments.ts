@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { actionAdmin, actionUser } from "@/lib/auth-guard";
+import { actionPermission, actionUser } from "@/lib/auth-guard";
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
@@ -178,7 +179,9 @@ async function reviewPayment(
   formData: FormData,
   outcome: "PAID" | "REJECTED",
 ): Promise<PaymentFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  // The person handing the device back is the person taking the money.
+  const actor = await actionPermission("payment:verify");
+  if (!actor) return { error: "Not authorized." };
 
   const parsed = reviewSchema.safeParse({
     paymentId: formData.get("paymentId"),
@@ -223,6 +226,19 @@ async function reviewPayment(
         data: { status: "PAID" },
       });
     }
+    await logAudit(
+      tx,
+      actor,
+      verified ? "payment.verify" : "payment.reject",
+      "Payment",
+      payment.id,
+      {
+        label,
+        amount: Number(payment.amount),
+        payerUserId: payment.userId,
+        adminNote: parsed.data.adminNote || null,
+      },
+    );
     await tx.notification.create({
       data: {
         userId: payment.userId,

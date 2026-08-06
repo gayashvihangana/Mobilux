@@ -5,11 +5,13 @@ import {
   Smartphone,
   Wrench,
 } from "lucide-react";
-import { SHOP } from "@/lib/config";
+import type { ShopBrand } from "@/components/logo";
 
 // Hero cover art: a phone running the shop's tracker, built from theme
 // tokens so it matches light and dark mode exactly — no photo needed.
-export function HeroVisual() {
+// The mock app header shows the shop's own name and mark, so it takes the
+// brand as a prop from the page rather than reading the build-time config.
+export function HeroVisual({ brand }: { brand: ShopBrand }) {
   return (
     <div
       className="animate-fade-up relative mx-auto w-fit"
@@ -32,10 +34,17 @@ export function HeroVisual() {
             {/* Mini app header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="grid size-5 place-items-center rounded-md bg-primary/15">
-                  <Smartphone className="size-3 text-primary" />
+                <span className="grid size-5 place-items-center overflow-hidden rounded-md bg-primary/15">
+                  {brand.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={brand.logoUrl} alt="" className="size-full object-cover" />
+                  ) : brand.logoEmoji ? (
+                    <span className="text-[10px] leading-none">{brand.logoEmoji}</span>
+                  ) : (
+                    <Smartphone className="size-3 text-primary" />
+                  )}
                 </span>
-                <span className="font-display text-xs font-bold">{SHOP.name}</span>
+                <span className="font-display text-xs font-bold">{brand.name}</span>
               </div>
               <span className="relative">
                 <Bell className="size-3.5 text-muted-foreground" />

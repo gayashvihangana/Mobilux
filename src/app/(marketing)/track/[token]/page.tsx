@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageCircle, SearchX } from "lucide-react";
-import { SHOP, WHATSAPP_ENABLED, whatsappLink } from "@/lib/config";
+import { getShopInfo, shopWhatsappLink } from "@/lib/settings";
 import { findByToken } from "@/lib/track";
 import { limitByIp } from "@/lib/rate-limit";
 import { TrackResult } from "@/components/track-result";
@@ -26,7 +26,15 @@ export default async function TrackByTokenPage({
   // limit is here so a flood of bad links can't be used to hammer the
   // database for free.
   const throttle = await limitByIp("track");
-  const ticket = throttle.ok ? await findByToken(token) : null;
+  const [ticket, shop] = await Promise.all([
+    throttle.ok ? findByToken(token) : null,
+    getShopInfo(),
+  ]);
+
+  const helpHref = shopWhatsappLink(
+    shop,
+    `Hi ${shop.name}! My repair tracking link isn't working.`,
+  );
 
   if (!ticket) {
     return (
@@ -41,12 +49,10 @@ export default async function TrackByTokenPage({
             us with your ticket number and we&apos;ll send you a fresh link.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {WHATSAPP_ENABLED ? (
+            {helpHref ? (
               <Button asChild variant="outline" size="sm">
                 <a
-                  href={whatsappLink(
-                    `Hi ${SHOP.name}! My repair tracking link isn't working.`,
-                  )}
+                  href={helpHref}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

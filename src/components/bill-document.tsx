@@ -1,18 +1,40 @@
-import { SHOP, BILL_QUOTE, WARRANTY_TERMS } from "@/lib/config";
-import { computeBill, invoiceNumber, type BillTicket } from "@/lib/bill";
+import { billQuote, WARRANTY_TERMS } from "@/lib/config";
+import {
+  computeBill,
+  invoiceNumber,
+  type BillPayTo,
+  type BillTicket,
+} from "@/lib/bill";
 import { doneLabel } from "@/lib/status";
 import { formatDate, formatLKR, formatPhoneIntl, formatTime } from "@/lib/utils";
 
 export type { BillTicket };
+
+// The letterhead. Passed in rather than imported from config because the bill
+// builder renders a live preview of this component on the client, where the
+// database is unreachable — and because the shop's real name lives in
+// Settings, not in a build-time env var.
+export type BillShopInfo = {
+  name: string;
+  tagline: string;
+  address: string;
+  phone: string;
+  email: string;
+};
 
 // A classic, print-ready invoice on white "paper" — serif letterhead, a
 // meta block (invoice no. / repair id / date / time) top-right, and a
 // warranty + thank-you footer. Looks the same regardless of site theme.
 export function BillDocument({
   ticket,
+  shop,
+  shopPayTo,
   trackQr,
 }: {
   ticket: BillTicket;
+  shop: BillShopInfo;
+  /** Settings → Bank accounts default, used only when the bill saved none. */
+  shopPayTo?: BillPayTo;
   trackQr?: string;
 }) {
   const {
@@ -32,7 +54,7 @@ export function BillDocument({
     payTo,
     show,
     warrantyEnd,
-  } = computeBill(ticket);
+  } = computeBill(ticket, shopPayTo);
 
   const showSubtotal = isItemized && (items.length > 1 || discountAmount > 0);
   const showTechnician = show.technician && !!technician;
@@ -69,15 +91,15 @@ export function BillDocument({
         <div className="flex items-start justify-between gap-6">
           <div>
             <p className="text-3xl font-bold tracking-tight text-neutral-900">
-              {SHOP.name}
+              {shop.name}
             </p>
             <p className="mt-0.5 text-sm tracking-wide text-neutral-500 italic">
-              {SHOP.tagline}
+              {shop.tagline}
             </p>
             <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-              {SHOP.city}
+              {shop.address}
               <br />
-              {SHOP.phone} · {SHOP.email}
+              {shop.phone} · {shop.email}
             </p>
           </div>
           <div className="text-right">
@@ -427,7 +449,7 @@ export function BillDocument({
         {/* ── Footer ────────────────────────────────────────── */}
         <div className="mt-9 border-t-2 border-neutral-800 pt-5">
           <p className="text-center text-sm text-neutral-700 italic">
-            “{BILL_QUOTE}”
+            “{billQuote(shop.name)}”
           </p>
           <p className="mt-4 text-[10.5px] leading-relaxed text-neutral-400">
             <span className="font-semibold text-neutral-500 uppercase">
@@ -436,7 +458,7 @@ export function BillDocument({
             {WARRANTY_TERMS}
           </p>
           <p className="mt-4 text-center text-[11px] tracking-wide text-neutral-400">
-            {SHOP.name} · {SHOP.phone} · {SHOP.email}
+            {[shop.name, shop.phone, shop.email].filter(Boolean).join(" · ")}
           </p>
         </div>
       </div>

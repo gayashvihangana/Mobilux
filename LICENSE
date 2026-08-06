@@ -1,0 +1,176 @@
+Mobilux Repair Shop Management System
+Software Licence Agreement
+
+Copyright © 2026 Gayash Vihangana. All rights reserved.
+
+This is proprietary software. It is not open source. Nothing in this repository
+grants anyone the right to use, copy, modify or deploy it except as set out
+below, and no such right arises from the source code being visible or from a
+copy being obtained by any means.
+
+
+0. DEFINITIONS
+
+   "Licensor" means Gayash Vihangana.
+
+   "Software" means the Mobilux Repair Shop Management System, including its
+   source code, database schema, migrations, documentation and any updates the
+   Licensor supplies.
+
+   "Licensee" means the business named in the accompanying order, invoice or
+   written agreement with the Licensor.
+
+   "Instance" means one running deployment of the Software, serving one
+   business, with its own database.
+
+   "Licensee Data" means everything the Licensee and its customers put into an
+   Instance: customer records, repair records, bills, payments, uploaded files.
+
+
+1. GRANT
+
+   On payment in full of the agreed fee, the Licensor grants the Licensee a
+   non-exclusive, non-transferable, perpetual licence to install and run one
+   Instance of the Software for the Licensee's own repair business, under the
+   Licensee's own name and branding.
+
+   This licence covers the Licensee's own employees and contractors while they
+   are working for the Licensee.
+
+   Each additional business, brand or trading location requires its own licence
+   and its own fee. One licence, one business, one Instance.
+
+
+2. WHAT THE LICENSEE MAY DO
+
+   a) Run the Instance for its own commercial repair business, without limit on
+      the number of repairs, customers, staff accounts or revenue.
+
+   b) Configure the Instance — shop name, logo, contact details, opening hours,
+      bank accounts, pricing, discount rules — through the settings provided.
+
+   c) Take and keep its own backups of the Instance and of Licensee Data.
+
+   d) Continue running the Instance indefinitely, whether or not the Licensee
+      buys ongoing support. Support and updates are a separate arrangement;
+      stopping them does not end this licence.
+
+
+3. WHAT THE LICENSEE MAY NOT DO
+
+   a) Distribute, publish, sell, rent, lease, sublicense, lend or otherwise make
+      the Software available to anyone else, in source or compiled form.
+
+   b) Run the Software, or allow it to be run, for any business other than the
+      Licensee's own — including operating it as a service, a hosted product or
+      a shared platform for third parties.
+
+   c) Deploy more than one Instance, other than a non-production copy used
+      solely for testing or training by the Licensee's own staff.
+
+   d) Remove, obscure or alter any copyright notice or authorship attribution in
+      the Software.
+
+   e) Use the Software to build, or assist anyone else in building, a competing
+      product.
+
+   The Licensee may modify its own copy of the Software for its own use. Doing so
+   ends the Licensor's obligation to support or repair the modified parts, and
+   any such modification remains subject to clauses 3(a) to 3(e).
+
+
+4. CONFIDENTIALITY OF THE SOURCE
+
+   Where the Licensor supplies source code, the Licensee shall treat it as
+   confidential, disclose it only to those of its employees and contractors who
+   need it to run or maintain the Instance, and ensure those people are bound by
+   equivalent obligations.
+
+
+5. OWNERSHIP
+
+   The Software remains the property of the Licensor. This is a licence to use
+   it, not a sale of it. All rights not expressly granted are reserved.
+
+   Licensee Data is and remains the property of the Licensee. The Licensor
+   claims no ownership of it and no right to use it, other than as strictly
+   necessary to provide support the Licensee has requested.
+
+   Where the Licensor holds or accesses Licensee Data while providing support,
+   the Licensee is the data controller and the Licensor is a data processor
+   acting on the Licensee's instructions.
+
+   On request, the Licensor will provide the Licensee with an export of its own
+   data in a usable format.
+
+
+6. NO WARRANTY
+
+   The Software is provided "as is". To the fullest extent permitted by law, the
+   Licensor makes no warranties, express or implied, including any implied
+   warranty of merchantability, fitness for a particular purpose, or
+   non-infringement.
+
+   The Licensor does not warrant that the Software will be uninterrupted or
+   error-free. Availability depends on third-party services (hosting, database,
+   email and file storage providers) that are outside the Licensor's control.
+
+   Nothing in this clause limits any right the Licensee has under Sri Lankan
+   consumer protection law that cannot lawfully be excluded.
+
+
+7. BACKUPS AND DATA LOSS
+
+   The Licensee is responsible for satisfying itself that backups of its
+   Instance exist and can be restored. Where the Licensor has agreed in writing
+   to manage backups as part of a support arrangement, that agreement governs.
+
+   The Licensor is not liable for loss of Licensee Data except to the extent it
+   results from the Licensor's own negligence or wilful misconduct.
+
+
+8. LIABILITY
+
+   To the fullest extent permitted by law, the Licensor's total liability
+   arising out of or in connection with this licence, whether in contract, tort
+   or otherwise, is limited to the fees actually paid by the Licensee to the
+   Licensor in the twelve months preceding the event giving rise to the claim.
+
+   The Licensor is not liable for loss of profit, loss of business, loss of
+   goodwill or any indirect or consequential loss.
+
+   Nothing in this clause excludes liability for death or personal injury caused
+   by negligence, for fraud, or for anything else that cannot lawfully be
+   excluded.
+
+
+9. TERM AND TERMINATION
+
+   This licence starts on payment in full and continues indefinitely.
+
+   The Licensor may terminate it if the Licensee materially breaches clause 3
+   and does not remedy the breach within 30 days of written notice.
+
+   On termination, the Licensee shall stop running the Software and delete all
+   copies of it. Licensee Data remains the Licensee's, and the Licensee is
+   entitled to an export of it.
+
+
+10. GENERAL
+
+   This licence, together with the accompanying order or written agreement, is
+   the entire agreement between the parties about the Software.
+
+   If any provision is held unenforceable, the rest continues in force.
+
+   This licence is governed by the laws of Sri Lanka, and the courts of Sri
+   Lanka have exclusive jurisdiction.
+
+   Enquiries and licence requests: Gayash Vihangana.
+
+
+UNLICENSED COPIES
+
+If you have obtained this Software and are not a Licensee under a written
+agreement with the Licensor, you have no licence to use it. Please contact the
+Licensor to obtain one.

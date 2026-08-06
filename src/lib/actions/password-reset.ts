@@ -7,7 +7,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { emailConfigured, sendEmail } from "@/lib/email";
 import { limitByIp, limitByKey, waitMessage } from "@/lib/rate-limit";
-import { SHOP } from "@/lib/config";
+import { getShopInfo } from "@/lib/settings";
+import { DEMO_MODE } from "@/lib/config";
 
 export type ResetFormState = {
   error?: string;
@@ -45,9 +46,11 @@ export async function requestPasswordReset(
   ]);
   if (!byIp.ok || !byEmail.ok) return { sent: true, email };
 
+  const shop = await getShopInfo();
+
   if (!emailConfigured()) {
     return {
-      error: `Password reset by email isn't set up yet. Please contact us on WhatsApp (${SHOP.phone}) and we'll reset it for you.`,
+      error: `Password reset by email isn't set up yet. Please contact us on WhatsApp (${shop.phone}) and we'll reset it for you.`,
     };
   }
 
@@ -81,7 +84,7 @@ export async function requestPasswordReset(
 
   const delivered = await sendEmail({
     to: email,
-    subject: `${code} is your ${SHOP.name} password reset code`,
+    subject: `${code} is your ${shop.name} password reset code`,
     heading: "Reset your password",
     lines: [
       `Hi ${user.name},`,
@@ -115,6 +118,18 @@ export async function resetPassword(
   _prev: ResetFormState,
   formData: FormData,
 ): Promise<ResetFormState> {
+  // Defense in depth: requestPasswordReset() is already inert in demo mode
+  // (emailConfigured() is false with no RESEND_API_KEY set, so no code is
+  // ever sent), but this closes the completion step too rather than relying
+  // on that alone.
+  if (DEMO_MODE) {
+    return {
+      sent: true,
+      email: String(formData.get("email") ?? ""),
+      error: "Password resets are disabled in the demo.",
+    };
+  }
+
   const parsed = resetSchema.safeParse({
     email: formData.get("email"),
     code: formData.get("code"),

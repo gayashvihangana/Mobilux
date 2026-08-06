@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
+import { requirePermission } from "@/lib/auth-guard";
 
 export const metadata: Metadata = {
   title: "Bench errors",
@@ -125,6 +126,7 @@ function RankedBars({
 }
 
 export default async function AdminErrorsPage() {
+  await requirePermission("report:read");
   const [issues, ticketCount] = await Promise.all([
     prisma.repairIssue.findMany({
       orderBy: { reportedAt: "desc" },

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { MessageCircle, Search, SearchX } from "lucide-react";
-import { SHOP, WHATSAPP_ENABLED, whatsappLink } from "@/lib/config";
+import { getShopInfo, shopWhatsappLink } from "@/lib/settings";
 import { findByNumberAndPhone } from "@/lib/track";
 import { limitByIp } from "@/lib/rate-limit";
 import { TrackResult } from "@/components/track-result";
@@ -27,10 +27,14 @@ export default async function TrackPage({
   // Ticket numbers are sequential, so without a throttle this form is a
   // scraper's front door even with the phone check in place.
   const throttle = submitted ? await limitByIp("track") : { ok: true };
-  const ticket =
-    submitted && throttle.ok
-      ? await findByNumberAndPhone(query, phone)
-      : null;
+  const [ticket, shop] = await Promise.all([
+    submitted && throttle.ok ? findByNumberAndPhone(query, phone) : null,
+    getShopInfo(),
+  ]);
+  const helpHref = shopWhatsappLink(
+    shop,
+    `Hi ${shop.name}! I can't find my repair ticket "${query}" on the tracker. Can you help?`,
+  );
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-32 pb-20">
@@ -102,12 +106,10 @@ export default async function TrackPage({
             came in without an account, use the tracking link we sent you — or
             message us and we&apos;ll find it.
           </p>
-          {WHATSAPP_ENABLED ? (
+          {helpHref ? (
             <Button asChild variant="outline" size="sm" className="mt-5">
               <a
-                href={whatsappLink(
-                  `Hi ${SHOP.name}! I can't find my repair ticket "${query}" on the tracker. Can you help?`,
-                )}
+                href={helpHref}
                 target="_blank"
                 rel="noopener noreferrer"
               >

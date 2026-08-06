@@ -6,6 +6,12 @@
 /* ── Light theme — designed for white surfaces: darker status hues for
      AA contrast, slate-navy text, soft diffuse shadows, airy glows ── */
 :root {
+  /* Brand hue in degrees. The root layout overrides this inline from the
+     shop's Settings, and every branded token below rotates with it. Only the
+     hue is configurable — lightness and chroma stay tuned per theme, so a
+     shop cannot pick a colour that fails contrast in dark mode. */
+  --brand-hue: 262;
+
   --radius: 0.75rem;
   --background: oklch(0.984 0.003 247);
   --foreground: oklch(0.229 0.035 262);
@@ -13,7 +19,7 @@
   --card-foreground: oklch(0.229 0.035 262);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.229 0.035 262);
-  --primary: oklch(0.546 0.215 262);
+  --primary: oklch(0.546 0.215 var(--brand-hue));
   --primary-foreground: oklch(0.985 0.002 247);
   --secondary: oklch(0.961 0.007 247);
   --secondary-foreground: oklch(0.281 0.032 260);
@@ -25,7 +31,7 @@
   --destructive-foreground: oklch(0.985 0.002 247);
   --border: oklch(0.906 0.011 252);
   --input: oklch(0.906 0.011 252);
-  --ring: oklch(0.546 0.215 262);
+  --ring: oklch(0.546 0.215 var(--brand-hue));
   --success: oklch(0.527 0.137 150);
   --warning: oklch(0.554 0.147 55);
   --info: oklch(0.5 0.105 237);
@@ -35,9 +41,11 @@
   --glass-border: oklch(0.229 0.035 262 / 8%);
   --glass-shadow: 0 8px 32px oklch(0.229 0.05 262 / 8%);
   --grid-line: oklch(0.229 0.035 262 / 6%);
-  --grad-1: oklch(0.28 0.045 262);
-  --grad-2: oklch(0.5 0.16 250);
-  --grad-3: oklch(0.546 0.215 262);
+  /* The gradient keeps its designed spread by rotating with the brand hue
+     rather than being pinned to blue. */
+  --grad-1: oklch(0.28 0.045 var(--brand-hue));
+  --grad-2: oklch(0.5 0.16 calc(var(--brand-hue) - 12));
+  --grad-3: oklch(0.546 0.215 var(--brand-hue));
   --glow-strength: 12%;
 }
 
@@ -49,7 +57,7 @@
   --card-foreground: oklch(0.93 0.008 252);
   --popover: oklch(0.175 0.023 260);
   --popover-foreground: oklch(0.93 0.008 252);
-  --primary: oklch(0.623 0.188 259);
+  --primary: oklch(0.623 0.188 var(--brand-hue));
   --primary-foreground: oklch(0.985 0.002 247);
   --secondary: oklch(0.24 0.026 259);
   --secondary-foreground: oklch(0.93 0.008 252);
@@ -61,7 +69,7 @@
   --destructive-foreground: oklch(0.985 0.002 247);
   --border: oklch(0.985 0.002 247 / 8%);
   --input: oklch(0.985 0.002 247 / 12%);
-  --ring: oklch(0.623 0.188 259);
+  --ring: oklch(0.623 0.188 var(--brand-hue));
   --success: oklch(0.723 0.16 150);
   --warning: oklch(0.75 0.155 65);
   --info: oklch(0.746 0.13 230);
@@ -71,9 +79,27 @@
   --glass-shadow: 0 8px 32px oklch(0 0 0 / 24%);
   --grid-line: oklch(0.985 0.002 247 / 4%);
   --grad-1: oklch(0.93 0.008 252);
-  --grad-2: oklch(0.746 0.13 230);
-  --grad-3: oklch(0.623 0.188 259);
+  --grad-2: oklch(0.746 0.13 calc(var(--brand-hue) - 30));
+  --grad-3: oklch(0.623 0.188 var(--brand-hue));
   --glow-strength: 20%;
+}
+
+/* Re-derives the branded tokens inside a subtree, so a preview can show a
+   different brand hue than the page it sits on. `--primary` is substituted
+   where it is *declared* (on :root), so a nested `--brand-hue` alone changes
+   nothing — the tokens have to be declared again at the scope boundary. */
+.brand-scope {
+  --primary: oklch(0.546 0.215 var(--brand-hue));
+  --ring: oklch(0.546 0.215 var(--brand-hue));
+  --grad-2: oklch(0.5 0.16 calc(var(--brand-hue) - 12));
+  --grad-3: oklch(0.546 0.215 var(--brand-hue));
+}
+
+.dark .brand-scope {
+  --primary: oklch(0.623 0.188 var(--brand-hue));
+  --ring: oklch(0.623 0.188 var(--brand-hue));
+  --grad-2: oklch(0.746 0.13 calc(var(--brand-hue) - 30));
+  --grad-3: oklch(0.623 0.188 var(--brand-hue));
 }
 
 @theme inline {

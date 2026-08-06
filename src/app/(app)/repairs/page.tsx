@@ -9,7 +9,7 @@ import { DONE_TICKET_STATUSES } from "@/lib/completed-repairs";
 import { Button } from "@/components/ui/button";
 import { FilterMenu } from "@/components/filter-menu";
 import { TicketCard } from "@/components/ticket-card";
-import { SHOP } from "@/lib/config";
+import { getShopInfo } from "@/lib/settings";
 
 export const metadata: Metadata = {
   title: "My repairs",
@@ -40,7 +40,7 @@ export default async function RepairsPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const session = await auth();
+  const [session, shop] = await Promise.all([auth(), getShopInfo()]);
   if (!session?.user) redirect("/login");
 
   const { filter } = await searchParams;
@@ -86,7 +86,7 @@ export default async function RepairsPage({
             My repairs
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Every repair you&apos;ve done with {SHOP.name}, past and present.
+            Every repair you&apos;ve done with {shop.name}, past and present.
           </p>
         </div>
         <Button asChild>

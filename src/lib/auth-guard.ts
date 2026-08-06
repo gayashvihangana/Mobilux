@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { Role } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { can, isShopStaff, type Permission } from "@/lib/permissions";
 
 // Sessions are stateless JWTs: the role and the account's very existence are
 // baked into a cookie at sign-in and nothing on the server can take them back.
@@ -86,6 +87,30 @@ export async function requireAdmin(): Promise<GuardedUser> {
 }
 
 /**
+ * For the back office as a whole — ADMIN or STAFF. Use this on the admin
+ * layout, then `requirePermission` on the pages inside it that a technician
+ * shouldn't reach.
+ */
+export async function requireStaff(): Promise<GuardedUser> {
+  const user = await requireUser();
+  if (!isShopStaff(user)) redirect("/dashboard");
+  return user;
+}
+
+/**
+ * For a page that only some back-office roles may open. A technician who
+ * types /admin/reports lands back on the admin overview rather than a 403 —
+ * they haven't done anything wrong, the page simply isn't theirs.
+ */
+export async function requirePermission(
+  action: Permission,
+): Promise<GuardedUser> {
+  const user = await requireStaff();
+  if (!can(user, action)) redirect("/admin");
+  return user;
+}
+
+/**
  * For server actions, which return `{ error }` to a form rather than
  * redirecting. Null means "not signed in, or no longer allowed".
  */
@@ -97,6 +122,22 @@ export async function actionUser(): Promise<GuardedUser | null> {
 export async function actionAdmin(): Promise<GuardedUser | null> {
   const user = await currentUser();
   return user?.role === "ADMIN" ? user : null;
+}
+
+/**
+ * The server-action counterpart of `requirePermission`. Null means "not
+ * signed in, no longer allowed, or not permitted to do this".
+ *
+ * Every action calls this itself. A server action is a public HTTP endpoint:
+ * hiding the button that triggers it is presentation, and the fact that a
+ * technician cannot see the Reports page says nothing about whether they can
+ * POST to an action that reads revenue.
+ */
+export async function actionPermission(
+  action: Permission,
+): Promise<GuardedUser | null> {
+  const user = await currentUser();
+  return can(user, action) ? user : null;
 }
 
 /**

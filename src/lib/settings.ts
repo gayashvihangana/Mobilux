@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { BANK_DETAILS, SHOP } from "@/lib/config";
 import { DEFAULT_BILL_SHOW, resolveBillShow, type BillShow } from "@/lib/bill";
@@ -23,8 +25,14 @@ export async function getDefaultBillShow(): Promise<BillShow> {
   }
 }
 
-// ── Shop details (name, contact, opening hours) ──────────────────────
-// Editable under Admin → Settings; each falls back to the config default.
+// ── Shop identity ────────────────────────────────────────────────────
+// This is the shop's identity everywhere: header logo, footer, browser tab,
+// emails, bills, the public tracker. Editable under Admin → Settings; each
+// field falls back to the `NEXT_PUBLIC_SHOP_*` build-time value, which in turn
+// falls back to a neutral placeholder.
+//
+// The env vars exist so a fresh install looks right before an owner has saved
+// anything. Once they save, the database wins — with no redeploy.
 export const SHOP_INFO_KEYS = {
   name: "shop_name",
   tagline: "shop_tagline",
@@ -32,6 +40,10 @@ export const SHOP_INFO_KEYS = {
   email: "shop_email",
   address: "shop_address",
   hours: "shop_hours",
+  whatsapp: "shop_whatsapp",
+  logoEmoji: "shop_logo_emoji",
+  logoUrl: "shop_logo_url",
+  accentHue: "shop_accent_hue",
 } as const;
 
 export type ShopInfo = {
@@ -41,21 +53,96 @@ export type ShopInfo = {
   email: string;
   address: string;
   hours: string;
+  /** Digits only, international format. Blank hides every WhatsApp button. */
+  whatsapp: string;
+  /** A single emoji used as the logo mark when there's no uploaded image. */
+  logoEmoji: string;
+  /** Uploaded logo image. Takes precedence over the emoji. */
+  logoUrl: string;
+  /**
+   * Brand colour as an OKLCH hue angle, 0–360. Only the hue is configurable:
+   * lightness and chroma stay tuned per theme, so an owner cannot pick a
+   * colour that fails contrast in dark mode. See DEFAULT_ACCENT_HUE.
+   */
+  accentHue: number;
 };
 
-export async function getShopInfo(): Promise<ShopInfo> {
-  const rows = await prisma.setting.findMany({
-    where: { key: { in: Object.values(SHOP_INFO_KEYS) } },
-  });
-  const map = new Map(rows.map((r) => [r.key, r.value]));
-  return {
-    name: map.get(SHOP_INFO_KEYS.name) || SHOP.name,
-    tagline: map.get(SHOP_INFO_KEYS.tagline) || SHOP.tagline,
-    phone: map.get(SHOP_INFO_KEYS.phone) || SHOP.phone,
-    email: map.get(SHOP_INFO_KEYS.email) || SHOP.email,
-    address: map.get(SHOP_INFO_KEYS.address) || SHOP.city,
-    hours: map.get(SHOP_INFO_KEYS.hours) || SHOP.hours,
-  };
+/** The blue the app ships with — matches `--primary` in globals.css. */
+export const DEFAULT_ACCENT_HUE = 262;
+
+/**
+ * Named hues offered in Settings. Restricting the choice to a hue angle is
+ * what keeps every theme token coherent: the whole palette rotates together
+ * and nothing has to be re-checked for contrast.
+ */
+export const ACCENT_PRESETS = [
+  { label: "Blue", hue: 262 },
+  { label: "Indigo", hue: 285 },
+  { label: "Violet", hue: 310 },
+  { label: "Rose", hue: 10 },
+  { label: "Amber", hue: 70 },
+  { label: "Green", hue: 150 },
+  { label: "Teal", hue: 190 },
+  { label: "Cyan", hue: 225 },
+] as const;
+
+export function normalizeHue(value: string | number | null | undefined): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_ACCENT_HUE;
+  // Wrap rather than clamp — hue is an angle, so 370 is 10.
+  return ((Math.round(n) % 360) + 360) % 360;
+}
+
+/** Cache tag for everything derived from the shop-identity settings. */
+export const SHOP_INFO_TAG = "shop-info";
+
+// Six settings rows on every render of every page is not acceptable, and this
+// is now read by the root layout, the header, the footer, page metadata and
+// every email. Two layers:
+//
+//   unstable_cache — survives across requests, dropped by revalidateTag when
+//                    an admin saves (see lib/actions/settings.ts).
+//   React cache    — dedupes the repeat calls inside a single render.
+const readShopInfo = unstable_cache(
+  async (): Promise<ShopInfo> => {
+    const rows = await prisma.setting.findMany({
+      where: { key: { in: Object.values(SHOP_INFO_KEYS) } },
+    });
+    const map = new Map(rows.map((r) => [r.key, r.value]));
+    return {
+      name: map.get(SHOP_INFO_KEYS.name) || SHOP.name,
+      tagline: map.get(SHOP_INFO_KEYS.tagline) || SHOP.tagline,
+      phone: map.get(SHOP_INFO_KEYS.phone) || SHOP.phone,
+      email: map.get(SHOP_INFO_KEYS.email) || SHOP.email,
+      address: map.get(SHOP_INFO_KEYS.address) || SHOP.city,
+      hours: map.get(SHOP_INFO_KEYS.hours) || SHOP.hours,
+      whatsapp: (
+        map.get(SHOP_INFO_KEYS.whatsapp) ?? SHOP.whatsapp
+      ).replace(/\D/g, ""),
+      logoEmoji: map.get(SHOP_INFO_KEYS.logoEmoji) || "",
+      logoUrl: map.get(SHOP_INFO_KEYS.logoUrl) || "",
+      accentHue: normalizeHue(
+        map.get(SHOP_INFO_KEYS.accentHue) || DEFAULT_ACCENT_HUE,
+      ),
+    };
+  },
+  ["shop-info"],
+  { tags: [SHOP_INFO_TAG] },
+);
+
+export const getShopInfo = cache(readShopInfo);
+
+/**
+ * A wa.me link for the shop's saved number, or null when they haven't set one
+ * — callers render nothing rather than a button that opens an empty wa.me/.
+ */
+export function shopWhatsappLink(
+  shop: Pick<ShopInfo, "whatsapp">,
+  message?: string,
+): string | null {
+  if (!shop.whatsapp) return null;
+  const base = `https://wa.me/${shop.whatsapp}`;
+  return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
 
 // Shop bank details — the default "pay to" account shown on unpaid bills.

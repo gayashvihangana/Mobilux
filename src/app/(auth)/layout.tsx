@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { getShopInfo } from "@/lib/settings";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const shop = await getShopInfo();
+
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       <div className="bg-grid absolute inset-0" aria-hidden />
@@ -16,7 +19,13 @@ export default function AuthLayout({
         aria-hidden
       />
       <div className="relative mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6">
-        <Logo />
+        <Logo
+          brand={{
+            name: shop.name,
+            logoUrl: shop.logoUrl,
+            logoEmoji: shop.logoEmoji,
+          }}
+        />
         <div className="flex items-center gap-2">
           <Link
             href="/"

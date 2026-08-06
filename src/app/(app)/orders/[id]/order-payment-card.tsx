@@ -7,16 +7,19 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ReceiptForm } from "@/components/forms/receipt-form";
-import { BANK_DETAILS, SHOP } from "@/lib/config";
+import { getShopInfo, getShopPayTo } from "@/lib/settings";
 import { formatDateTime, formatLKR } from "@/lib/utils";
 
-export function OrderPaymentCard({
+export async function OrderPaymentCard({
   order,
   latestPayment,
 }: {
   order: Pick<Order, "id" | "status" | "total">;
   latestPayment: Payment | null;
 }) {
+  // Same account the bill prints — see the note in repairs/[id]/payment-card.
+  const [payTo, shop] = await Promise.all([getShopPayTo(), getShopInfo()]);
+
   if (order.status === "CANCELLED") {
     return (
       <Card className="border-destructive/30">
@@ -45,7 +48,7 @@ export function OrderPaymentCard({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Order complete — thank you for shopping with {SHOP.name}!
+            Order complete — thank you for shopping with {shop.name}!
           </p>
         </CardContent>
       </Card>
@@ -136,20 +139,20 @@ export function OrderPaymentCard({
           <dl className="mt-3 space-y-1.5 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Bank</dt>
-              <dd className="text-right font-medium">{BANK_DETAILS.bankName}</dd>
+              <dd className="text-right font-medium">{payTo.bankName}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Branch</dt>
-              <dd className="text-right font-medium">{BANK_DETAILS.branch}</dd>
+              <dd className="text-right font-medium">{payTo.branch}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Account name</dt>
-              <dd className="text-right font-medium">{BANK_DETAILS.accountName}</dd>
+              <dd className="text-right font-medium">{payTo.accountName}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Account no.</dt>
               <dd className="text-right font-mono font-medium">
-                {BANK_DETAILS.accountNumber}
+                {payTo.accountNumber}
               </dd>
             </div>
           </dl>

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { actionAdmin } from "@/lib/auth-guard";
+import { actionPermission } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 
 export type CustomerFormState = {
@@ -12,8 +12,9 @@ export type CustomerFormState = {
   success?: boolean;
 } | null;
 
-async function requireAdmin() {
-  return actionAdmin();
+// The customer directory is the owner's view of who their customers are and what they spend.
+async function allowed() {
+  return !!(await actionPermission("customer:manage"));
 }
 
 function revalidateCustomers() {
@@ -42,7 +43,7 @@ export async function createCustomer(
   _prev: CustomerFormState,
   formData: FormData,
 ): Promise<CustomerFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const parsed = createSchema.safeParse({
     name: formData.get("name"),
@@ -85,7 +86,7 @@ export async function setCustomerBlocked(
   _prev: CustomerFormState,
   formData: FormData,
 ): Promise<CustomerFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   const blocked = formData.get("blocked") === "true";

@@ -1,9 +1,9 @@
 # Mobilux — Technical Design Document
 
-**Version:** 1.0 · **Last updated:** 31 July 2026
+**Version:** 1.3 · **Last updated:** 6 August 2026
 **Audience:** developers working on or taking over this codebase.
 
-Related: [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) · [README](../README.md) for setup
+Related: [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [OPERATIONS.md](OPERATIONS.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) · [README](../README.md) for setup
 
 > **Status legend.** Sections describing behaviour that exists today are
 > unmarked. Anything marked 🔜 is designed but **not yet built** — it lands in
@@ -94,43 +94,60 @@ receipt · buy from the storefront · leave a review · earn loyalty discounts.
 Cannot see anything belonging to another customer. Every customer-scoped query
 re-checks ownership against the database rather than trusting a form field.
 
-### 2.2 Staff / repairman (`STAFF`) 🔜
+### 2.2 Staff / repairman (`STAFF`)
 
-The people at the bench and the counter. **Schema value exists, currently unused
-— every shop worker shares the owner's admin login today.** Week 3 makes it real.
+The people at the bench and the counter. Each has their own account, created by
+the owner under Admin → Staff, and signs in at `/staff/login`.
 
 Can: everything on the bench (log repairs, update status, parts, costs, photos,
-notes) **plus billing** (build and issue bills, mark paid, verify bank receipts).
+notes) **plus billing** (build and issue bills, mark paid, verify bank receipts),
+plus the storefront catalogue, orders and review moderation.
 
 Cannot: see revenue or profit reports · change shop settings or bank accounts ·
-delete a repair · block a customer · create or remove staff accounts.
+delete a repair or a timeline entry · block a customer · open the customer
+directory · change loyalty pricing · create or remove staff accounts · withdraw
+a reported bench error or record a customer's decision on their behalf.
+
+That last one matters: a technician reporting a mishap and then withdrawing it
+would erase the record Admin → Bench errors is built on.
 
 ### 2.3 Admin / shop owner (`ADMIN`)
 
 Everything staff can do, plus the money and configuration: reports, settings,
 bank accounts, deletions, customer blocking, staff management.
 
-### 2.4 Permission matrix 🔜
+### 2.4 Permission matrix
 
-| Action | Customer | Staff | Admin |
-|---|:---:|:---:|:---:|
-| Submit a repair request | ✅ own | ✅ any | ✅ any |
-| View repair | own only | ✅ | ✅ |
-| Update repair status / notes / parts | — | ✅ | ✅ |
-| Build & issue a bill | — | ✅ | ✅ |
-| Mark a bill paid / verify a receipt | — | ✅ | ✅ |
-| Report a during-repair issue | — | ✅ | ✅ |
-| Accept / decline an issue | ✅ own | — | ✅ on behalf |
-| Delete a repair or timeline entry | — | ❌ | ✅ |
-| Reports (revenue, profit, bench errors) | — | ❌ | ✅ |
-| Products & storefront | — | ✅ | ✅ |
-| Moderate reviews | — | ✅ | ✅ |
-| Shop settings & bank accounts | — | ❌ | ✅ |
-| Block / unblock a customer | — | ❌ | ✅ |
-| Create / deactivate staff | — | ❌ | ✅ |
+The table below is generated from `lib/permissions.ts`, which is the only place
+this is decided. The permission name is what a page or action actually asks for.
+
+| Action | Permission | Customer | Staff | Admin |
+|---|---|:---:|:---:|:---:|
+| Submit a repair request | *(own)* | ✅ own | ✅ any | ✅ any |
+| View repair | *(own)* | own only | ✅ | ✅ |
+| Update repair status / notes / parts | `repair:write` | — | ✅ | ✅ |
+| Build & issue a bill | `bill:write` | — | ✅ | ✅ |
+| Mark a bill paid / verify a receipt | `bill:write` / `payment:verify` | — | ✅ | ✅ |
+| Report a during-repair issue | `repair:issue` | — | ✅ | ✅ |
+| Accept / decline an issue | `repair:issue-resolve` | ✅ own | ❌ | ✅ on behalf |
+| Withdraw a reported issue | `repair:issue-resolve` | — | ❌ | ✅ |
+| Delete a repair or timeline entry | `repair:delete` | — | ❌ | ✅ |
+| Reports (revenue, profit, bench errors) | `report:read` | — | ❌ | ✅ |
+| Products & storefront | `product:write` / `order:write` | — | ✅ | ✅ |
+| Moderate reviews | `review:moderate` | — | ✅ | ✅ |
+| Loyalty discount tiers | `discount:write` | — | ❌ | ✅ |
+| Customer directory | `customer:manage` | — | ❌ | ✅ |
+| Block / unblock a customer | `customer:block` | — | ❌ | ✅ |
+| Shop settings & bank accounts | `settings:write` | — | ❌ | ✅ |
+| Create / deactivate staff | `staff:manage` | — | ❌ | ✅ |
+| Activity log (who deleted what, who moved money) | `audit:read` | — | ❌ | ✅ |
 
 Enforcement is **server-side in every case**. Hiding a nav item is presentation,
 not security — see [§6](#6-authorisation).
+
+`npm run verify:permissions` asserts this table, audits that no server action
+was left unguarded, and drives a real technician session against every
+back-office route.
 
 ### 2.5 Anonymous visitor
 
@@ -166,11 +183,21 @@ photos, no damage-dispute text, no costs.
 |---|---|---|
 | `(marketing)` | Landing, storefront, repair tracker | Public |
 | `(auth)` | Login, register, forgot password | Public |
-| `(app)` | Customer workspace | `requireUser()`, redirects ADMIN to `/admin` |
-| `admin` | Shop back office | `requireAdmin()` |
-| `bill/[id]` | Printable invoice | Signed in **and** owner-or-admin |
+| `(app)` | Customer workspace | `(app)/layout.tsx` → `requireUser()`, redirects ADMIN to `/admin` |
+| `admin` | Shop back office | `admin/layout.tsx` → `requireStaff()`, then `requirePermission()` per page |
+| `bill/[id]` | Printable invoice | **No layout above it** — the page calls `requireUser()` itself, then owner-or-admin |
 | `api/auth/[...nextauth]` | Auth.js handler | — |
-| `staff/login` 🔜 | Shop team sign-in | Public, `noindex` |
+| `staff/login` | Shop team sign-in | Public, `noindex`, not linked from the site |
+
+⚠️ **`bill/[id]` is the odd one out and worth knowing about.** Every other
+signed-in route inherits a DB-validated guard from the layout above it, so the
+page itself can read `auth()` for the user id and trust that the account was
+re-checked. `bill/[id]` has no such layout. It read the session cookie directly
+until 6 August 2026, which meant blocking a customer — or a password change that
+was supposed to end their other sessions — did not reach it: the old cookie kept
+opening the bill until it expired. Found by the week-1 verification, fixed by
+switching the page to `requireUser()`. **Any new route added outside `(app)` and
+`admin` has the same trap.**
 
 ### 3.3 Code layout
 
@@ -182,13 +209,18 @@ src/
     actions/      server actions, one file per domain
     auth-guard.ts session + live DB re-validation  ← every guard goes through here
     rate-limit.ts fixed-window limiter on Postgres
-    permissions.ts  the can(user, action) table    🔜
+    permissions.ts  the can(user, action) table — pure, so middleware can use it
     prisma.ts     singleton client
     settings.ts   DB-backed shop configuration
     config.ts     env-var fallbacks for shop identity
     bill.ts       bill computation (pure)
     track.ts      public tracker queries (deliberately narrow selects)
   middleware.ts   edge guard — cheap first pass only
+
+scripts/
+  migrate-deploy.mjs   runs before next build on Vercel
+  db-pull.mjs          copy production data into a local database
+  verify-security.mjs  post-install security verification (writes — read it first)
 ```
 
 **Convention:** business rules live in `lib/`, not in components. Anything a
@@ -199,7 +231,7 @@ discounts) is a pure function in `lib/` so it can't drift between the two.
 
 ## 4. Data model
 
-14 models. Full definitions in `prisma/schema.prisma`.
+15 models. Full definitions in `prisma/schema.prisma`.
 
 ```
 User ──┬─< RepairTicket ──┬─< StatusUpdate
@@ -209,12 +241,14 @@ User ──┬─< RepairTicket ──┬─< StatusUpdate
        ├─< Order ──< OrderItem >── Product
        ├─< Payment
        ├─< Notification
-       └─< Testimonial
+       ├─< Testimonial
+       └─< AuditLog  (actor, optional — SetNull if the account is ever gone)
 
 Setting        key-value shop configuration
 DiscountRule   loyalty tiers
 PasswordReset  one active reset code per email
 RateLimit      fixed-window counters
+AuditLog       who deleted what, who moved money — see §6, week 4.1
 ```
 
 ### 4.1 Notable decisions
@@ -278,19 +312,36 @@ request
 ```
 
 **Middleware is not a security boundary here.** It runs on the edge where Prisma
-can't, so it can only read the token. Every real check happens in a layout or a
-server action.
+can't, so it can only read the token. Every real check happens in a layout, a
+page that guards itself, or a server action.
 
-### 5.3 Sign-in separation 🔜
+**The failure mode to watch for** is a route that reads `auth()` without a
+DB-validated guard above it. Such a route is protected against *signed-out*
+visitors (middleware catches those) but not against an account that has since
+been blocked or had its sessions revoked — the cookie is still cryptographically
+valid, and only the database knows it shouldn't be honoured. `bill/[id]` was
+exactly this ([§3.2](#32-route-groups)). Reading `auth()` inside a route that
+*does* sit under a guarded layout is fine.
 
-Currently one `/login` for everyone, routed by role after authentication. Week 3
-splits it: `/login` for customers, `/staff/login` for the shop team —
-unadvertised, `noindex`, its own screen. A customer account entered at the staff
-entrance is rejected and vice versa.
+### 5.3 Sign-in separation
 
-Rationale: it keeps the customer site clean, and it means credential-stuffing
-against staff accounts has to find the entrance first. It is the standard B2B
-pattern.
+Two doors, one credential check: `/login` for customers, `/staff/login` for the
+shop team — unadvertised, `noindex`, disallowed in `robots.txt`, never linked
+from the public site.
+
+Both end in the same `authorize()` and the same database-checked guards, so
+neither door is a security boundary on its own. Entering the wrong one with the
+**right** password is a redirect, not a failure: the form names the other
+entrance and offers a link. Entering the wrong password says only "invalid email
+or password" at both doors, so neither can be used to discover which addresses
+belong to the shop's staff.
+
+Rationale: it keeps the customer site clean, and credential stuffing against
+staff accounts has to find the entrance first.
+
+Staff have **no self-service password reset** — a technician may not have an
+email address the shop controls. The owner sets a new password under Admin →
+Staff, which also bumps `sessionsValidFrom`.
 
 ---
 
@@ -301,7 +352,8 @@ pattern.
 Three layers, and only the last two are load-bearing:
 
 1. `middleware.ts` — path-based, redirects the obviously-wrong. Cheap, not trusted.
-2. **Layout guards** — `requireAdmin()` / `requireUser()`, DB-validated.
+2. **Layout guards** — `requireAdmin()` / `requireUser()`, DB-validated. A route
+   with no guarded layout above it must call one of these itself.
 3. **Server actions** — every one re-checks. An action is a public HTTP endpoint;
    it never assumes a page guard ran first.
 
@@ -313,9 +365,35 @@ const ticket = await prisma.repairTicket.findUnique({ where: { id } });
 if (!ticket || ticket.customerId !== user.id) notFound();
 ```
 
-🔜 Week 3 replaces scattered `role === "ADMIN"` comparisons with a single
-`can(user, action)` table in `lib/permissions.ts`, so adding a role doesn't mean
-auditing 40 call sites.
+Authorisation itself is one table: `can(user, action)` in `lib/permissions.ts`.
+Before it there were ~60 copies of `role === "ADMIN"`, which is fine with two
+roles and a liability with three — adding STAFF would have meant auditing every
+one of them, and "can a technician mark a bill paid?" had sixty answers.
+
+The module is pure — no Prisma, no `server-only` — so `middleware.ts` can use it
+for the cheap edge pass. It answers *what may this role do*; whether the account
+still exists and is still allowed is `lib/auth-guard`'s job, against the
+database, on every request.
+
+Three entry points, all in `lib/auth-guard`:
+
+| | Used by | On failure |
+|---|---|---|
+| `requireStaff()` | the admin layout | redirect to `/dashboard` |
+| `requirePermission(action)` | a page inside it | redirect to `/admin` |
+| `actionPermission(action)` | every server action | returns null → `{ error }` |
+
+A technician who types `/admin/reports` lands back on the admin overview rather
+than a 403 — they haven't done anything wrong, the page simply isn't theirs.
+
+**`can()` answers what a role may do; `AuditLog` answers what an account
+actually did.** `lib/audit.ts`'s `logAudit()` is called from inside the same
+transaction as the mutation it records — deleting a repair, marking a bill
+paid, verifying or rejecting a payment, deleting a loyalty tier or product,
+and every bank-account change — so a failed audit write rolls the mutation
+back rather than the action silently going unlogged. Read-only in the UI
+(Admin → Activity, `audit:read`, owner-only); nothing deletes an entry.
+`npm run verify:audit` checks the wiring.
 
 ---
 
@@ -383,6 +461,7 @@ place and why:
 | CSRF | Next's built-in Server Action origin check |
 | Uploads | Type + size caps, UUID filenames, `Referrer-Policy` so URLs don't leak |
 | Secrets | Never committed; `AUTH_SECRET` unique per deployment |
+| Proving it | `npm run verify:security` drives a live server + database — see [OPERATIONS.md §3](OPERATIONS.md#3-verifying-an-install) |
 
 **`script-src` still allows `'unsafe-inline'`.** Next's App Router emits inline
 bootstrap scripts and next-themes writes an inline theme script; removing it
@@ -392,6 +471,10 @@ The other directives do real work regardless.
 ---
 
 ## 9. Deployment & environments
+
+The full variable list, the deploy checklist, and the backup/restore runbook are
+in [OPERATIONS.md](OPERATIONS.md). This section is the shape; that one is the
+procedure.
 
 ### 9.1 Per-instance resources
 
@@ -406,20 +489,50 @@ let a token minted at one shop validate at another.
 | `AUTH_SECRET` | `npx auth secret`, unique |
 | Resend key | Optional — email silently no-ops without it |
 
+The demo instance is a second, complete set of the above —
+`NEXT_PUBLIC_DEMO_MODE=true`, no Resend key, reset nightly by a Vercel Cron
+guarded three independent ways. [OPERATIONS.md §6](OPERATIONS.md#6-demo-instance-and-nightly-reset).
+
 ### 9.2 Configuration layers
 
 | Layer | Where | Changed by | Takes effect |
 |---|---|---|---|
-| Identity fallback | `NEXT_PUBLIC_*` env vars | Installer | Redeploy |
+| First-run fallback | `NEXT_PUBLIC_*` env vars | Installer | Redeploy |
 | Live configuration | `Setting` table | Shop owner, in the UI | Immediately |
 
-⚠️ **These are not yet unified.** The database wins for bills, pickup messages
-and bank details; the env var still wins for the logo, footer, page title and
-emails. Week 2 of the shipping plan fixes this. Until then, renaming a shop needs
-both a Settings edit **and** an env change.
+**The database is the source of truth.** Every surface that shows the shop's
+identity — header logo, footer, browser tab title, social previews, JSON-LD,
+emails, the printed bill, the public tracker, WhatsApp links, the brand colour —
+reads `getShopInfo()`. The env vars only fill in before an owner has saved
+anything, so a fresh install looks right on day one.
 
-`NEXT_PUBLIC_*` values are inlined **at build time**, not read per request —
-changing one requires a redeploy, and Vercel does not read your local `.env`.
+`NEXT_PUBLIC_*` values are inlined **at build time**, so changing one still
+requires a redeploy — but an owner never needs to. They change it in Settings.
+
+### 9.2.1 How a rename reaches every page
+
+`getShopInfo()` is wrapped in `unstable_cache` under the tag `shop-info`, and
+memoised per request with React `cache`. It is read by the root layout, so
+without the cache it would be six settings rows on every render of every page.
+
+`unstable_cache` persists to the **filesystem** incremental cache, which
+survives a server restart. `revalidateTag("shop-info")` in `updateShopInfo` is
+therefore the only thing that clears it — restarting the process does not.
+That makes the `revalidateTag` call load-bearing, not a nicety: without it a
+rename would never appear, even after a redeploy.
+
+Components that cannot read the database — anything under `"use client"`, which
+includes the mobile nav sheet and the bill builder's live preview — take the
+identity as a prop from the nearest async layout or page.
+
+### 9.2.2 Brand colour
+
+The shop picks a **hue angle**, not a colour. `globals.css` expresses every
+branded token as a rotation of `--brand-hue`, which the root layout sets inline
+on `<html>` from Settings. Lightness and chroma stay tuned per theme, so a shop
+cannot choose something that fails contrast in dark mode. `.brand-scope`
+re-declares those tokens so the Settings page can preview a different hue than
+the page it sits on.
 
 ### 9.3 Migrations
 
@@ -434,15 +547,28 @@ Honest list. None are secret; all are either accepted trade-offs or scheduled.
 
 1. **Walk-in tickets have no phone number.** So `/track` manual lookup cannot
    verify them — those customers depend entirely on their tracking link.
-2. **Configuration is split** between env vars and the database ([§9.2](#92-configuration-layers)). Week 2.
-3. **No audit log.** Nothing records who deleted a repair or marked a bill paid.
-   Becomes urgent the moment staff accounts exist. Week 4.
-4. **`STAFF` is unused** — everyone shares the owner's login today. Week 3.
-5. **Uploaded files are permanent public URLs.** Unguessable, but not revocable;
+2. **The build needs a database.** The root layout reads shop identity, so
+   `next build` cannot prerender without `DATABASE_URL` reachable. Fine on
+   Vercel (migrations already run first); worth knowing if a build ever fails
+   with a Prisma connection error rather than a code error.
+3. **A technician's permissions are fixed.** There is one STAFF role, not
+   per-person permissions. A shop that wants "Nimal can bill but Sunil can't"
+   needs a second role; the table in `lib/permissions.ts` is where that would
+   go, and nothing else would have to change.
+4. **Uploaded files are permanent public URLs.** Unguessable, but not revocable;
    anyone who obtains one keeps access. Accepted for now.
-6. **No 2FA**, and password policy is length-only (min 8, no breach check).
-7. **`next-auth` is a beta dependency.** Pin it exactly before selling.
-8. **English only.** Sinhala/Tamil is probably the biggest adoption lever in this
+5. **No 2FA**, and password policy is length-only (min 8, no breach check).
+6. **`next-auth` is a beta dependency.** Pin it exactly before selling.
+7. **English only.** Sinhala/Tamil is probably the biggest adoption lever in this
    market, and a bigger job than it looks.
-9. **No automated tests.** Verification is typecheck + build + manual
-   click-through. The riskiest gap as the codebase grows.
+8. **Almost no automated tests.** `scripts/verify-security.mjs`,
+   `scripts/verify-permissions.ts` and `scripts/verify-audit.ts` cover the
+   security-critical paths — tracker exposure, ticket enumeration, the rate
+   limiter, blocking, session revocation, the whole role split, and who's
+   accountable for a deletion or a payment — against a live server and
+   database. Everything else is typecheck + build + manual click-through.
+   There are no unit tests around bill computation, loyalty tiers or status
+   transitions, which is where a silent money bug would live.
+9. **Login lockout is not covered by the verification script.** It runs through
+   a `useActionState` form action the script cannot invoke over HTTP. The
+   limiter underneath it is proven; the wiring is checked by hand.

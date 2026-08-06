@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { TestimonialStatus } from "@prisma/client";
-import { actionAdmin, actionUser } from "@/lib/auth-guard";
+import { actionPermission, actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { DONE_TICKET_STATUSES } from "@/lib/completed-repairs";
 import {
@@ -27,8 +27,9 @@ async function requireUser() {
   return actionUser();
 }
 
-async function requireAdmin() {
-  return actionAdmin();
+// Moderating reviews is counter work.
+async function allowed() {
+  return !!(await actionPermission("review:moderate"));
 }
 
 // The home page renders approved testimonials, so every change has to reach
@@ -201,7 +202,7 @@ export async function createTestimonial(
   _prev: TestimonialFormState,
   formData: FormData,
 ): Promise<TestimonialFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const parsed = adminSchema.safeParse({
     rating: formData.get("rating"),
@@ -240,7 +241,7 @@ export async function updateTestimonial(
   _prev: TestimonialFormState,
   formData: FormData,
 ): Promise<TestimonialFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Feedback not found." };
@@ -292,7 +293,7 @@ export async function updateTestimonialNote(
   _prev: TestimonialFormState,
   formData: FormData,
 ): Promise<TestimonialFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Feedback not found." };
@@ -316,7 +317,7 @@ export async function setTestimonialStatus(
   id: string,
   status: TestimonialStatus,
 ): Promise<TestimonialFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const existing = await prisma.testimonial.findUnique({
     where: { id },
@@ -356,7 +357,7 @@ export async function toggleTestimonialFeatured(
   id: string,
   featured: boolean,
 ): Promise<TestimonialFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const existing = await prisma.testimonial.findUnique({
     where: { id },
@@ -380,7 +381,7 @@ export async function moveTestimonial(
   id: string,
   direction: "up" | "down",
 ): Promise<TestimonialFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const approved = await prisma.testimonial.findMany({
     where: { status: "APPROVED" },
@@ -413,7 +414,7 @@ export async function deleteTestimonial(
   _prev: TestimonialFormState,
   formData: FormData,
 ): Promise<TestimonialFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Feedback not found." };
@@ -425,7 +426,7 @@ export async function deleteTestimonial(
 }
 
 export async function setTestimonialsVisibility(visible: boolean) {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
   await setSetting(TESTIMONIALS_VISIBLE_KEY, visible ? "true" : "false");
   revalidateTestimonials();
   return { success: true };

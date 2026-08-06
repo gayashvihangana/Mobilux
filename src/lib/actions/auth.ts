@@ -4,8 +4,10 @@ import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
 import { z } from "zod";
 import { signIn, signOut } from "@/auth";
+import { isShopStaff } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { limitByIp, limitByKey, waitMessage } from "@/lib/rate-limit";
+import { DEMO_MODE } from "@/lib/config";
 
 export type AuthFormState = {
   error?: string;
@@ -15,6 +17,8 @@ export type AuthFormState = {
   blocked?: boolean;
   blockedEmail?: string;
   unblockRequested?: boolean;
+  // Correct credentials entered at the wrong door — names the right one.
+  wrongEntrance?: "staff" | "customer";
 } | null;
 
 const registerSchema = z.object({
@@ -33,6 +37,13 @@ export async function register(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  // Hiding the "Sign up" link and redirecting /register in middleware.ts is
+  // presentation — this is a public HTTP endpoint regardless of what the UI
+  // offers, same reasoning as every permission check in lib/auth-guard.ts.
+  if (DEMO_MODE) {
+    return { error: "New accounts are disabled on this demo. Use one of the sign-in buttons instead." };
+  }
+
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -87,7 +98,18 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export async function login(
+// Two entrances, one credential check.
+//
+// `/login` is the customer door and `/staff/login` is the shop's. Keeping them
+// apart means the customer site never advertises where the back office is, and
+// credential stuffing against a technician's account has to find the entrance
+// first. Neither door is a security boundary on its own — both end up in the
+// same authorize() and the same database-checked guards — so entering the
+// wrong one is a redirect, not a failure.
+type Entrance = "customer" | "staff";
+
+async function signInAt(
+  entrance: Entrance,
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
@@ -118,24 +140,46 @@ export async function login(
     };
   }
 
-  // If the account is blocked, tell the customer directly (only once we've
-  // confirmed the password, so we don't reveal which emails are blocked).
   const account = await prisma.user.findUnique({ where: { email } });
-  if (account?.blocked) {
-    const ok = await bcrypt.compare(parsed.data.password, account.passwordHash);
-    if (!ok) return { error: "Invalid email or password." };
-    return {
-      blocked: true,
-      blockedEmail: email,
-      unblockRequested: account.unblockRequested,
-    };
+
+  // Everything below only happens once the password checks out, so none of it
+  // can be used to discover which addresses have accounts, which are blocked,
+  // or which belong to the shop's own staff.
+  const passwordOk = account
+    ? await bcrypt.compare(parsed.data.password, account.passwordHash)
+    : false;
+
+  if (account && passwordOk) {
+    const staffAccount = isShopStaff(account);
+
+    // Right credentials, wrong door. Point them at the other one rather than
+    // signing them in somewhere that will immediately redirect them.
+    if (staffAccount && entrance === "customer") {
+      return { wrongEntrance: "staff" };
+    }
+    if (!staffAccount && entrance === "staff") {
+      return { wrongEntrance: "customer" };
+    }
+
+    if (account.blocked) {
+      // A blocked customer can ask to be let back in. A deactivated
+      // technician cannot — that is an employment matter, not a support one.
+      return staffAccount
+        ? { error: "This account has been deactivated. Speak to the owner." }
+        : {
+            blocked: true,
+            blockedEmail: email,
+            unblockRequested: account.unblockRequested,
+          };
+    }
   }
 
   const callbackUrl = formData.get("callbackUrl");
+  const fallback = entrance === "staff" ? "/admin" : "/dashboard";
   const redirectTo =
     typeof callbackUrl === "string" && callbackUrl.startsWith("/")
       ? callbackUrl
-      : "/dashboard";
+      : fallback;
 
   try {
     await signIn("credentials", {
@@ -150,6 +194,22 @@ export async function login(
     }
     throw error;
   }
+}
+
+/** The customer door, at `/login`. */
+export async function login(
+  prev: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  return signInAt("customer", prev, formData);
+}
+
+/** The shop team's door, at `/staff/login`. Unadvertised and noindex. */
+export async function staffLogin(
+  prev: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  return signInAt("staff", prev, formData);
 }
 
 // A blocked customer asks to be unblocked — flags the account and notifies
@@ -168,6 +228,9 @@ export async function requestUnblock(
 
   const user = await prisma.user.findUnique({ where: { email: normalized } });
   if (!user || !user.blocked) return { ok: false };
+  // Deactivating a technician is an employment decision, not a support
+  // ticket. They must not be able to notify every admin about it.
+  if (isShopStaff(user)) return { ok: false };
   if (user.unblockRequested) return { ok: true, already: true };
 
   await prisma.user.update({

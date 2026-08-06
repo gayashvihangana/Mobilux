@@ -11,8 +11,13 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:pull": "node scripts/db-pull.mjs",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "verify:security": "node scripts/verify-security.mjs",
+    "verify:permissions": "tsx scripts/verify-permissions.ts",
+    "verify:audit": "tsx scripts/verify-audit.ts",
+    "verify:demo": "tsx scripts/verify-demo.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
