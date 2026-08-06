@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { actionAdmin, actionUser } from "@/lib/auth-guard";
+import { actionPermission, actionUser } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { phonesVisible } from "@/lib/settings";
 import { sendEmail } from "@/lib/email";
@@ -104,7 +104,9 @@ export async function updateOrderStatus(
   _prev: OrderFormState,
   formData: FormData,
 ): Promise<OrderFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("order:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const parsed = z
     .object({

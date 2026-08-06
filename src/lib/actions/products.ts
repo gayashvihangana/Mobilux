@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { actionAdmin } from "@/lib/auth-guard";
+import { actionPermission } from "@/lib/auth-guard";
 import { prisma } from "@/lib/prisma";
 import { saveUploads } from "@/lib/uploads";
 import { PHONES_VISIBLE_KEY, setSetting } from "@/lib/settings";
@@ -30,8 +30,9 @@ function slugify(name: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-async function requireAdmin() {
-  return actionAdmin();
+// Catalogue and stock are counter work.
+async function allowed() {
+  return !!(await actionPermission("product:write"));
 }
 
 function revalidateShop() {
@@ -43,7 +44,7 @@ export async function createProduct(
   _prev: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
@@ -79,7 +80,7 @@ export async function updateProduct(
   _prev: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string") return { error: "Invalid product." };
@@ -121,7 +122,7 @@ export async function deleteProduct(
   _prev: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string") return { error: "Invalid product." };
@@ -146,7 +147,7 @@ export async function deleteProduct(
 }
 
 export async function setPhonesVisibility(visible: boolean) {
-  if (!(await requireAdmin())) return;
+  if (!(await allowed())) return;
   await setSetting(PHONES_VISIBLE_KEY, visible ? "true" : "false");
   revalidateShop();
 }

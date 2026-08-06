@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
-import { actionAdmin } from "@/lib/auth-guard";
+import { actionPermission } from "@/lib/auth-guard";
 import { saveUploads } from "@/lib/uploads";
 import {
   SHOP_BANK_ACCOUNTS_KEY,
@@ -21,8 +21,9 @@ export type SettingsFormState = {
   success?: boolean;
 } | null;
 
-async function requireAdmin() {
-  return !!(await actionAdmin());
+// Changing where money is paid is the highest-value attack on a repair shop.
+async function allowed() {
+  return !!(await actionPermission("settings:write"));
 }
 
 function revalidateSettings() {
@@ -65,7 +66,7 @@ export async function addBankAccount(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const parsed = parseAccount(formData);
   if (!parsed.success) {
@@ -82,7 +83,7 @@ export async function updateBankAccount(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Account not found." };
@@ -105,7 +106,7 @@ export async function deleteBankAccount(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const id = formData.get("id");
   if (typeof id !== "string" || !id) return { error: "Account not found." };
@@ -126,7 +127,7 @@ export async function deleteBankAccount(
 export async function makePrimaryBankAccount(
   id: string,
 ): Promise<SettingsFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const accounts = await getShopBankAccounts();
   const target = accounts.find((a) => a.id === id);
@@ -171,7 +172,7 @@ export async function updateShopInfo(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
-  if (!(await requireAdmin())) return { error: "Not authorized." };
+  if (!(await allowed())) return { error: "Not authorized." };
 
   const parsed = shopInfoSchema.safeParse({
     name: formData.get("name") ?? "",

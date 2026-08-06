@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { Prisma, type TicketStatus } from "@prisma/client";
-import { actionAdmin, actionUser } from "@/lib/auth-guard";
+import { actionPermission, actionUser } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { computeBill, resolveBillShow } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
@@ -323,7 +324,9 @@ export async function adminCreateTicket(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const parsed = parseAdminTicketForm(formData);
   if (!parsed.success) {
@@ -389,7 +392,9 @@ export async function updateTicketDetails(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -476,7 +481,9 @@ export async function updateBillNotes(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("bill:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -528,7 +535,9 @@ export async function generateBill(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("bill:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const parsed = generateBillSchema.safeParse({
     ticketId: formData.get("ticketId"),
@@ -664,7 +673,9 @@ export async function markBillPaid(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("bill:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const parsed = markPaidSchema.safeParse({
     ticketId: formData.get("ticketId"),
@@ -700,7 +711,9 @@ export async function markBillUnpaid(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("bill:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -725,7 +738,9 @@ export async function linkTicketCustomer(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const ticketId = formData.get("ticketId");
   const userId = formData.get("userId");
@@ -795,7 +810,9 @@ export async function updateStatusNote(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:write"))) {
+    return { error: "Not authorized." };
+  }
 
   const parsed = updateNoteSchema.safeParse({
     updateId: formData.get("updateId"),
@@ -826,7 +843,9 @@ export async function deleteStatusUpdate(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:delete"))) {
+    return { error: "Not authorized." };
+  }
 
   const updateId = formData.get("updateId");
   if (typeof updateId !== "string" || !updateId) {
@@ -991,7 +1010,7 @@ export async function updateTicketStatus(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) {
+  if (!(await actionPermission("repair:write"))) {
     return { error: "Not authorized." };
   }
 
@@ -1162,7 +1181,9 @@ export async function deleteTicket(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:delete"))) {
+    return { error: "Not authorized." };
+  }
 
   const ticketId = formData.get("ticketId");
   if (typeof ticketId !== "string") return { error: "Invalid ticket." };
@@ -1216,7 +1237,9 @@ export async function reportRepairIssue(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:issue"))) {
+    return { error: "Not authorized." };
+  }
 
   const parsed = reportIssueSchema.safeParse({
     ticketId: formData.get("ticketId"),
@@ -1321,7 +1344,9 @@ export async function undoRepairIssueDecision(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:issue-resolve"))) {
+    return { error: "Not authorized." };
+  }
 
   const issueId = formData.get("issueId");
   if (typeof issueId !== "string") return { error: "Invalid issue." };
@@ -1422,7 +1447,9 @@ export async function withdrawRepairIssue(
   _prev: TicketFormState,
   formData: FormData,
 ): Promise<TicketFormState> {
-  if (!(await actionAdmin())) return { error: "Not authorized." };
+  if (!(await actionPermission("repair:issue-resolve"))) {
+    return { error: "Not authorized." };
+  }
 
   const issueId = formData.get("issueId");
   if (typeof issueId !== "string") return { error: "Invalid issue." };
@@ -1512,8 +1539,8 @@ export async function respondRepairIssue(
   if (!issue) return { error: "Issue not found." };
 
   const ticket = issue.ticket;
-  const isAdmin = user.role === "ADMIN";
-  if (!isAdmin && ticket.customerId !== user.id) {
+  const onBehalf = can(user, "repair:issue-resolve");
+  if (!onBehalf && ticket.customerId !== user.id) {
     return { error: "Not authorized." };
   }
   if (issue.status !== "PENDING") {
