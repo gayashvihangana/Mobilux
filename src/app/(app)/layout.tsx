@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/auth-guard";
+import { isShopStaff } from "@/lib/permissions";
 import { getShopInfo } from "@/lib/settings";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,8 @@ export default async function AppLayout({
 }) {
   // Database-checked, so a blocked customer is out on their next request.
   const user = await requireUser();
-  if (user.role === "ADMIN") redirect("/admin");
+  // The shop team has its own workspace; this one is the customer's.
+  if (isShopStaff(user)) redirect("/admin");
 
   const shop = await getShopInfo();
   const brand = {
