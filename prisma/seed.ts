@@ -62,6 +62,23 @@ async function main() {
     );
   }
 
+  // A technician, so the three-role split can actually be exercised locally.
+  // Only seeded for development — production seeds run with SEED_ADMIN_*
+  // set, and a shop creates its own staff under Admin → Staff.
+  if (creds.usedDefault) {
+    await prisma.user.upsert({
+      where: { email: "tech@mobilux.lk" },
+      update: {},
+      create: {
+        name: "Nimal Silva",
+        email: "tech@mobilux.lk",
+        passwordHash: await bcrypt.hash("Technician@123", 12),
+        role: "STAFF",
+        phone: "0723456789",
+      },
+    });
+  }
+
   const customerPassword = await bcrypt.hash("Customer@123", 12);
   const customer = await prisma.user.upsert({
     where: { email: "kasun@example.com" },
@@ -313,6 +330,9 @@ async function main() {
       creds.usedDefault ? DEV_ADMIN_PASSWORD : "(the SEED_ADMIN_PASSWORD you set)"
     }`,
   );
+  if (creds.usedDefault) {
+    console.log("Staff login:    tech@mobilux.lk / Technician@123  (/staff/login)");
+  }
   console.log("Customer login: kasun@example.com / Customer@123");
   void admin;
 }
