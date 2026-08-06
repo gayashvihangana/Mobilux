@@ -1071,6 +1071,7 @@ export async function updateTicketStatus(
     deviceName: joinedDevice || undefined,
     location: shopInfo.address,
     hours: shopInfo.hours,
+    shopName: shopInfo.name,
   };
 
   // Human-readable copy shared by the in-app notification and the email:

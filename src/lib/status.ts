@@ -1,5 +1,4 @@
 import type { DeviceType, OrderStatus, TicketStatus } from "@prisma/client";
-import { SHOP } from "@/lib/config";
 
 // READY_FOR_PICKUP is deliberately absent: completing the repair IS being
 // ready for pickup, so COMPLETED goes straight to PICKED_UP. The enum value
@@ -183,10 +182,16 @@ export function currentActivityLabel(status: TicketStatus): string {
 
 // Context that lets the pickup-related notes name the device and tell the
 // customer where/when to collect. All optional — the text degrades cleanly.
+//
+// `shopName` is passed in rather than imported: this module is pure so that a
+// server action and a page can't produce different copy, and the live name
+// lives in the database (getShopInfo). Omitting it drops the sign-off rather
+// than printing a stale build-time name.
 export type MilestoneContext = {
   deviceName?: string;
   location?: string;
   hours?: string;
+  shopName?: string;
 };
 
 // Default body text for a timeline entry with no custom note. The pickup
@@ -202,9 +207,15 @@ export function milestoneDescription(
   // note so the two don't repeat the same block of text.
   if (status === "READY_FOR_PICKUP") return pickupNote(ctx);
   if (status === "PICKED_UP") {
-    return `Your ${device} has been collected — we hope it feels good as new. It was a pleasure serving you, and we look forward to seeing you again. Thank you for choosing ${SHOP.name}!`;
+    return `Your ${device} has been collected — we hope it feels good as new. It was a pleasure serving you, and we look forward to seeing you again.${thanks(ctx)}`;
   }
   return MILESTONE_DESCRIPTIONS[status];
+}
+
+/** " Thank you for choosing <shop>!" — nothing at all when no name is given. */
+function thanks(ctx: MilestoneContext): string {
+  const name = ctx.shopName?.trim();
+  return name ? ` Thank you for choosing ${name}!` : "";
 }
 
 // The full "come and collect" message shown on the live pickup row and in
@@ -216,7 +227,7 @@ export function pickupNote(ctx: MilestoneContext = {}): string {
   const when = ctx.hours?.trim()
     ? ` We're open ${ctx.hours.trim()} — please drop by to collect it during these hours.`
     : "";
-  return `Your ${device} is ready to collect${where}.${when} Thank you for choosing ${SHOP.name}!`;
+  return `Your ${device} is ready to collect${where}.${when}${thanks(ctx)}`;
 }
 
 // How far along the pipeline a status sits. CANCELLED sits outside it and
