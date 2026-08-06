@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 // (WhatsApp, SMS, or the QR on their printed bill) is the whole point of the
 // token: the customer sees their repair without the shop having to create
 // them a login, and nobody can reach anyone else's repair by counting up
-// from MBX-0001.
+// from REP-001.
 export function TrackingLink({
   url,
   ticketNumber,

@@ -298,7 +298,7 @@ async function main() {
     const completedEntry = t.history.find((h) => h.status === "COMPLETED");
     await prisma.repairTicket.create({
       data: {
-        ticketNumber: `MBX-${String(seq).padStart(4, "0")}`,
+        ticketNumber: `REP-${String(seq).padStart(3, "0")}`,
         customerId: customer.id,
         deviceType: "PHONE",
         brand: t.brand,

@@ -7,6 +7,8 @@
 | [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) | You | The checklist you actually follow, per shop, start to finish |
 | [HANDOVER.md](HANDOVER.md) | Shop owners | What to leave with a shop after training — Settings, logging a repair, billing, staff |
 | [PRIVACY.md](PRIVACY.md) | Shop owners, you | What's stored, where, for how long, and who's responsible for it |
+| [PRICING-WORKSHEET.md](PRICING-WORKSHEET.md) | You | A method for pricing setup + monthly — not numbers, a way to reach your own |
+| [DEMO-POST.md](DEMO-POST.md) | You | Shot list and ready-to-adapt copy for the week 6 demo post |
 | [SHIPPING-PLAN.md](SHIPPING-PLAN.md) | You | Six weeks of work to a sellable product, at ~20 hrs/week |
 | [PROPOSAL.md](PROPOSAL.md) | Shop owners | Commercial proposal. Fill in the `[[…]]` markers before sending |
 | [REPORT.md](REPORT.md) | University | Academic report. Sections marked ✍️ **YOU** need your own evidence |
