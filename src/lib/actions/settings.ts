@@ -1,12 +1,16 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { actionAdmin } from "@/lib/auth-guard";
+import { saveUploads } from "@/lib/uploads";
 import {
   SHOP_BANK_ACCOUNTS_KEY,
   SHOP_INFO_KEYS,
+  SHOP_INFO_TAG,
   getShopBankAccounts,
+  getShopInfo,
+  normalizeHue,
   setSetting,
   type BankAccount,
 } from "@/lib/settings";
@@ -25,6 +29,15 @@ function revalidateSettings() {
   revalidatePath("/admin/settings");
   // Bills read the default account, so refresh anywhere it might show.
   revalidatePath("/admin/tickets", "layout");
+}
+
+// The shop's identity is read by the root layout, so it is cached across
+// requests (lib/settings.ts). Dropping the tag is what makes a rename show up
+// in the header, footer, browser tab, emails and bills without a redeploy —
+// revalidatePath alone would not clear it.
+function revalidateShopIdentity() {
+  revalidateTag(SHOP_INFO_TAG);
+  revalidatePath("/", "layout");
 }
 
 async function persistAccounts(accounts: BankAccount[]) {
@@ -124,6 +137,14 @@ export async function makePrimaryBankAccount(
   return { success: true };
 }
 
+// A logo mark is one emoji, not a sentence. Counting by code points rather
+// than UTF-16 units so a single flag or skin-toned emoji isn't rejected for
+// being "too long".
+const emojiSchema = z
+  .string()
+  .trim()
+  .refine((v) => v === "" || [...v].length <= 4, "Use a single emoji");
+
 const shopInfoSchema = z.object({
   name: z.string().trim().min(1, "Shop name is required").max(120),
   tagline: z.string().trim().max(120).optional().or(z.literal("")),
@@ -131,6 +152,19 @@ const shopInfoSchema = z.object({
   email: z.string().trim().max(120).optional().or(z.literal("")),
   address: z.string().trim().max(200).optional().or(z.literal("")),
   hours: z.string().trim().max(200).optional().or(z.literal("")),
+  // Stored digits-only so wa.me links can't be built from "+94 71 234 5678".
+  whatsapp: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine(
+      (v) => v === "" || (v.length >= 8 && v.length <= 15),
+      "Enter the number with its country code, digits only",
+    ),
+  logoEmoji: emojiSchema,
+  accentHue: z.coerce
+    .number()
+    .refine(Number.isFinite, "Pick a brand colour"),
 });
 
 export async function updateShopInfo(
@@ -146,12 +180,42 @@ export async function updateShopInfo(
     email: formData.get("email") ?? "",
     address: formData.get("address") ?? "",
     hours: formData.get("hours") ?? "",
+    whatsapp: formData.get("whatsapp") ?? "",
+    logoEmoji: formData.get("logoEmoji") ?? "",
+    accentHue: formData.get("accentHue") ?? "",
   });
   if (!parsed.success) {
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  const { name, tagline, phone, email, address, hours } = parsed.data;
+  const {
+    name,
+    tagline,
+    phone,
+    email,
+    address,
+    hours,
+    whatsapp,
+    logoEmoji,
+    accentHue,
+  } = parsed.data;
+
+  // Logo image: a new upload replaces the old one, "removeLogo" clears it, and
+  // neither present means leave whatever is saved alone. Resolved before any
+  // write so a failed upload doesn't half-save the form.
+  const current = await getShopInfo();
+  let logoUrl = current.logoUrl;
+
+  if (formData.get("removeLogo") === "1") {
+    logoUrl = "";
+  }
+  const file = formData.get("logo");
+  if (file instanceof File && file.size > 0) {
+    const { urls, error } = await saveUploads([file], "branding", 1);
+    if (error) return { error };
+    if (urls?.[0]) logoUrl = urls[0];
+  }
+
   await Promise.all([
     setSetting(SHOP_INFO_KEYS.name, name),
     setSetting(SHOP_INFO_KEYS.tagline, tagline || ""),
@@ -159,9 +223,14 @@ export async function updateShopInfo(
     setSetting(SHOP_INFO_KEYS.email, email || ""),
     setSetting(SHOP_INFO_KEYS.address, address || ""),
     setSetting(SHOP_INFO_KEYS.hours, hours || ""),
+    setSetting(SHOP_INFO_KEYS.whatsapp, whatsapp),
+    setSetting(SHOP_INFO_KEYS.logoEmoji, logoEmoji || ""),
+    setSetting(SHOP_INFO_KEYS.logoUrl, logoUrl),
+    setSetting(SHOP_INFO_KEYS.accentHue, String(normalizeHue(accentHue))),
   ]);
 
   revalidateSettings();
+  revalidateShopIdentity();
   return { success: true };
 }
 

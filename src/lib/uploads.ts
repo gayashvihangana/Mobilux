@@ -29,7 +29,7 @@ const STORAGE_NOT_CONFIGURED =
 // back as { error } so the calling form can show it.
 export async function saveUploads(
   files: File[],
-  subdir: "tickets" | "receipts" | "products" | "avatars",
+  subdir: "tickets" | "receipts" | "products" | "avatars" | "branding",
   maxFiles = 4,
 ): Promise<{ urls?: string[]; error?: string }> {
   const valid = files.filter((f) => f.size > 0);
