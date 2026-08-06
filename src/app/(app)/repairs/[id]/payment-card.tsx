@@ -13,12 +13,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { BANK_DETAILS } from "@/lib/config";
+import { getShopPayTo } from "@/lib/settings";
 import { applyDiscount } from "@/lib/loyalty";
 import { formatDateTime, formatLKR } from "@/lib/utils";
 import { ReceiptForm } from "@/components/forms/receipt-form";
 
-export function PaymentCard({
+export async function PaymentCard({
   ticket,
   latestPayment,
   discountPercent,
@@ -27,6 +27,11 @@ export function PaymentCard({
   latestPayment: Payment | null;
   discountPercent: number;
 }) {
+  // The account an admin marked default under Admin → Settings — the same one
+  // printed on the bill. Reading the env var here meant a shop that changed
+  // banks in Settings still showed customers the old account.
+  const payTo = await getShopPayTo();
+
   // Final price not confirmed yet — show estimate only
   if (!ticket.finalCost) {
     return (
@@ -181,20 +186,20 @@ export function PaymentCard({
           <dl className="mt-3 space-y-1.5 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Bank</dt>
-              <dd className="text-right font-medium">{BANK_DETAILS.bankName}</dd>
+              <dd className="text-right font-medium">{payTo.bankName}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Branch</dt>
-              <dd className="text-right font-medium">{BANK_DETAILS.branch}</dd>
+              <dd className="text-right font-medium">{payTo.branch}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Account name</dt>
-              <dd className="text-right font-medium">{BANK_DETAILS.accountName}</dd>
+              <dd className="text-right font-medium">{payTo.accountName}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Account no.</dt>
               <dd className="text-right font-mono font-medium">
-                {BANK_DETAILS.accountNumber}
+                {payTo.accountNumber}
               </dd>
             </div>
           </dl>

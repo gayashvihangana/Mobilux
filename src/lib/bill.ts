@@ -179,20 +179,35 @@ function normaliseItems(raw: BillTicket["billItems"]): BillLineItem[] {
     }));
 }
 
-// Per-bill overrides win; blanks fall back to the shop default.
-function resolvePayTo(override: BillPayTo | null): Required<BillPayTo> {
+// Per-bill overrides win, then the shop's default account from Settings, then
+// the build-time env values. A generated bill stores its own `billPayTo`, so
+// changing banks never rewrites an invoice that has already been issued — the
+// fallback chain only matters for bills that predate the bill builder.
+function resolvePayTo(
+  override: BillPayTo | null,
+  shopDefault?: BillPayTo,
+): Required<BillPayTo> {
   const o = override ?? {};
+  const d = shopDefault ?? {};
   return {
-    bankName: o.bankName?.trim() || BANK_DETAILS.bankName,
-    branch: o.branch?.trim() || BANK_DETAILS.branch,
-    accountName: o.accountName?.trim() || BANK_DETAILS.accountName,
-    accountNumber: o.accountNumber?.trim() || BANK_DETAILS.accountNumber,
+    bankName: o.bankName?.trim() || d.bankName?.trim() || BANK_DETAILS.bankName,
+    branch: o.branch?.trim() || d.branch?.trim() || BANK_DETAILS.branch,
+    accountName:
+      o.accountName?.trim() || d.accountName?.trim() || BANK_DETAILS.accountName,
+    accountNumber:
+      o.accountNumber?.trim() ||
+      d.accountNumber?.trim() ||
+      BANK_DETAILS.accountNumber,
   };
 }
 
 // Single source of truth for bill math — the on-screen bill and the
 // downloaded PDF must always show identical figures.
-export function computeBill(ticket: BillTicket): BillTotals {
+export function computeBill(
+  ticket: BillTicket,
+  /** The shop's current default account, from Settings → Bank accounts. */
+  shopPayTo?: BillPayTo,
+): BillTotals {
   const deviceName =
     [ticket.brand, ticket.model].filter(Boolean).join(" ") || "Device";
   const owner = ticket.customer?.name ?? ticket.customerName ?? "Customer";
@@ -216,7 +231,7 @@ export function computeBill(ticket: BillTicket): BillTotals {
   const paidMethod = isSettled
     ? (ticket.paidMethod ?? (ticket.paidPayment ? "Bank transfer" : null))
     : null;
-  const payTo = resolvePayTo(ticket.billPayTo);
+  const payTo = resolvePayTo(ticket.billPayTo, shopPayTo);
   const show = resolveBillShow(ticket.billShow);
 
   const items = normaliseItems(ticket.billItems);

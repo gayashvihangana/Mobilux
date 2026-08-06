@@ -38,7 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { BillDocument } from "@/components/bill-document";
+import { BillDocument, type BillShopInfo } from "@/components/bill-document";
 import {
   DEFAULT_BILL_SHOW,
   type BillShow,
@@ -261,6 +261,7 @@ function ReadonlyField({
 export function BillBuilder({
   ticketId,
   bill,
+  shop,
   trackQr,
   defaultPayTo,
   defaultShow,
@@ -272,6 +273,8 @@ export function BillBuilder({
 }: {
   ticketId: string;
   bill: BillTicket;
+  /** Letterhead for the live preview — this component can't read the DB. */
+  shop: BillShopInfo;
   trackQr?: string;
   defaultPayTo?: PayTo;
   /** The show/hide layout saved from the last bill the shop generated. */
@@ -1083,7 +1086,12 @@ export function BillBuilder({
           uses the last generated version.
         </p>
         <div className="lg:sticky lg:top-6">
-          <BillDocument ticket={previewTicket} trackQr={trackQr} />
+          <BillDocument
+            ticket={previewTicket}
+            shop={shop}
+            shopPayTo={defaultPayTo}
+            trackQr={trackQr}
+          />
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth-guard";
+import { getShopInfo, getShopPayTo } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { invoiceNumber } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
@@ -70,7 +71,11 @@ export default async function BillPage({
     ? `/admin/tickets/${result.bill.id}`
     : `/repairs/${result.bill.id}`;
 
-  const trackQr = await trackQrDataUrl(result.trackToken);
+  const [trackQr, shop, shopPayTo] = await Promise.all([
+    trackQrDataUrl(result.trackToken),
+    getShopInfo(),
+    getShopPayTo(),
+  ]);
 
   return (
     <div className="min-h-dvh bg-neutral-100 py-10 print:bg-white print:py-0">
@@ -94,7 +99,12 @@ export default async function BillPage({
         <DownloadBillButton />
       </div>
       <div className="px-4 print:px-0">
-        <BillDocument ticket={result.bill} trackQr={trackQr} />
+        <BillDocument
+          ticket={result.bill}
+          shop={shop}
+          shopPayTo={shopPayTo}
+          trackQr={trackQr}
+        />
       </div>
     </div>
   );

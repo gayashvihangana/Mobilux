@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { computeBill } from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
-import { getDefaultBillShow, getShopPayTo } from "@/lib/settings";
+import { getDefaultBillShow, getShopInfo, getShopPayTo } from "@/lib/settings";
 import { trackQrDataUrl } from "@/lib/track-qr";
 import { BillBuilder } from "./bill-builder";
 
@@ -27,10 +27,11 @@ export default async function CreateBillPage({
   if (!result) notFound();
 
   const totals = computeBill(result.bill);
-  const [trackQr, defaultPayTo, defaultShow] = await Promise.all([
+  const [trackQr, defaultPayTo, defaultShow, shop] = await Promise.all([
     trackQrDataUrl(result.trackToken),
     getShopPayTo(),
     getDefaultBillShow(),
+    getShopInfo(),
   ]);
 
   return (
@@ -59,6 +60,7 @@ export default async function CreateBillPage({
       <BillBuilder
         ticketId={id}
         bill={result.bill}
+        shop={shop}
         trackQr={trackQr}
         defaultPayTo={defaultPayTo}
         defaultShow={defaultShow}
