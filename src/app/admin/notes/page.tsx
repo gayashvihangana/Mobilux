@@ -4,12 +4,14 @@ import { NotebookPen } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { JournalNote } from "@/components/journal-note";
 import { formatDate } from "@/lib/utils";
+import { requirePermission } from "@/lib/auth-guard";
 
 export const metadata: Metadata = {
   title: "Notes & Lessons",
 };
 
 export default async function AdminNotesPage() {
+  await requirePermission("report:read");
   const tickets = await prisma.repairTicket.findMany({
     where: { adminNotes: { not: null } },
     orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { DEVICE_TYPES } from "@/lib/status";
 import { formatLKR } from "@/lib/utils";
+import { requirePermission } from "@/lib/auth-guard";
 
 export const metadata: Metadata = {
   title: "Reports",
@@ -225,6 +226,7 @@ function RankedBars({
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function AdminReportsPage() {
+  await requirePermission("report:read");
   const [tickets, paidByTicket] = await Promise.all([
     prisma.repairTicket.findMany({
       select: {

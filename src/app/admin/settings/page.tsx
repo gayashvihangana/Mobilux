@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { requirePermission } from "@/lib/auth-guard";
 import { getShopBankAccounts, getShopInfo } from "@/lib/settings";
 import {
   BankAccountDialog,
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminSettingsPage() {
+  await requirePermission("settings:write");
   const [accounts, shopInfo] = await Promise.all([
     getShopBankAccounts(),
     getShopInfo(),

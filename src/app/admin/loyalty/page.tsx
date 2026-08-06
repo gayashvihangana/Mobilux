@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { requirePermission } from "@/lib/auth-guard";
 import { cn } from "@/lib/utils";
 import {
   DeleteRuleButton,
@@ -21,6 +22,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminLoyaltyPage() {
+  await requirePermission("discount:write");
   const rules = await prisma.discountRule.findMany({
     orderBy: { minRepairs: "asc" },
   });

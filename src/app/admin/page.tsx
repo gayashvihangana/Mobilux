@@ -9,6 +9,8 @@ import {
   PackageCheck,
   Users,
 } from "lucide-react";
+import { requireStaff } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
@@ -108,6 +110,7 @@ function QueueRow({
 }
 
 export default async function AdminOverviewPage() {
+  const user = await requireStaff();
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -676,6 +679,11 @@ export default async function AdminOverviewPage() {
   })).filter((s) => s.count > 0);
 
   // Small "right now" links — navigation, not insight, so they stay links.
+  // A technician gets the bench, not the books: the profit dashboard and the
+  // customer directory are the owner's. Everything else here — what needs
+  // confirming, what's waiting for payment, what's on the shelf — is the work.
+  const showMoney = can(user, "report:read");
+
   const todayLinks = [
     {
       label: "Needs confirmation",
@@ -693,14 +701,18 @@ export default async function AdminOverviewPage() {
       tone: "text-warning",
       highlight: false,
     },
-    {
-      label: "Customers",
-      value: customerCount,
-      href: "/admin/customers",
-      icon: Users,
-      tone: "text-info",
-      highlight: false,
-    },
+    ...(can(user, "customer:manage")
+      ? [
+          {
+            label: "Customers",
+            value: customerCount,
+            href: "/admin/customers",
+            icon: Users,
+            tone: "text-info",
+            highlight: false,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -710,7 +722,9 @@ export default async function AdminOverviewPage() {
           Overview
         </h1>
         <p className="mt-1 text-muted-foreground">
-          How the shop is doing — tap any card for the trend behind it.
+          {showMoney
+            ? "How the shop is doing — tap any card for the trend behind it."
+            : "What's on the bench today, and what's waiting on someone."}
         </p>
       </div>
 
@@ -723,21 +737,23 @@ export default async function AdminOverviewPage() {
         pendingCount={pendingCount}
       />
 
-      <OverviewDashboard
-        hero={{
-          profit,
-          profitThisMonth,
-          profitLastMonth,
-          margin: profitMargin,
-          revenue,
-          costs,
-          revenueThisMonth,
-          costsThisMonth,
-        }}
-        profitKpi={profitKpi}
-        kpis={kpis}
-        months={months}
-      />
+      {showMoney ? (
+        <OverviewDashboard
+          hero={{
+            profit,
+            profitThisMonth,
+            profitLastMonth,
+            margin: profitMargin,
+            revenue,
+            costs,
+            revenueThisMonth,
+            costsThisMonth,
+          }}
+          profitKpi={profitKpi}
+          kpis={kpis}
+          months={months}
+        />
+      ) : null}
 
       {/* Right now */}
       <div className="grid gap-4 sm:grid-cols-3">

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { BlockToggle, CustomerDialog } from "./customer-forms";
+import { requirePermission } from "@/lib/auth-guard";
 
 export const metadata: Metadata = {
   title: "Customers",
@@ -42,6 +43,7 @@ function relativeTime(date: Date | null): string {
 }
 
 export default async function AdminCustomersPage() {
+  await requirePermission("customer:manage");
   const customers = await prisma.user.findMany({
     where: { role: "CUSTOMER" },
     orderBy: { lastLoginAt: { sort: "desc", nulls: "last" } },
