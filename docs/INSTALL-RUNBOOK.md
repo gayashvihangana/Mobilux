@@ -47,7 +47,13 @@ an account you never created.
       `scripts/migrate-deploy.mjs` derives the direct one itself; you don't
       need a second variable.
 - [ ] Turn on point-in-time restore now, not after something goes wrong —
-      [OPERATIONS.md §4.2](OPERATIONS.md#42-turn-it-on)
+      [OPERATIONS.md §4.2](OPERATIONS.md#42-turn-it-on). Note the free tier
+      gives only **6 hours**, which is why the next step is not optional.
+- [ ] **Wire up the nightly backup** — add this shop's `DATABASE_URL` as a
+      GitHub Actions secret and point a backup job at it
+      ([OPERATIONS.md §4.5](OPERATIONS.md#45-restoring-from-a-nightly-backup)).
+      6 hours of history does not cover "deleted Saturday, noticed Monday";
+      the nightly dump is what you are actually promising the shop.
 
 ## 3. Vercel Blob store
 
