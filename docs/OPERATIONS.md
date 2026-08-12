@@ -184,10 +184,23 @@ repair, never as lost money.
 
 ### 4.2 Turn it on
 
-Neon Console → the project → **Settings → Storage → History retention**. Set the
-retention window and save. Free tier is limited; check what the shop's plan
-actually gives you and write that number into their proposal, because
-"restore to any point in the last N days" is a thing shops ask about.
+**First, know which kind of Neon database you have** — this trips people up.
+Vercel Postgres *is* Neon underneath, so a database created from Vercel's
+Storage tab is a real Neon database that you have **no direct Neon account
+for**. Going to neon.tech and trying to sign in gets you a signup page and a
+lot of confusion.
+
+| How it was created | Where to manage it |
+|---|---|
+| Vercel → Storage → Create (the usual path) | **Vercel → the project → Storage → the database.** Use its "Open in Neon" button to reach the Neon console *through* the integration — no separate account, no separate password. |
+| Directly at neon.tech | Neon Console, signed in normally (often GitHub SSO). |
+
+Then, in the Neon console either way: the project → **Settings → Storage →
+History retention**. Set the retention window and save.
+
+Free tier is limited; check what the shop's plan actually gives you and write
+that number into their proposal and privacy note, because "restore to any point
+in the last N days" is a thing shops ask about.
 
 ### 4.3 Test it — this is the part people skip
 

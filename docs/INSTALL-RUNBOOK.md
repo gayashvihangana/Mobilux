@@ -33,8 +33,17 @@ steps stop feeling obvious.
 
 ## 2. Neon database
 
-- [ ] New Neon project, one database
-- [ ] Copy the **pooled** connection string — that's `DATABASE_URL`.
+Easiest route is **Vercel → the new project → Storage → Create → Postgres**,
+which provisions a Neon database and wires `DATABASE_URL` into the project
+for you. Worth knowing: that gives you a real Neon database that you have no
+separate neon.tech login for — you reach its console via the "Open in Neon"
+button on the Vercel storage page. See
+[OPERATIONS.md §4.2](OPERATIONS.md#42-turn-it-on) before you go looking for
+an account you never created.
+
+- [ ] Create the database (Vercel Storage → Postgres, or a new Neon project
+      directly if you'd rather manage it outside Vercel)
+- [ ] Confirm `DATABASE_URL` is the **pooled** connection string.
       `scripts/migrate-deploy.mjs` derives the direct one itself; you don't
       need a second variable.
 - [ ] Turn on point-in-time restore now, not after something goes wrong —
