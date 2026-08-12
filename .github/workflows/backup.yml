@@ -41,7 +41,21 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-17
-          pg_dump --version
+
+          # Installing 17 is not enough: the runner's own client stays ahead
+          # on PATH (/usr/bin/pg_dump is 16), so an unqualified `pg_dump` in
+          # a later step still resolves to the old one. Put 17 first for
+          # every subsequent step.
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+          # Assert against the full path, not PATH — checking `pg_dump` here
+          # would report the old client and pass, which is exactly how the
+          # version mismatch reached the dump step unnoticed.
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          /usr/lib/postgresql/17/bin/pg_dump --version | grep -q " 17\." || {
+            echo "::error::Expected pg_dump 17.x, got: $(/usr/lib/postgresql/17/bin/pg_dump --version)"
+            exit 1
+          }
 
       - name: Dump the database
         env:
@@ -51,6 +65,10 @@ jobs:
             echo "::error::BACKUP_DATABASE_URL secret is not set."
             exit 1
           fi
+
+          # Which client are we actually about to run? Cheap to print, and
+          # the answer being "16" is what broke the first run of this job.
+          echo "Using $(command -v pg_dump) — $(pg_dump --version)"
 
           # pg_dump wants a direct connection, not the pooled one — the
           # pooler doesn't support the session-level state a dump relies on.
