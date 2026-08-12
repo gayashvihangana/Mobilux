@@ -368,11 +368,18 @@ in the table check, one entry added for `audit:read`).
       build the control; `verify:audit` greps the app for `auditLog.delete(`
       and fails the build if one ever appears
 
-### 4.2 Demo instance (10 h) — **code done 7 Aug 2026, provisioning pending**
+### 4.2 Demo instance (10 h) — **live 13 Aug 2026**
 
-- [ ] Second Vercel project + second Neon DB + fresh `AUTH_SECRET`, same repo
-      — this step is a Vercel/Neon dashboard action, not code; runbook is
-      [OPERATIONS.md §6.1](OPERATIONS.md#61-provisioning-once)
+**<https://mobilux-demo-gayashvihanganateam.vercel.app>** — provisioned,
+seeded and verified against the real deployment.
+
+- [x] Second Vercel project + second Neon DB + fresh `AUTH_SECRET`, same repo
+      — runbook is [OPERATIONS.md §6.1](OPERATIONS.md#61-provisioning-once).
+      Project `mobilux-demo`, its own Neon database
+      (`ep-blue-breeze-…`, distinct from production's `ep-curly-queen-…`),
+      its own `AUTH_SECRET`. Vercel's Deployment Protection is on by
+      default on a new project and had to be turned off, or the demo
+      redirects every visitor to a Vercel SSO login.
 - [x] `prisma/seed-demo.ts` — a **fictional** shop ("Ceylon Device Care"),
       8 customers, 25 repairs across all 10 `TicketStatus` values, several
       paid bills, 7 products, 4 reviews, one open dispute (`RepairIssue`
@@ -391,7 +398,18 @@ in the table check, one entry added for `audit:read`).
       `resetPassword()` both refuse outright, or one visitor locks the
       one-click buttons out for everyone until the next reset
 
-### 4.3 Nightly reset (3 h) — **done 7 Aug 2026**
+### 4.3 Nightly reset (3 h) — **done 7 Aug 2026, proven live 13 Aug 2026**
+
+> **Re-verified against the real deployment**, not just a scratch database:
+> no `Authorization` header → 401; a wrong secret → 401; the correct secret
+> → 200 and an actual truncate-and-reseed, confirmed by querying the demo
+> database afterwards (10 users, 25 tickets covering all 10 statuses, 7
+> products, 4 reviews, exactly 1 open dispute). The host guard is proven by
+> the same run succeeding — it only reaches the truncate when
+> `DEMO_DATABASE_HOST` matches the live `DATABASE_URL`.
+>
+> Note the route is **GET**, not POST — that's what Vercel Cron issues. A
+> POST returns 405 and never reaches the guards at all.
 
 A Vercel Cron hitting a reset route. **Three independent guards** — this is the
 one endpoint in the project that must never misfire against a real shop:
