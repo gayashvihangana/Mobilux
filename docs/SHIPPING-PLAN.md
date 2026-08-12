@@ -95,14 +95,35 @@ deploying today would make mobiluxlk.vercel.app say "Your Shop".
 Note: `NEXT_PUBLIC_BILL_QUOTE` is read by `src/lib/config.ts` but was missing
 from `.env.example` — added 6 Aug 2026.
 
-### 1.4 Backups, actually tested (3 h)
+### 1.4 Backups, actually tested (3 h) — **done 13 Aug 2026**, differently than planned
 
-- [ ] Turn on Neon point-in-time restore — steps in
-      [OPERATIONS.md §4.2](OPERATIONS.md#42-turn-it-on)
-- [ ] **Restore once, to a scratch database, and confirm the data is there** —
-      the branch-based drill in [OPERATIONS.md §4.3](OPERATIONS.md#43-test-it--this-is-the-part-people-skip)
+- [x] Turn on Neon point-in-time restore — steps in
+      [OPERATIONS.md §4.2](OPERATIONS.md#42-turn-it-on). On at the maximum
+      the free tier allows: **6 hours**.
+- [x] **Nightly encrypted backup, kept 90 days** —
+      `.github/workflows/backup.yml`, run and verified green (a real 29.7 KB
+      encrypted artifact, table checks passing). See
+      [OPERATIONS.md §4.5](OPERATIONS.md#45-restoring-from-a-nightly-backup).
 - [x] Write the recovery steps down — this becomes a selling point →
       [OPERATIONS.md §4.4](OPERATIONS.md#44-recovery-runbook)
+- [ ] **Restore a backup end to end** — decrypt an artifact, `pg_restore` it
+      into a scratch database, confirm the repairs are really there. Still
+      open, and it is the one that matters: everything above proves a
+      backup is *produced*, not that it can be *used*.
+
+> **6 hours is not a backup.** That was the finding here. Data is lost in a
+> repair shop by deleting the wrong record on Saturday and noticing on
+> Monday — about 40 hours, so the window has long closed. Six hours only
+> covers mistakes caught immediately, which are also the ones you could just
+> re-type.
+>
+> [PROPOSAL.md](PROPOSAL.md) was promising "restore to any point in the last
+> `[[N]]` days", which could not be filled in honestly against that window.
+> The nightly job is what makes the promise true; the proposal and
+> [PRIVACY.md](PRIVACY.md) now describe the 90-day snapshot instead.
+>
+> The passphrase lives in a password manager, **not** in the database it
+> protects — lose it and every artifact is permanently unreadable.
 
 ### 1.5 Commit the security work (2 h)
 
