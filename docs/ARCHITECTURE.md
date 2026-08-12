@@ -1,14 +1,15 @@
 # Mobilux — Technical Design Document
 
-**Version:** 1.3 · **Last updated:** 6 August 2026
+**Version:** 1.4 · **Last updated:** 7 August 2026
 **Audience:** developers working on or taking over this codebase.
 
 Related: [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [OPERATIONS.md](OPERATIONS.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) · [README](../README.md) for setup
 
-> **Status legend.** Sections describing behaviour that exists today are
-> unmarked. Anything marked 🔜 is designed but **not yet built** — it lands in
-> weeks 2–4 of the shipping plan. Do not read 🔜 sections as descriptions of the
-> current code.
+> Weeks 1–4 of the shipping plan are done — everything below describes code
+> that exists and has been verified against a live database, not a plan.
+> The 🔜 marker this document used to carry for weeks 2–4 work is retired;
+> anything still pending is in [§10](#10-known-limitations) or
+> [SHIPPING-PLAN.md](SHIPPING-PLAN.md)'s weeks 5–6.
 
 ---
 
@@ -188,6 +189,7 @@ photos, no damage-dispute text, no costs.
 | `bill/[id]` | Printable invoice | **No layout above it** — the page calls `requireUser()` itself, then owner-or-admin |
 | `api/auth/[...nextauth]` | Auth.js handler | — |
 | `staff/login` | Shop team sign-in | Public, `noindex`, not linked from the site |
+| `api/cron/reset-demo` | Demo instance's nightly reset | Three independent guards — see [§9.1](#91-per-instance-resources) |
 
 ⚠️ **`bill/[id]` is the odd one out and worth knowing about.** Every other
 signed-in route inherits a DB-validated guard from the layout above it, so the
@@ -210,17 +212,25 @@ src/
     auth-guard.ts session + live DB re-validation  ← every guard goes through here
     rate-limit.ts fixed-window limiter on Postgres
     permissions.ts  the can(user, action) table — pure, so middleware can use it
+    audit.ts      logAudit() — who deleted what, who moved money
     prisma.ts     singleton client
     settings.ts   DB-backed shop configuration
-    config.ts     env-var fallbacks for shop identity
+    config.ts     env-var fallbacks for shop identity, incl. DEMO_MODE
+    demo-data.ts  demo instance's truncateAll()/seedDemoData(), shared by
+                  prisma/seed-demo.ts and the nightly reset route
+    demo-accounts.ts  the three well-known demo logins — no Prisma import,
+                  safe for the one-click login buttons to import client-side
     bill.ts       bill computation (pure)
     track.ts      public tracker queries (deliberately narrow selects)
   middleware.ts   edge guard — cheap first pass only
 
 scripts/
-  migrate-deploy.mjs   runs before next build on Vercel
-  db-pull.mjs          copy production data into a local database
-  verify-security.mjs  post-install security verification (writes — read it first)
+  migrate-deploy.mjs     runs before next build on Vercel
+  db-pull.mjs            copy production data into a local database
+  verify-security.mjs    week 1 — post-install security verification (writes)
+  verify-permissions.ts  week 3 — the role split, static + live
+  verify-audit.ts        week 4.1 — audit log wiring, static + live
+  verify-demo.ts         week 4.2/4.3 — demo-mode guards, static + live
 ```
 
 **Convention:** business rules live in `lib/`, not in components. Anything a
@@ -259,7 +269,7 @@ the ticket carries `customerName` instead. This is why so many queries branch on
 walk-ins ([§10](#10-known-limitations)).
 
 **`ticketNumber` is sequential, `trackToken` is not.** The human-readable
-`MBX-0044` is what people say on the phone; the random `trackToken` is what the
+`REP-044` is what people say on the phone; the random `trackToken` is what the
 public tracker is keyed on, because sequential IDs can be walked.
 
 **Money is `Decimal(10,2)`, never float.** Prisma returns `Decimal` objects —
@@ -405,10 +415,16 @@ back rather than the action silently going unlogged. Read-only in the UI
 SUBMITTED ─► CONFIRMED ─► RECEIVED ─► DIAGNOSING ─► AWAITING_PARTS
    (online)   (accepted)   (at shop)                      │
                                                           ▼
-        PICKED_UP ◄── READY_FOR_PICKUP ◄── COMPLETED ◄── IN_PROGRESS
+                             PICKED_UP ◄── COMPLETED ◄── IN_PROGRESS
                                                           │
                               CANCELLED ◄─────────────────┘
 ```
+
+`TicketStatus` also has a `READY_FOR_PICKUP` value, but `lib/status.ts`'s
+`STATUS_PIPELINE` deliberately excludes it: completing the repair **is** being
+ready for pickup, so `COMPLETED` goes straight to `PICKED_UP`. The value is
+kept only for tickets created before that pipeline was simplified — it's
+treated as equivalent to `COMPLETED` everywhere a status is read.
 
 Every transition writes a `StatusUpdate` row — the timeline is the audit trail of
 the repair itself. Moving **backwards** is treated as a correction, not progress:

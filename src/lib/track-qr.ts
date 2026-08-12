@@ -3,7 +3,7 @@ import { SITE_URL } from "@/lib/config";
 
 // The tracking link IS the credential for a walk-in customer with no account,
 // so it is keyed on the ticket's unguessable trackToken rather than its
-// sequential MBX-#### number. Scanning the QR on a printed bill opens the
+// sequential REP-### number. Scanning the QR on a printed bill opens the
 // repair directly; typing the ticket number into /track still works, but has
 // to be backed by the phone number on file (see the tracker page).
 export function trackUrl(trackToken: string) {
