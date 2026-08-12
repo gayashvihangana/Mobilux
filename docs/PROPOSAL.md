@@ -124,8 +124,9 @@ or a new design. Those are quoted separately.
 
 **Is my customer data safe?**
 Your shop gets its own private database — no other shop can see it. Passwords are
-encrypted. The system is backed up, and I can restore it to any point in the last
-[[N]] days.
+encrypted. A full backup is taken **every night and kept for 90 days**, so if
+something is deleted by mistake — even if you only notice a week later — it can
+be brought back. Backups are encrypted too.
 
 **What happens if the website goes down?**
 It runs on the same hosting used by large companies, so this is rare. With a

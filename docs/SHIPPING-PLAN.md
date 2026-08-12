@@ -66,8 +66,10 @@ The verification found and fixed a real hole — see the note below.
       — **still manual**, the script can't invoke that form action
 - [x] Open a tracking link in a private window → milestones show, admin notes and photos do **not**
 - [x] `/track` with ticket number + wrong phone digits → "couldn't find that repair"
-- [ ] Print a bill → scan the QR → confirm it opens the tracker — **needs a phone**
 - [x] Change your password → confirm other devices are signed out
+- [x] Print a bill → scan the QR → confirm it opens the tracker — **done
+      7 Aug 2026**, on the real deployment: bank details on the bill are
+      real (not placeholders), and the QR opens that repair's own tracker
 
 > **Found while verifying:** `/bill/[id]` sits outside both guarded layouts and
 > read the session cookie directly, so blocking a customer — and a password
@@ -76,16 +78,19 @@ The verification found and fixed a real hole — see the note below.
 > `requireUser()`; the verification script now checks every guarded route, not
 > just `/dashboard`. See [ARCHITECTURE.md §3.2](ARCHITECTURE.md#32-route-groups).
 
-### 1.3 Fix the Vercel environment (2 h)
+### 1.3 Fix the Vercel environment (2 h) — **done 7 Aug 2026**
 
 Your live deployment has none of the new `NEXT_PUBLIC_SHOP_*` variables, so
 deploying today would make mobiluxlk.vercel.app say "Your Shop".
 
-- [ ] Add all `NEXT_PUBLIC_SHOP_*` and `NEXT_PUBLIC_BANK_*` vars in Vercel
+- [x] Add all `NEXT_PUBLIC_SHOP_*` and `NEXT_PUBLIC_BANK_*` vars in Vercel
       (Production + Preview + Development), raw values, no quotes —
       full list in [OPERATIONS.md §1](OPERATIONS.md#1-environment-variables)
-- [ ] Deploy and check the live site + a printed bill —
-      checklist in [OPERATIONS.md §2](OPERATIONS.md#2-deploying)
+- [x] Deploy and check the live site + a printed bill —
+      checklist in [OPERATIONS.md §2](OPERATIONS.md#2-deploying). Confirmed
+      live: real shop name (not "Your Shop"), real WhatsApp number, bill
+      shows real bank details, QR opens the right tracker, and
+      `/staff/login` · `/login` · `/track` · `/shop` all serve 200
 
 Note: `NEXT_PUBLIC_BILL_QUOTE` is read by `src/lib/config.ts` but was missing
 from `.env.example` — added 6 Aug 2026.

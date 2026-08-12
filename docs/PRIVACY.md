@@ -51,10 +51,13 @@ shop's specific drawer.
 
 - **Live data** stays for as long as the shop keeps running the system —
   there's no automatic deletion of old repairs or customer accounts.
-- **Backups:** Neon's point-in-time restore covers the last
-  `[[N — set per shop's Neon plan, see OPERATIONS.md §4.2]]` days. A shop
-  closing an account doesn't retroactively purge older backups inside that
-  window — see [OPERATIONS.md §4](OPERATIONS.md#4-backups-and-recovery).
+- **Backups:** two layers. The database's own point-in-time history covers
+  only the last **6 hours** on the current plan; the real coverage is a
+  **nightly encrypted snapshot kept for 90 days**
+  (`.github/workflows/backup.yml`). So a customer's data can persist in a
+  backup for up to 90 days after it is deleted from the live system — a shop
+  closing an account does not retroactively purge those. See
+  [OPERATIONS.md §4](OPERATIONS.md#4-backups-and-recovery).
 - **If a shop asks you to delete a customer's data**, or asks for an export
   of everything held on them, that's a manual request today — there's no
   self-service "export my data" or "delete my account" button yet

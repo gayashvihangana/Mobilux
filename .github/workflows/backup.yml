@@ -1,0 +1,119 @@
+name: Nightly database backup
+
+# Neon's free tier keeps only 6 hours of history, which does not cover the
+# way data is actually lost in a repair shop: someone deletes the wrong
+# repair on Saturday, the owner notices on Monday. This workflow is the real
+# backup — a nightly encrypted pg_dump kept for 90 days, independent of
+# whatever retention the database plan happens to give.
+#
+# Restoring from one of these is documented in docs/OPERATIONS.md §4.4.
+#
+# Secrets this needs (Settings → Secrets and variables → Actions):
+#   BACKUP_DATABASE_URL  the shop's DATABASE_URL (pooled is fine — see below)
+#   BACKUP_PASSPHRASE    a long random string; without it the dump cannot be
+#                        decrypted, so store it somewhere you will still have
+#                        after losing the database
+
+on:
+  schedule:
+    # 02:00 Asia/Colombo (UTC+5:30) = 20:30 UTC the previous day.
+    - cron: "30 20 * * *"
+  # Always keep this: a backup job you cannot trigger by hand is a backup job
+  # you cannot test, and an untested backup is a belief rather than a backup.
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Install PostgreSQL 17 client
+        # The runner ships an older pg_dump, and pg_dump refuses to dump a
+        # server newer than itself. Neon is on 17, so pin the client to match
+        # rather than discovering the mismatch on the night it matters.
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Dump the database
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$BACKUP_DATABASE_URL" ]; then
+            echo "::error::BACKUP_DATABASE_URL secret is not set."
+            exit 1
+          fi
+
+          # pg_dump wants a direct connection, not the pooled one — the
+          # pooler doesn't support the session-level state a dump relies on.
+          # Same swap scripts/migrate-deploy.mjs does for prisma migrate.
+          DIRECT_URL="${BACKUP_DATABASE_URL/-pooler./.}"
+
+          # -Fc = custom format: compressed, and pg_restore can pull a single
+          # table out of it, which is what you actually want when one repair
+          # was deleted rather than the whole database.
+          pg_dump --format=custom --no-owner --no-privileges \
+            --file=backup.dump "$DIRECT_URL"
+
+          ls -lh backup.dump
+
+      - name: Verify the dump is real
+        # The failure that matters is a dump that "succeeds" and is empty or
+        # truncated, because then you find out at restore time. Check the
+        # archive parses and that the tables we expect are actually in it.
+        run: |
+          SIZE=$(stat -c%s backup.dump)
+          echo "Dump size: $SIZE bytes"
+          if [ "$SIZE" -lt 10000 ]; then
+            echo "::error::Dump is only $SIZE bytes — suspiciously small."
+            exit 1
+          fi
+
+          # Parses as an archive at all?
+          pg_restore --list backup.dump > toc.txt
+
+          # Kept deliberately loose — this is here to catch an empty or
+          # truncated dump, not to police pg_restore's quoting style.
+          for table in User RepairTicket Payment AuditLog; do
+            if ! grep -Eq "TABLE DATA +public +\"?${table}\"?" toc.txt; then
+              echo "::error::Table '$table' is missing from the dump."
+              exit 1
+            fi
+            echo "  ok  $table present"
+          done
+
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::BACKUP_PASSPHRASE secret is not set."
+            exit 1
+          fi
+
+          # The dump holds real customer names, phone numbers, addresses and
+          # device details. Artifacts on a private repo are already access
+          # controlled; this means a leaked artifact is still useless.
+          gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase "$BACKUP_PASSPHRASE" \
+            --output "backup-$(date -u +%Y-%m-%d).dump.gpg" \
+            backup.dump
+
+          rm backup.dump
+          ls -lh backup-*.dump.gpg
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup-*.dump.gpg
+          retention-days: 90
+          if-no-files-found: error

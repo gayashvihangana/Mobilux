@@ -184,10 +184,23 @@ repair, never as lost money.
 
 ### 4.2 Turn it on
 
-Neon Console → the project → **Settings → Storage → History retention**. Set the
-retention window and save. Free tier is limited; check what the shop's plan
-actually gives you and write that number into their proposal, because
-"restore to any point in the last N days" is a thing shops ask about.
+**First, know which kind of Neon database you have** — this trips people up.
+Vercel Postgres *is* Neon underneath, so a database created from Vercel's
+Storage tab is a real Neon database that you have **no direct Neon account
+for**. Going to neon.tech and trying to sign in gets you a signup page and a
+lot of confusion.
+
+| How it was created | Where to manage it |
+|---|---|
+| Vercel → Storage → Create (the usual path) | **Vercel → the project → Storage → the database.** Use its "Open in Neon" button to reach the Neon console *through* the integration — no separate account, no separate password. |
+| Directly at neon.tech | Neon Console, signed in normally (often GitHub SSO). |
+
+Then, in the Neon console either way: the project → **Settings → Storage →
+History retention**. Set the retention window and save.
+
+Free tier is limited; check what the shop's plan actually gives you and write
+that number into their proposal and privacy note, because "restore to any point
+in the last N days" is a thing shops ask about.
 
 ### 4.3 Test it — this is the part people skip
 
@@ -233,17 +246,49 @@ is what makes "your data is backed up" a fact rather than a sales line.
    was lost between the restore point and now. They will have to re-enter that
    window by hand, so give them the exact time range.
 
-**Losing everything (Neon project gone).** This is the case retention does not
-cover. If a shop's data matters more than the free tier's window, take a
-periodic `pg_dump` to storage you control:
+**When the restore point is older than the history window.** The free tier
+keeps **6 hours**, which does not cover the way data is actually lost: a repair
+is deleted on Saturday and the owner notices on Monday. For anything older than
+the window — and for "the Neon project itself is gone" — use the nightly
+backups instead of steps 3–5 above. See §4.5.
 
-```bash
-pg_dump "$DATABASE_URL" --no-owner --format=custom --file="shop-$(date +%F).dump"
-```
+### 4.5 Restoring from a nightly backup
 
-Restore with `pg_restore --no-owner --dbname="$DATABASE_URL"`. Keep these off the
-machine that runs the shop, and keep at least one copy you cannot delete by
-accident.
+`.github/workflows/backup.yml` takes an encrypted `pg_dump` every night at
+02:00 Colombo time and keeps it for 90 days. This is the backup that covers
+the realistic cases; Neon's own history only covers the last few hours.
+
+**To restore one:**
+
+1. **GitHub → Actions → Nightly database backup →** the run from the day you
+   want → download the `db-backup-*` artifact. It unzips to
+   `backup-YYYY-MM-DD.dump.gpg`.
+2. **Decrypt** with the `BACKUP_PASSPHRASE`:
+   ```bash
+   gpg --decrypt --output backup.dump backup-2026-08-07.dump.gpg
+   ```
+3. **Restore into a scratch database first** — a Neon branch, or a local
+   Docker Postgres. Never straight over production; if it's the wrong night
+   you have then destroyed the good data too.
+   ```bash
+   pg_restore --no-owner --clean --if-exists --dbname="$SCRATCH_URL" backup.dump
+   ```
+4. **Check the specific records** the shop is missing are actually there.
+5. Only then cut over, following steps 5–7 above.
+
+**Two things to know before you need them:**
+
+- **The passphrase is not in the database.** If you store `BACKUP_PASSPHRASE`
+  only in GitHub secrets and lose access to the account, the backups are
+  unreadable. Keep a copy in a password manager.
+- **A backup you have never restored is a belief.** Do the drill in §4.3 once
+  per shop at install, using a real artifact from this workflow, not just a
+  Neon branch.
+
+**Adding a shop.** The workflow backs up whatever `BACKUP_DATABASE_URL` points
+at — one database. For a second shop, either add a second workflow file with
+its own secret, or convert the job to a matrix over several secrets. Do it at
+install time, as part of [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md), not later.
 
 ---
 
