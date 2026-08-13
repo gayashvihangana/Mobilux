@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { DEMO_MODE } from "@/lib/config";
 
 // Fixed-window rate limiting backed by Postgres.
 //
@@ -83,8 +84,20 @@ export async function clientIp(): Promise<string> {
 // password a few times is never affected, a script is stopped in seconds.
 
 export const POLICY = {
-  /** Password guessing. Applied per IP and per email address. */
-  login: { max: 8, windowMs: 15 * 60_000 },
+  /**
+   * Password guessing. Applied per IP and per email address.
+   *
+   * The demo instance gets a much higher ceiling. Nothing there is worth
+   * guessing at — the three logins are printed on the sign-in buttons — and
+   * the shop-tuned limit actively breaks it: visitors arrive behind shared
+   * carrier NAT, so a handful of strangers clicking "Continue as owner"
+   * exhausts one IP budget between them and the demo looks broken to
+   * everyone after it. This is the one place where the limiter costs more
+   * than it protects.
+   */
+  login: DEMO_MODE
+    ? { max: 200, windowMs: 15 * 60_000 }
+    : { max: 8, windowMs: 15 * 60_000 },
   /** Account creation from one address. */
   register: { max: 5, windowMs: 60 * 60_000 },
   /** Reset-code requests — the email-bombing and Resend-quota guard. */

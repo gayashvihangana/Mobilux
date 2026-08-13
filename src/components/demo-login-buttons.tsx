@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DEMO_ACCOUNTS, type DemoRole } from "@/lib/demo-accounts";
 import type { AuthFormState } from "@/lib/actions/auth";
@@ -19,16 +19,27 @@ type LoginAction = (
 // mistake without also failing to sign in.
 function OneClickLogin({ action, role }: { action: LoginAction; role: DemoRole }) {
   const account = DEMO_ACCOUNTS[role];
-  const [, formAction, pending] = useActionState(action, null);
+  // The state is rendered, not discarded. It used to be thrown away, which
+  // meant a refused sign-in — most often the login rate limiter, since these
+  // buttons invite repeated clicking — produced no feedback at all and the
+  // button looked broken. A one-click button that can fail silently is worse
+  // than a form, because there is nothing for the visitor to re-check.
+  const [state, formAction, pending] = useActionState(action, null);
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="space-y-1.5">
       <input type="hidden" name="email" value={account.email} />
       <input type="hidden" name="password" value={account.password} />
       <Button type="submit" variant="outline" className="w-full" disabled={pending}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
         Continue as {account.label}
       </Button>
+      {state?.error ? (
+        <p className="flex items-start gap-1.5 text-xs text-destructive">
+          <TriangleAlert className="mt-0.5 size-3 shrink-0" />
+          {state.error}
+        </p>
+      ) : null}
     </form>
   );
 }
