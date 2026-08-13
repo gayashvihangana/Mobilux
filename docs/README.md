@@ -8,25 +8,23 @@
 | [HANDOVER.md](HANDOVER.md) | Shop owners | What to leave with a shop after training — Settings, logging a repair, billing, staff |
 | [PRIVACY.md](PRIVACY.md) | Shop owners, you | What's stored, where, for how long, and who's responsible for it |
 | [PROPOSAL.md](PROPOSAL.md) | Shop owners | Commercial proposal. Fill in the `[[…]]` markers before sending |
+| [SHIPPING-PLAN.md](SHIPPING-PLAN.md) | Anyone curious | Six weeks from "it works on my machine" to something sellable — and an honest log of what broke on the way |
+| [REPORT.md](REPORT.md) | University | Academic report skeleton. Sections marked ✍️ **YOU** need their own evidence |
 | [../README.md](../README.md) | Anyone | Feature tour, setup, environment variables, deployment |
+
+**Start with [SHIPPING-PLAN.md](SHIPPING-PLAN.md)** if you want to know what
+this project is really like rather than what it claims. It records the
+authentication hole found by actually testing the security work, the
+discovery that a 6-hour backup window is not a backup, and the week the
+staff sign-in page turned out to have been broken in every browser while
+every automated check reported success.
 
 ## Not in this repo
 
-Some documents are kept on disk but **deliberately untracked** (see
-`.gitignore`), because they are business or personal material rather than
-anything needed to run or hand over the software:
-
-| Document | What it is |
-|---|---|
-| `SECURITY-AUDIT.md` *(repo root)* | The residual open findings — a map of what is still weak |
-| `docs/PRICING-WORKSHEET.md` | What a shop is worth to you, and how to reach that number |
-| `docs/SHIPPING-PLAN.md` | The roadmap, including every known gap |
-| `docs/REPORT.md` | An academic submission, personal to the author |
-| `docs/DEMO-POST.md` | Unpublished marketing drafts |
-
-If you have cloned this repo and one of the above is referenced somewhere,
-that is why you cannot find it. Everything required to **build, deploy,
-install and hand over** the product is tracked and present.
+Two documents are kept on disk but untracked (see `.gitignore`) — commercial
+material that nobody reading the code needs: `docs/PRICING-WORKSHEET.md` and
+`docs/DEMO-POST.md`. `SECURITY-AUDIT.md` at the repo root has never been
+committed; it enumerates residual weaknesses and is not for publication.
 
 ## The three actors
 

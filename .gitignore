@@ -44,22 +44,27 @@ SECURITY-AUDIT.md
 linkedin/
 
 # ── Internal documents ───────────────────────────────────────────────
-# Business and personal material that happens to live next to the technical
-# docs. Kept on disk, deliberately not tracked, so nobody who gets access to
-# this repo reads the margins or the honest list of what is still weak.
+# Commercial material, kept on disk and out of a now-public repo:
 #
-#   PRICING-WORKSHEET  what a shop is worth to you, and why
-#   SHIPPING-PLAN      the roadmap, including every known gap and weakness
-#   REPORT             an academic submission, personal to the author
+#   PRICING-WORKSHEET  how to price a shop — the method, and eventually the
+#                      numbers. Nobody buying an install needs to read it.
 #   DEMO-POST          unpublished marketing drafts
 #
-# NOTE: these were tracked until 13 Aug 2026 and remain in git history.
-# Untracking stops them appearing in the current checkout; it does not
-# unpublish them. Anyone who can clone this repo can still recover them from
-# an older commit. That was an accepted trade-off — scrubbing history means
-# rewriting every commit hash and breaking existing clones. Treat anything
-# genuinely secret as already disclosed and rotate it instead.
+# SHIPPING-PLAN.md and REPORT.md are deliberately NOT here. Both are
+# templates with no real figures in them, and the shipping plan — an honest
+# log of what broke and what is still unproven — is worth more read than
+# hidden.
+#
+# NOTE: everything here was tracked until 13 Aug 2026 and remains in git
+# history. Ignoring a file stops it appearing in the checkout; it does not
+# unpublish it. Anything genuinely secret should be treated as disclosed and
+# rotated, not hidden behind this list.
 docs/PRICING-WORKSHEET.md
-docs/SHIPPING-PLAN.md
-docs/REPORT.md
 docs/DEMO-POST.md
+
+# The written proposal carries a second personal email address, and a public
+# repo is a spam-scraper's feedstock. prompts.md is a scratch list of
+# one-line feature notes to self — no use to a reader, and not the record
+# anyone should judge the work by. Both stay local.
+/proposal/
+/prompts.md

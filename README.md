@@ -386,6 +386,39 @@ Local and production are separate databases. `db:pull` reads from
 
 ---
 
+## Try it
+
+**[Live demo →](https://mobilux-demo-gayashvihanganateam.vercel.app)** — a
+fictional shop with a few weeks of invented repairs. One-click sign-in as a
+customer, a technician or the owner; the buttons are on the sign-in pages.
+Nothing there is real and it resets itself every night.
+
+## How it was built
+
+[`docs/SHIPPING-PLAN.md`](docs/SHIPPING-PLAN.md) is the honest version — six
+weeks from "it works on my machine" to something sellable, including the
+parts that went wrong. An authentication hole found only by testing the
+security work against a real database. The discovery that a 6-hour backup
+window is not a backup. A week where the staff sign-in page was broken in
+every browser while every automated check reported success, because the
+tests spoke HTTP and users use a browser.
+
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) covers the design, including
+[§10 Known limitations](docs/ARCHITECTURE.md#10-known-limitations) — what is
+still weak, written down rather than discovered later.
+
+## Licence
+
+**Source-available, not open source.** The code is published so it can be
+read, reviewed and learned from. It is **not** licensed for use, deployment
+or resale — see [`LICENSE`](LICENSE), a proprietary licence granting one
+business the right to run one instance.
+
+If you want to run this for a shop, that is a conversation, not a `git
+clone`.
+
+---
+
 <div align="center">
 <sub>Built for a repair shop in Colombo, Sri Lanka.</sub>
 </div>

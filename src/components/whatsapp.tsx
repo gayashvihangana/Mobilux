@@ -1,4 +1,5 @@
 import { getShopInfo, shopWhatsappLink } from "@/lib/settings";
+import { DEMO_MODE } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 // Official WhatsApp glyph — lucide has no brand icons.
@@ -19,9 +20,16 @@ export function WhatsAppIcon({ className }: { className?: string }) {
 // "browsing" to "talking to the shop".
 export async function WhatsAppFloat() {
   const shop = await getShopInfo();
+  // On the demo the shop is fictional but the number is real, so the default
+  // greeting would arrive as "Hi Ceylon Device Care!" — a message addressed
+  // to a business that does not exist, from someone actually asking about
+  // the software. Name the real subject instead.
+  const message = DEMO_MODE
+    ? "Hi! I saw the Mobilux demo and I'd like to know more."
+    : `Hi ${shop.name}! I have a question.`;
   // A shop that hasn't set a WhatsApp number gets no bubble, rather than one
   // that opens an empty wa.me/ page.
-  const href = shopWhatsappLink(shop, `Hi ${shop.name}! I have a question.`);
+  const href = shopWhatsappLink(shop, message);
   if (!href) return null;
 
   return (
