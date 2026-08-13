@@ -9,7 +9,6 @@
 | [PRIVACY.md](PRIVACY.md) | Shop owners, you | What's stored, where, for how long, and who's responsible for it |
 | [PROPOSAL.md](PROPOSAL.md) | Shop owners | Commercial proposal. Fill in the `[[…]]` markers before sending |
 | [SHIPPING-PLAN.md](SHIPPING-PLAN.md) | Anyone curious | Six weeks from "it works on my machine" to something sellable — and an honest log of what broke on the way |
-| [REPORT.md](REPORT.md) | University | Academic report skeleton. Sections marked ✍️ **YOU** need their own evidence |
 | [../README.md](../README.md) | Anyone | Feature tour, setup, environment variables, deployment |
 
 **Start with [SHIPPING-PLAN.md](SHIPPING-PLAN.md)** if you want to know what
@@ -21,10 +20,12 @@ every automated check reported success.
 
 ## Not in this repo
 
-Two documents are kept on disk but untracked (see `.gitignore`) — commercial
-material that nobody reading the code needs: `docs/PRICING-WORKSHEET.md` and
-`docs/DEMO-POST.md`. `SECURITY-AUDIT.md` at the repo root has never been
-committed; it enumerates residual weaknesses and is not for publication.
+A few documents are kept on disk but untracked (see `.gitignore`), because
+nobody reading the code needs them: `docs/PRICING-WORKSHEET.md` and
+`docs/DEMO-POST.md` are commercial material, and `docs/REPORT.md` is a
+write-up templated as a university submission, which this project is not.
+`SECURITY-AUDIT.md` at the repo root has never been committed; it
+enumerates residual weaknesses and is not for publication.
 
 ## The three actors
 
