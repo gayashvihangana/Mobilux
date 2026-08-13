@@ -212,7 +212,7 @@ async function signIn(who: { email: string; password: string }) {
  * $ACTION_n:0 / $ACTION_n:1 / $ACTION_KEY hidden inputs; replaying them runs
  * the real action.
  */
-async function submitForm(path: string, fields: Record<string, string>) {
+async function submitFormRaw(path: string, fields: Record<string, string>) {
   const html = await (await get(path)).text();
   const decode = (s: string) =>
     s.replace(/&quot;/g, '"').replace(/&amp;/g, "&");
@@ -227,12 +227,26 @@ async function submitForm(path: string, fields: Record<string, string>) {
   for (const [k, v] of hidden) fd.set(k, v);
   for (const [k, v] of Object.entries(fields)) fd.set(k, v);
 
+  const jar = new Jar();
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     redirect: "manual",
     body: fd,
   });
-  return await res.text();
+  jar.absorb(res);
+  return { res, jar, text: await res.text() };
+}
+
+/** The common case: only the rendered response body matters. */
+async function submitForm(path: string, fields: Record<string, string>) {
+  return (await submitFormRaw(path, fields)).text;
+}
+
+/** Did this submission actually sign someone in, and where did it send them? */
+function signedInTo(r: { res: Response; jar: Jar }) {
+  const location = r.res.headers.get("location") ?? "";
+  const hasSession = /authjs\.session-token/.test(r.jar.header());
+  return { ok: r.res.status === 303 && hasSession, location, hasSession };
 }
 
 const ALLOWED_FOR_STAFF = [
@@ -303,23 +317,39 @@ async function checkRoutes() {
   return staff;
 }
 
-// ── 4. two entrances ────────────────────────────────────────────────
+// ── 4. two entrances, either of which signs you in ──────────────────
+// Both doors run the same credential check and land the account wherever its
+// role belongs. Using the "wrong" one used to verify the password and then
+// refuse, making the caller retype it on the other page — friction that only
+// ever hit someone who had already proved they owned the account, and that
+// turned the unadvertised staff URL into something every technician had to be
+// told. The door is still unadvertised; it just is not compulsory.
 async function checkEntrances() {
-  const staffAtCustomerDoor = await submitForm("/login", {
-    email: STAFF.email,
-    password: STAFF.password,
-  });
-  check(/Use the staff entrance/.test(staffAtCustomerDoor),
-    "staff credentials at /login are pointed to the staff entrance");
-  check(!/Invalid email or password/.test(staffAtCustomerDoor),
-    "…without pretending the password was wrong");
+  const staffAtCustomerDoor = signedInTo(
+    await submitFormRaw("/login", {
+      email: STAFF.email,
+      password: STAFF.password,
+    }),
+  );
+  check(staffAtCustomerDoor.ok,
+    "staff credentials at /login sign in rather than being turned away",
+    staffAtCustomerDoor.hasSession ? "" : "no session cookie issued");
+  check(staffAtCustomerDoor.location.includes("/admin"),
+    "…and land in the back office, not on /dashboard",
+    `-> ${staffAtCustomerDoor.location || "(no redirect)"}`);
 
-  const customerAtStaffDoor = await submitForm("/staff/login", {
-    email: CUSTOMER.email,
-    password: CUSTOMER.password,
-  });
-  check(/customer account/i.test(customerAtStaffDoor),
-    "a customer at /staff/login is sent to the customer page");
+  const customerAtStaffDoor = signedInTo(
+    await submitFormRaw("/staff/login", {
+      email: CUSTOMER.email,
+      password: CUSTOMER.password,
+    }),
+  );
+  check(customerAtStaffDoor.ok,
+    "a customer at /staff/login signs in too",
+    customerAtStaffDoor.hasSession ? "" : "no session cookie issued");
+  check(customerAtStaffDoor.location.includes("/dashboard"),
+    "…and lands on their own dashboard, not in /admin",
+    `-> ${customerAtStaffDoor.location || "(no redirect)"}`);
 
   const wrongPassword = await submitForm("/staff/login", {
     email: STAFF.email,
