@@ -14,13 +14,16 @@ export function StaffLoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, formAction, pending] = useActionState(staffLogin, null);
 
   return (
-    <form action={formAction} className="space-y-5">
-      {callbackUrl ? (
-        <input type="hidden" name="callbackUrl" value={callbackUrl} />
-      ) : null}
-
+    // The demo buttons sit OUTSIDE this form — each is its own <form>, and
+    // nesting forms is invalid HTML. See the note in the customer login form.
+    <div className="space-y-5">
       {DEMO_MODE ? (
         <DemoLoginButtons action={staffLogin} roles={["owner", "staff"]} />
+      ) : null}
+
+      <form action={formAction} className="space-y-5">
+      {callbackUrl ? (
+        <input type="hidden" name="callbackUrl" value={callbackUrl} />
       ) : null}
 
       {state?.error ? (
@@ -62,6 +65,7 @@ export function StaffLoginForm({ callbackUrl }: { callbackUrl?: string }) {
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-    </form>
+      </form>
+    </div>
   );
 }
