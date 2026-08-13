@@ -10,18 +10,25 @@
 
 ## Your website
 
-- **Customers:** `[[https://yourshop.example.com]]`
-- **Your team signs in separately, at:** `[[https://yourshop.example.com/staff/login]]`
-  — bookmark this. It's not linked from anywhere on the public site on
-  purpose, so keep the link somewhere your team can find it.
+**`[[https://yourshop.example.com]]`** — one address for everyone.
 
 ## Your logins
 
-| Who | Signs in at | Password |
-|---|---|---|
-| You (owner) | `/staff/login` | Set during install — change it the first time you sign in |
-| Each technician | `/staff/login` | You set it under **Staff** (see below), and read it out to them once |
-| Customers | `/login` | They set their own |
+Everybody signs in at the same place: the **Log in** button on your site.
+The system knows who you are and takes you to the right place — you and your
+technicians land in the back office, customers land on their own repairs.
+Nobody has to remember a special address.
+
+| Who | Password |
+|---|---|
+| You (owner) | Set during install — change it the first time you sign in |
+| Each technician | You set it under **Staff** (see below), and read it out to them once |
+| Customers | They set their own |
+
+*(There is also a separate staff-only sign-in page at
+`[[https://yourshop.example.com/staff/login]]` if you'd rather your team
+used it — it works exactly the same. It isn't linked from your public site.
+You don't need it; it's there if you want it.)*
 
 **If you ever forget your own password:** there's no automatic reset for
 staff accounts (a technician may not have an email you control), so if

@@ -288,14 +288,28 @@ to "What's on the bench today".
 
 - [x] `/staff/login` — its own screen, its own copy, `noindex`, not linked from
       the public site, and disallowed in `robots.txt`
-- [x] A customer account entered at `/staff/login` is rejected, and a staff
-      account at `/login` is redirected to the staff entrance
+- [x] ~~A customer account entered at `/staff/login` is rejected, and a staff
+      account at `/login` is redirected to the staff entrance~~ — **reversed
+      13 Aug 2026, see below**
 - [x] Remove the admin path from the customer login page — a signed-out
       technician hitting `/admin/*` is now sent to `/staff/login`, not `/login`
 
-The wrong-door message only appears **after the password checks out**, so
-neither entrance can be used to discover which addresses belong to the shop's
-staff. A wrong password says "invalid email or password" at both doors.
+A wrong password says "invalid email or password" at both doors, so neither
+entrance can be used to discover which addresses belong to the shop's staff.
+
+> **The wrong-door rejection was a mistake, and using the product found it.**
+> Staff credentials at `/login` verified the password and *then* refused,
+> sending the technician to another page to type it again. The only person
+> that inconveniences is one who has already proved they own the account, and
+> it made the deliberately-unadvertised staff URL something every technician
+> had to be told and remember — the shop's own team paying, daily, for a
+> property that protects nothing (the leak it guards against is already ruled
+> out by the identical wrong-password response).
+>
+> Both doors now sign you in and route by role via `homePathFor()`.
+> `/staff/login` still exists, still `noindex`, still unlinked — it is simply
+> no longer compulsory. `verify:permissions` asserts the new behaviour:
+> **55/55**.
 
 ### 3.4 Staff management (3 h)
 

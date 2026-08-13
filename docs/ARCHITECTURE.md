@@ -340,14 +340,26 @@ shop team — unadvertised, `noindex`, disallowed in `robots.txt`, never linked
 from the public site.
 
 Both end in the same `authorize()` and the same database-checked guards, so
-neither door is a security boundary on its own. Entering the wrong one with the
-**right** password is a redirect, not a failure: the form names the other
-entrance and offers a link. Entering the wrong password says only "invalid email
-or password" at both doors, so neither can be used to discover which addresses
-belong to the shop's staff.
+neither door is a security boundary on its own — and **either one signs you
+in**. The account lands wherever its role belongs (`homePathFor()`), not
+wherever it knocked: a technician who uses `/login` goes to `/admin`, a
+customer who finds `/staff/login` goes to `/dashboard`.
 
-Rationale: it keeps the customer site clean, and credential stuffing against
-staff accounts has to find the entrance first.
+Entering the wrong password still says only "invalid email or password" at both
+doors, so neither can be used to discover which addresses belong to the shop's
+staff.
+
+Rationale: the separate door keeps the customer site clean and means credential
+stuffing has to find the entrance first. What it must *not* do is become a URL
+every technician has to be told about and remember.
+
+> **This used to refuse.** Entering staff credentials at `/login` verified the
+> password, then returned "use the staff entrance" and made the technician open
+> another page and type it all again. That is friction whose only victim is
+> someone who has already proved they own the account — it protects nothing,
+> because the leak it guards against (which addresses are staff) is already
+> ruled out by the identical wrong-password response. Changed 13 Aug 2026; the
+> shop's own team was the group paying for it, daily.
 
 Staff have **no self-service password reset** — a technician may not have an
 email address the shop controls. The owner sets a new password under Admin →

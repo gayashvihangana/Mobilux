@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
 import { z } from "zod";
 import { signIn, signOut } from "@/auth";
-import { isShopStaff } from "@/lib/permissions";
+import { homePathFor, isShopStaff } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { limitByIp, limitByKey, waitMessage } from "@/lib/rate-limit";
 import { DEMO_MODE } from "@/lib/config";
@@ -17,8 +17,6 @@ export type AuthFormState = {
   blocked?: boolean;
   blockedEmail?: string;
   unblockRequested?: boolean;
-  // Correct credentials entered at the wrong door — names the right one.
-  wrongEntrance?: "staff" | "customer";
 } | null;
 
 const registerSchema = z.object({
@@ -98,14 +96,23 @@ const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-// Two entrances, one credential check.
+// Two entrances, one credential check — and either one signs you in.
 //
 // `/login` is the customer door and `/staff/login` is the shop's. Keeping them
 // apart means the customer site never advertises where the back office is, and
 // credential stuffing against a technician's account has to find the entrance
-// first. Neither door is a security boundary on its own — both end up in the
-// same authorize() and the same database-checked guards — so entering the
-// wrong one is a redirect, not a failure.
+// first. Neither door is a security boundary on its own: both end up in the
+// same authorize() and the same database-checked guards.
+//
+// Which is why using the "wrong" one is not an error. This used to verify the
+// password, then refuse and send you to the other page to type it all again —
+// friction with no security payoff, since the only person it inconvenienced
+// had already proved they owned the account. It made the unadvertised staff
+// door a URL every technician had to be told about and remember, when the
+// point of hiding it was only ever to keep it off the public site.
+//
+// So: sign in at whichever door you used, and land wherever your role
+// belongs. `/staff/login` still exists for anyone who bookmarks it.
 type Entrance = "customer" | "staff";
 
 async function signInAt(
@@ -149,33 +156,31 @@ async function signInAt(
     ? await bcrypt.compare(parsed.data.password, account.passwordHash)
     : false;
 
-  if (account && passwordOk) {
-    const staffAccount = isShopStaff(account);
-
-    // Right credentials, wrong door. Point them at the other one rather than
-    // signing them in somewhere that will immediately redirect them.
-    if (staffAccount && entrance === "customer") {
-      return { wrongEntrance: "staff" };
-    }
-    if (!staffAccount && entrance === "staff") {
-      return { wrongEntrance: "customer" };
-    }
-
-    if (account.blocked) {
-      // A blocked customer can ask to be let back in. A deactivated
-      // technician cannot — that is an employment matter, not a support one.
-      return staffAccount
-        ? { error: "This account has been deactivated. Speak to the owner." }
-        : {
-            blocked: true,
-            blockedEmail: email,
-            unblockRequested: account.unblockRequested,
-          };
-    }
+  if (account && passwordOk && account.blocked) {
+    // A blocked customer can ask to be let back in. A deactivated
+    // technician cannot — that is an employment matter, not a support one.
+    return isShopStaff(account)
+      ? { error: "This account has been deactivated. Speak to the owner." }
+      : {
+          blocked: true,
+          blockedEmail: email,
+          unblockRequested: account.unblockRequested,
+        };
   }
 
   const callbackUrl = formData.get("callbackUrl");
-  const fallback = entrance === "staff" ? "/admin" : "/dashboard";
+  // Where this account belongs, not which door it knocked on. A technician
+  // who signs in at /login is a technician; sending them to /dashboard would
+  // only make middleware bounce them to /admin a moment later.
+  //
+  // Falls back to the door's own default when the credentials are wrong —
+  // there is no account to ask, and signIn is about to reject anyway.
+  const fallback =
+    account && passwordOk
+      ? homePathFor(account)
+      : entrance === "staff"
+        ? "/admin"
+        : "/dashboard";
   const redirectTo =
     typeof callbackUrl === "string" && callbackUrl.startsWith("/")
       ? callbackUrl
