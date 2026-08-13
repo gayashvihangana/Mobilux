@@ -3,13 +3,12 @@
 **Version:** 1.4 · **Last updated:** 7 August 2026
 **Audience:** developers working on or taking over this codebase.
 
-Related: [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [OPERATIONS.md](OPERATIONS.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) · [README](../README.md) for setup
+Related: [OPERATIONS.md](OPERATIONS.md) · [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) · [PROPOSAL.md](PROPOSAL.md) · [README](../README.md) for setup
 
-> Weeks 1–4 of the shipping plan are done — everything below describes code
-> that exists and has been verified against a live database, not a plan.
-> The 🔜 marker this document used to carry for weeks 2–4 work is retired;
-> anything still pending is in [§10](#10-known-limitations) or
-> [SHIPPING-PLAN.md](SHIPPING-PLAN.md)'s weeks 5–6.
+> Everything below describes code that exists and has been verified against a
+> live database, not a plan. The 🔜 marker this document used to carry for
+> unbuilt work is retired; anything still pending is in
+> [§10](#10-known-limitations).
 
 ---
 
@@ -73,7 +72,7 @@ each shop gets its own deployment, database, file store and signing secret.
   every table means one missed `where` clause leaks another shop's customers.
   Separate databases make that class of bug impossible, and at this scale the
   hosting cost is zero (free tiers). The trade-off is per-shop provisioning
-  work — see [SHIPPING-PLAN.md](SHIPPING-PLAN.md).
+  work — see [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md).
 - **JWT sessions, not database sessions.** Chosen for edge-middleware
   compatibility. This has a real cost — see [§5](#5-authentication--session-design).
 

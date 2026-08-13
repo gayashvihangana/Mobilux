@@ -34,8 +34,14 @@ another shop's.
 
 ## Where it lives
 
-- **Database:** PostgreSQL, hosted by Neon, region `[[region — set per shop,
-  e.g. ap-southeast-1 / Singapore]]`.
+- **Database:** PostgreSQL, hosted by Neon, region **`us-east-1`
+  (N. Virginia, United States)**. Worth stating plainly rather than burying:
+  a Sri Lankan shop's customer records physically live on servers in the
+  United States. That is the default Neon/Vercel region and it is a choice,
+  not a law of nature — `ap-southeast-1` (Singapore) is closer and available.
+  Set it when the database is created; moving one afterwards means a dump and
+  restore. If a shop ever asks where their customers' data is, this line is
+  the answer, so keep it accurate per install.
 - **Files** (photos, receipts): Vercel Blob, same hosting provider as the
   site itself.
 - **Email:** sent through Resend, only to the address the customer or shop
@@ -60,8 +66,7 @@ shop's specific drawer.
   [OPERATIONS.md §4](OPERATIONS.md#4-backups-and-recovery).
 - **If a shop asks you to delete a customer's data**, or asks for an export
   of everything held on them, that's a manual request today — there's no
-  self-service "export my data" or "delete my account" button yet
-  ([SHIPPING-PLAN.md](SHIPPING-PLAN.md), after week 6).
+  self-service "export my data" or "delete my account" button yet.
 
 ## What's never collected
 
