@@ -176,7 +176,11 @@ export async function seedDemoData(prisma: PrismaClient) {
       { key: "shop_email", value: "hello@demo.mobilux.lk" },
       { key: "shop_address", value: "142 Galle Road, Colombo 03" },
       { key: "shop_hours", value: "Mon–Sat, 9:00 AM – 7:00 PM" },
-      { key: "shop_whatsapp", value: "94770000000" },
+      // The one real detail on an otherwise fictional shop, and deliberately
+      // so: the demo exists to be sold from, and a visitor impressed enough
+      // to tap the chat button should reach a person rather than a made-up
+      // number. Everything else here stays invented.
+      { key: "shop_whatsapp", value: "94719495825" },
       { key: "shop_bank_accounts", value: JSON.stringify([
         { id: "demo-1", bankName: "Demo Bank", branch: "Colombo 03", accountName: "Ceylon Device Care", accountNumber: "0000000000" },
       ]) },

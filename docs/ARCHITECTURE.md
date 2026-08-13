@@ -3,7 +3,7 @@
 **Version:** 1.4 · **Last updated:** 7 August 2026
 **Audience:** developers working on or taking over this codebase.
 
-Related: [OPERATIONS.md](OPERATIONS.md) · [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) · [PROPOSAL.md](PROPOSAL.md) · [README](../README.md) for setup
+Related: [OPERATIONS.md](OPERATIONS.md) · [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) · [SHIPPING-PLAN.md](SHIPPING-PLAN.md) · [PROPOSAL.md](PROPOSAL.md) · [README](../README.md) for setup
 
 > Everything below describes code that exists and has been verified against a
 > live database, not a plan. The 🔜 marker this document used to carry for
