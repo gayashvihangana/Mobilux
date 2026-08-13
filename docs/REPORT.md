@@ -424,7 +424,7 @@ separately (not published, as it enumerates residual weaknesses).
 |---|---|
 | Static type checking (`tsc --noEmit`) | Whole codebase, zero errors |
 | Production build | Whole codebase, all 31 routes compile |
-| Dependency vulnerability scan (`npm audit`) | Zero known vulnerabilities in production dependencies |
+| Dependency vulnerability scan (`npm audit --omit=dev`) | Zero known vulnerabilities in production dependencies, re-confirmed 13 Aug 2026 after fixing a high (`nanoid`) and a moderate (`undici`), both transitive |
 | Manual functional testing | All primary user journeys |
 | Live operational use | The system has processed real repairs in a working business |
 
