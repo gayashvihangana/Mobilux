@@ -586,7 +586,11 @@ Honest list. None are secret; all are either accepted trade-offs or scheduled.
 4. **Uploaded files are permanent public URLs.** Unguessable, but not revocable;
    anyone who obtains one keeps access. Accepted for now.
 5. **No 2FA**, and password policy is length-only (min 8, no breach check).
-6. **`next-auth` is a beta dependency.** Pin it exactly before selling.
+6. **`next-auth` is a beta dependency**, now pinned exactly to
+   `5.0.0-beta.32` (13 Aug 2026). It was `^5.0.0-beta.29`, and the caret had
+   already floated it to `.32` — on a prerelease that is a breaking-change
+   lottery run at `npm install` time, on someone else's shop. Re-pin
+   deliberately when upgrading, and re-run `verify:permissions` after.
 7. **English only.** Sinhala/Tamil is probably the biggest adoption lever in this
    market, and a bigger job than it looks.
 8. **Almost no automated tests.** `scripts/verify-security.mjs`,
