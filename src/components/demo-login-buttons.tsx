@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { Loader2, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DEMO_ACCOUNTS, type DemoRole } from "@/lib/demo-accounts";
 import type { AuthFormState } from "@/lib/actions/auth";
@@ -47,9 +48,22 @@ function OneClickLogin({ action, role }: { action: LoginAction; role: DemoRole }
 export function DemoLoginButtons({
   action,
   roles,
+  otherDoor,
 }: {
   action: LoginAction;
   roles: DemoRole[];
+  /**
+   * Points a demo visitor at the other side of the product.
+   *
+   * **Demo only, deliberately.** A real shop's sign-in page must not
+   * advertise where its back office is — that is the whole reason
+   * `/staff/login` is unlinked and `noindex`, and staff do not need it
+   * anyway now that either door signs them in. But a buyer landing on the
+   * demo's customer login has no way of knowing the owner's dashboard and
+   * technician view exist, and the back office is the part actually being
+   * sold. So it is shown here and nowhere else.
+   */
+  otherDoor?: { href: string; label: string };
 }) {
   return (
     <div className="space-y-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
@@ -61,6 +75,15 @@ export function DemoLoginButtons({
           <OneClickLogin key={role} action={action} role={role} />
         ))}
       </div>
+      {otherDoor ? (
+        <Link
+          href={otherDoor.href}
+          className="flex items-center justify-center gap-1 pt-0.5 text-xs font-medium text-primary transition-colors hover:underline"
+        >
+          {otherDoor.label}
+          <ArrowRight className="size-3" />
+        </Link>
+      ) : null}
     </div>
   );
 }

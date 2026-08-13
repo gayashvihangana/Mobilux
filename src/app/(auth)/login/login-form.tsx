@@ -46,7 +46,16 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
     // binds, so clicking it did nothing at all. Not visible over plain HTTP,
     // where nesting parses fine; only a real browser shows it.
     <div className="space-y-5">
-      {DEMO_MODE ? <DemoLoginButtons action={login} roles={["customer"]} /> : null}
+      {DEMO_MODE ? (
+        <DemoLoginButtons
+          action={login}
+          roles={["customer"]}
+          otherDoor={{
+            href: "/staff/login",
+            label: "See the shop owner's side",
+          }}
+        />
+      ) : null}
 
       <form action={formAction} className="space-y-5">
       {callbackUrl ? (

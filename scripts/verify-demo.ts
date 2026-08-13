@@ -157,7 +157,29 @@ function checkLoginButtonsAreReal() {
       `the ${label} page renders the demo buttons outside its <form> (no nested forms)`,
       buttonsAt === -1 ? "DemoLoginButtons not found" : `buttons at ${buttonsAt}, form at ${formAt}`,
     );
+
+    // The cross-door link exists so a buyer can find the back office on the
+    // demo. On a real shop it would advertise where the admin panel is, to
+    // every visitor and every crawler — the exact thing /staff/login being
+    // unlinked and noindex is for. It must therefore only ever be reachable
+    // through DemoLoginButtons, which only renders under DEMO_MODE.
+    const otherDoorAt = src.indexOf("otherDoor");
+    if (otherDoorAt !== -1) {
+      const gateAt = src.indexOf("DEMO_MODE");
+      check(
+        gateAt !== -1 && gateAt < otherDoorAt,
+        `the ${label} page's cross-door link is behind DEMO_MODE`,
+        gateAt === -1 ? "no DEMO_MODE gate found" : `gate at ${gateAt}, link at ${otherDoorAt}`,
+      );
+    }
   }
+
+  // …and the component must not hardcode it, or the gate above is pointless.
+  const btns = read("src", "components", "demo-login-buttons.tsx");
+  check(
+    !/href="\/staff\/login"/.test(btns),
+    "demo-login-buttons.tsx takes the cross-door link as a prop, never hardcodes /staff/login",
+  );
 }
 
 // ── run ─────────────────────────────────────────────────────────────
