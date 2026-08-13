@@ -4,9 +4,11 @@
 
 Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [OPERATIONS.md](OPERATIONS.md) ·
 [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) · [HANDOVER.md](HANDOVER.md) ·
-[PRIVACY.md](PRIVACY.md) · [PRICING-WORKSHEET.md](PRICING-WORKSHEET.md) ·
-[DEMO-POST.md](DEMO-POST.md) · [PROPOSAL.md](PROPOSAL.md) · [REPORT.md](REPORT.md) ·
-`SECURITY-AUDIT.md` (repo root, gitignored)
+[PRIVACY.md](PRIVACY.md) · [PROPOSAL.md](PROPOSAL.md)
+
+Kept out of the public repo, so the links below will not resolve in a
+clone: `PRICING-WORKSHEET.md`, `DEMO-POST.md`, `REPORT.md` and
+`SECURITY-AUDIT.md` (repo root). See [README.md](README.md).
 
 ---
 
@@ -465,10 +467,12 @@ attempt while signed in is refused with the expected message.
 - [ ] [PROPOSAL.md](PROPOSAL.md) — still needs **your** pricing, contact
       details and support terms in the `[[…]]` markers. Not filled in here —
       inventing a price or a phone number isn't mine to do.
-- [ ] [REPORT.md](REPORT.md) — the ✍️-marked sections (literature review,
-      methodology, evaluation, references, conclusion) need your own
-      research, your own usage data and your own reflection. Same reason —
-      genuinely not fillable by anyone but you.
+- [x] ~~`REPORT.md` — the ✍️-marked sections need your own research, usage
+      data and reflection~~ — **dropped 14 Aug 2026.** It was written as a
+      university submission ("For: University", `[[institution]]`,
+      `[[supervisor]]`), and this is a commercial and self-directed project
+      with no university attached. Kept locally for its structure; untracked
+      rather than left on a public repo inviting the question.
 
 ### 5.2 Shop handover pack (6 h) — **English done, Sinhala/Tamil not attempted**
 
