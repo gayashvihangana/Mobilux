@@ -43,6 +43,12 @@ an account you never created.
 
 - [ ] Create the database (Vercel Storage → Postgres, or a new Neon project
       directly if you'd rather manage it outside Vercel)
+- [ ] **Pick the region deliberately.** The default is `us-east-1`
+      (N. Virginia), which puts a Sri Lankan shop's customer records on
+      servers in the United States and adds a round trip to every query.
+      `ap-southeast-1` (Singapore) is the closer choice. This cannot be
+      changed later without a dump and restore, and whatever you pick has to
+      be written into that shop's [PRIVACY.md](PRIVACY.md).
 - [ ] Confirm `DATABASE_URL` is the **pooled** connection string.
       `scripts/migrate-deploy.mjs` derives the direct one itself; you don't
       need a second variable.
@@ -147,5 +153,5 @@ Same four checks as every deploy — [OPERATIONS.md §2](OPERATIONS.md#2-deployi
       a drill on your own dev data doesn't prove their backups work
       ([OPERATIONS.md §4.3](OPERATIONS.md#43-test-it--this-is-the-part-people-skip))
 - [ ] Add this shop to whatever list you're keeping of "who's running what" —
-      there is no provisioning registry yet ([SHIPPING-PLAN.md](SHIPPING-PLAN.md),
-      *after week 6*), so for now that list is this checklist plus a note
+      there is no provisioning registry yet, so for now that list is this
+      checklist plus a note

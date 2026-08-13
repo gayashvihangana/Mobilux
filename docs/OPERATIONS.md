@@ -2,7 +2,7 @@
 
 **Written:** 6 August 2026 · **Audience:** whoever keeps a deployed shop running
 
-Related: [ARCHITECTURE.md](ARCHITECTURE.md) · [SHIPPING-PLAN.md](SHIPPING-PLAN.md) ·
+Related: [ARCHITECTURE.md](ARCHITECTURE.md) ·
 [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) — the step-by-step checklist that
 follows this reference · [HANDOVER.md](HANDOVER.md) · [PRIVACY.md](PRIVACY.md) ·
 [README](../README.md) for local setup

@@ -7,15 +7,26 @@
 | [INSTALL-RUNBOOK.md](INSTALL-RUNBOOK.md) | You | The checklist you actually follow, per shop, start to finish |
 | [HANDOVER.md](HANDOVER.md) | Shop owners | What to leave with a shop after training — Settings, logging a repair, billing, staff |
 | [PRIVACY.md](PRIVACY.md) | Shop owners, you | What's stored, where, for how long, and who's responsible for it |
-| [PRICING-WORKSHEET.md](PRICING-WORKSHEET.md) | You | A method for pricing setup + monthly — not numbers, a way to reach your own |
-| [DEMO-POST.md](DEMO-POST.md) | You | Shot list and ready-to-adapt copy for the week 6 demo post |
-| [SHIPPING-PLAN.md](SHIPPING-PLAN.md) | You | Six weeks of work to a sellable product, at ~20 hrs/week |
 | [PROPOSAL.md](PROPOSAL.md) | Shop owners | Commercial proposal. Fill in the `[[…]]` markers before sending |
-| [REPORT.md](REPORT.md) | University | Academic report. Sections marked ✍️ **YOU** need your own evidence |
 | [../README.md](../README.md) | Anyone | Feature tour, setup, environment variables, deployment |
 
-Not in this folder: `SECURITY-AUDIT.md` lives at the repo root and is
-**gitignored** — it enumerates residual weaknesses and should not be published.
+## Not in this repo
+
+Some documents are kept on disk but **deliberately untracked** (see
+`.gitignore`), because they are business or personal material rather than
+anything needed to run or hand over the software:
+
+| Document | What it is |
+|---|---|
+| `SECURITY-AUDIT.md` *(repo root)* | The residual open findings — a map of what is still weak |
+| `docs/PRICING-WORKSHEET.md` | What a shop is worth to you, and how to reach that number |
+| `docs/SHIPPING-PLAN.md` | The roadmap, including every known gap |
+| `docs/REPORT.md` | An academic submission, personal to the author |
+| `docs/DEMO-POST.md` | Unpublished marketing drafts |
+
+If you have cloned this repo and one of the above is referenced somewhere,
+that is why you cannot find it. Everything required to **build, deploy,
+install and hand over** the product is tracked and present.
 
 ## The three actors
 
