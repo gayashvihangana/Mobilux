@@ -40,11 +40,18 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   };
 
   return (
-    <form action={formAction} className="space-y-5">
+    // The demo buttons sit OUTSIDE this form, not inside it. Each one is its
+    // own <form>, and HTML forbids nesting forms — the browser's parser drops
+    // the inner ones, hydration then mismatches, and the button's action never
+    // binds, so clicking it did nothing at all. Not visible over plain HTTP,
+    // where nesting parses fine; only a real browser shows it.
+    <div className="space-y-5">
+      {DEMO_MODE ? <DemoLoginButtons action={login} roles={["customer"]} /> : null}
+
+      <form action={formAction} className="space-y-5">
       {callbackUrl ? (
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
       ) : null}
-      {DEMO_MODE ? <DemoLoginButtons action={login} roles={["customer"]} /> : null}
       {state?.blocked ? (
         <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3.5 text-sm text-destructive">
           <div className="flex items-start gap-2.5">
@@ -124,6 +131,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           </Link>
         </p>
       ) : null}
-    </form>
+      </form>
+    </div>
   );
 }

@@ -364,6 +364,18 @@ async function checkEntrances() {
   const html = await res.text();
   check(/noindex/.test(html), "/staff/login asks search engines not to index it");
 
+  // A no-referrer policy on this page makes the browser send `Origin: null`,
+  // and Next's server-action handler does `new URL(originHeader)` as its CSRF
+  // check — so every sign-in attempt here 500s before the action runs. That
+  // shipped and went unnoticed for a week, because this script replays forms
+  // over plain HTTP, which sends no Origin at all and skips the check. The
+  // page's own comment explains the trade-off; this stops it coming back.
+  check(
+    !/<meta name="referrer" content="no-referrer"/.test(html),
+    "/staff/login does NOT send no-referrer — it would break every server action here",
+    /content="(no-referrer[^"]*)"/.exec(html)?.[1] ?? "",
+  );
+
   const robots = await (await get("/robots.txt")).text();
   check(/Disallow:.*\/staff/.test(robots), "robots.txt disallows /staff");
 

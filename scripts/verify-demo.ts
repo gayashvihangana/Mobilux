@@ -135,6 +135,29 @@ function checkLoginButtonsAreReal() {
 
   const accounts = read("src", "lib", "demo-accounts.ts");
   check(!/@prisma\/client|from "@\/lib\/prisma"/.test(accounts), "demo-accounts.ts has no Prisma import — safe to import from a client component");
+
+  // The bug this catches actually shipped. Each button is its own <form>, and
+  // both login pages used to render <DemoLoginButtons> inside their own
+  // <form>. Nesting forms is invalid HTML: the browser's parser silently drops
+  // the inner ones, hydration mismatches, the action never binds, and every
+  // button becomes inert. Nothing over plain HTTP shows it — the markup parses
+  // fine there, so the server-side checks all passed while the buttons were
+  // dead in a real browser.
+  for (const [label, ...path] of [
+    ["customer", "src", "app", "(auth)", "login", "login-form.tsx"],
+    ["staff", "src", "app", "staff", "login", "staff-login-form.tsx"],
+  ] as const) {
+    const src = read(...(path as unknown as string[]));
+    const buttonsAt = src.indexOf("<DemoLoginButtons");
+    // `<form action` rather than `<form`, so the prose in the comment above
+    // each of these components doesn't match instead of the element.
+    const formAt = src.indexOf("<form action");
+    check(
+      buttonsAt !== -1 && formAt !== -1 && buttonsAt < formAt,
+      `the ${label} page renders the demo buttons outside its <form> (no nested forms)`,
+      buttonsAt === -1 ? "DemoLoginButtons not found" : `buttons at ${buttonsAt}, form at ${formAt}`,
+    );
+  }
 }
 
 // ── run ─────────────────────────────────────────────────────────────

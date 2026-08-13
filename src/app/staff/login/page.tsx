@@ -17,10 +17,23 @@ import { StaffLoginForm } from "./staff-login-form";
 // This is not a security control — the URL is guessable and the guards behind
 // it are what actually matter — but there is no reason to advertise the shop's
 // back door to every crawler and credential-stuffing list.
+//
+// `referrer` MUST NOT be "no-referrer" here, however much it looks right.
+// That policy makes the browser send `Origin: null` on this page's own
+// requests, and Next's server-action handler runs `new URL(originHeader)` as
+// its CSRF check — so every sign-in attempt died with "Invalid URL" and a 500
+// before the action even ran. Sign-in at this door was completely broken in a
+// real browser from the day it shipped, and nothing caught it: the
+// verification scripts replay forms over plain HTTP, which sends no Origin at
+// all and so skips the check entirely.
+//
+// "same-origin" keeps the actual intent — an external site a technician
+// clicks through to still learns nothing — while leaving this page's own
+// requests with a real Origin.
 export const metadata: Metadata = {
   title: "Staff sign-in",
   robots: { index: false, follow: false },
-  referrer: "no-referrer",
+  referrer: "same-origin",
 };
 
 export default async function StaffLoginPage({
