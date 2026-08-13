@@ -18,7 +18,11 @@ export function StaffLoginForm({ callbackUrl }: { callbackUrl?: string }) {
     // nesting forms is invalid HTML. See the note in the customer login form.
     <div className="space-y-5">
       {DEMO_MODE ? (
-        <DemoLoginButtons action={staffLogin} roles={["owner", "staff"]} />
+        <DemoLoginButtons
+          action={staffLogin}
+          roles={["owner", "staff"]}
+          otherDoor={{ href: "/login", label: "See the customer's side" }}
+        />
       ) : null}
 
       <form action={formAction} className="space-y-5">
