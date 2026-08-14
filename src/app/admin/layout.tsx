@@ -6,6 +6,7 @@ import { getShopInfo } from "@/lib/settings";
 import { Logo } from "@/components/logo";
 import { UserMenu } from "@/components/user-menu";
 import { AdminNav, type AdminNavGroup } from "@/components/admin-nav";
+import type { NavIconName } from "@/components/nav-icons";
 import { Notifications } from "@/components/notifications";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileNav } from "@/components/mobile-nav";
@@ -16,39 +17,45 @@ import { MobileNav } from "@/components/mobile-nav";
 // `need` is presentation only. The page behind each link guards itself with
 // requirePermission, and the actions behind it guard themselves again; hiding
 // a link a technician can't use is tidiness, not security.
-type GuardedLink = { href: string; label: string; hint?: string; need?: Permission };
+type GuardedLink = {
+  href: string;
+  label: string;
+  hint?: string;
+  icon?: NavIconName;
+  need?: Permission;
+};
 
 const PRIMARY_LINKS: GuardedLink[] = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/tickets", label: "Repairs" },
-  { href: "/admin/customers", label: "Customers", need: "customer:manage" },
-  { href: "/admin/payments", label: "Payments", need: "payment:verify" },
+  { href: "/admin", label: "Overview", icon: "overview" },
+  { href: "/admin/tickets", label: "Repairs", icon: "repairs" },
+  { href: "/admin/customers", label: "Customers", icon: "customers", need: "customer:manage" },
+  { href: "/admin/payments", label: "Payments", icon: "payments", need: "payment:verify" },
 ];
 
 const NAV_GROUPS: (Omit<AdminNavGroup, "links"> & { links: GuardedLink[] })[] = [
   {
     label: "Shop",
     links: [
-      { href: "/admin/products", label: "Products", hint: "Catalog & stock", need: "product:write" },
-      { href: "/admin/orders", label: "Orders", hint: "Storefront orders", need: "order:write" },
-      { href: "/admin/loyalty", label: "Loyalty", hint: "Repeat-customer discounts", need: "discount:write" },
-      { href: "/admin/testimonials", label: "Reviews", hint: "Customer feedback", need: "review:moderate" },
+      { href: "/admin/products", label: "Products", hint: "Catalog & stock", icon: "products", need: "product:write" },
+      { href: "/admin/orders", label: "Orders", hint: "Storefront orders", icon: "orders", need: "order:write" },
+      { href: "/admin/loyalty", label: "Loyalty", hint: "Repeat-customer discounts", icon: "loyalty", need: "discount:write" },
+      { href: "/admin/testimonials", label: "Reviews", hint: "Customer feedback", icon: "reviews", need: "review:moderate" },
     ],
   },
   {
     label: "Insight",
     links: [
-      { href: "/admin/reports", label: "Reports", hint: "Revenue & repair trends", need: "report:read" },
-      { href: "/admin/errors", label: "Bench errors", hint: "What went wrong, and its cost", need: "report:read" },
-      { href: "/admin/notes", label: "Notes", hint: "Lessons from the bench", need: "report:read" },
-      { href: "/admin/activity", label: "Activity", hint: "Who did what", need: "audit:read" },
+      { href: "/admin/reports", label: "Reports", hint: "Revenue & repair trends", icon: "reports", need: "report:read" },
+      { href: "/admin/errors", label: "Bench errors", hint: "What went wrong, and its cost", icon: "errors", need: "report:read" },
+      { href: "/admin/notes", label: "Notes", hint: "Lessons from the bench", icon: "notes", need: "report:read" },
+      { href: "/admin/activity", label: "Activity", hint: "Who did what", icon: "activity", need: "audit:read" },
     ],
   },
   {
     label: "Setup",
     links: [
-      { href: "/admin/staff", label: "Staff", hint: "Technician accounts", need: "staff:manage" },
-      { href: "/admin/settings", label: "Settings", hint: "Shop details & bank accounts", need: "settings:write" },
+      { href: "/admin/staff", label: "Staff", hint: "Technician accounts", icon: "staff", need: "staff:manage" },
+      { href: "/admin/settings", label: "Settings", hint: "Shop details & bank accounts", icon: "settings", need: "settings:write" },
     ],
   },
 ];
@@ -57,7 +64,11 @@ const NAV_GROUPS: (Omit<AdminNavGroup, "links"> & { links: GuardedLink[] })[] = 
 function navFor(user: { role: Role }) {
   const allowed = (l: GuardedLink) => !l.need || can(user, l.need);
   return {
-    primary: PRIMARY_LINKS.filter(allowed).map(({ href, label }) => ({ href, label })),
+    primary: PRIMARY_LINKS.filter(allowed).map(({ href, label, icon }) => ({
+      href,
+      label,
+      icon,
+    })),
     groups: NAV_GROUPS.map((g) => ({ ...g, links: g.links.filter(allowed) })).filter(
       (g) => g.links.length > 0,
     ) as AdminNavGroup[],

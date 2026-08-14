@@ -15,9 +15,16 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Logo, type ShopBrand } from "@/components/logo";
+import { NavIcon, type NavIconName } from "@/components/nav-icons";
 import { cn } from "@/lib/utils";
 
-export type NavLink = { href: string; label: string };
+export type NavLink = {
+  href: string;
+  label: string;
+  /** One line on what the section is for — shown under the label. */
+  hint?: string;
+  icon?: NavIconName;
+};
 export type NavGroup = { label: string; links: NavLink[] };
 
 export function MobileNav({
@@ -41,17 +48,51 @@ export function MobileNav({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  const linkClass = (href: string) => {
-    const active = href.includes("#")
+  const isActive = (href: string) =>
+    href.includes("#")
       ? false
       : href === "/dashboard" || href === "/admin"
         ? pathname === href
         : pathname.startsWith(href);
-    return cn(
-      "rounded-lg px-3.5 py-2.5 text-[15px] font-medium transition-colors",
-      active
-        ? "bg-accent text-foreground"
-        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+
+  // Same row shape whether or not a link carries an icon and a hint, so a nav
+  // that mixes the two still lines up.
+  const navLink = (link: NavLink) => {
+    const active = isActive(link.href);
+    return (
+      <SheetClose asChild key={link.href}>
+        <Link
+          href={link.href}
+          aria-current={active ? "page" : undefined}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium transition-colors",
+            active
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          )}
+        >
+          {link.icon ? (
+            <span
+              className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-md border",
+                active
+                  ? "border-primary/30 bg-primary/10 text-primary"
+                  : "border-border bg-muted/60",
+              )}
+            >
+              <NavIcon name={link.icon} className="size-4" />
+            </span>
+          ) : null}
+          <span className="flex min-w-0 flex-col">
+            <span className="leading-tight">{link.label}</span>
+            {link.hint ? (
+              <span className="mt-0.5 text-xs leading-snug font-normal text-muted-foreground">
+                {link.hint}
+              </span>
+            ) : null}
+          </span>
+        </Link>
+      </SheetClose>
     );
   };
 
@@ -77,25 +118,13 @@ export function MobileNav({
           </SheetDescription>
         </SheetHeader>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
-          {links.map((link) => (
-            <SheetClose asChild key={link.href}>
-              <Link href={link.href} className={linkClass(link.href)}>
-                {link.label}
-              </Link>
-            </SheetClose>
-          ))}
+          {links.map(navLink)}
           {groups?.map((group) => (
             <div key={group.label} className="mt-3 flex flex-col gap-1">
-              <p className="px-3.5 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                 {group.label}
               </p>
-              {group.links.map((link) => (
-                <SheetClose asChild key={link.href}>
-                  <Link href={link.href} className={linkClass(link.href)}>
-                    {link.label}
-                  </Link>
-                </SheetClose>
-              ))}
+              {group.links.map(navLink)}
             </div>
           ))}
         </nav>
