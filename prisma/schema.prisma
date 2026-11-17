@@ -118,6 +118,9 @@ model RepairTicket {
   customerId          String? // linked account (optional — walk-ins have none)
   customer            User?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName        String? // walk-in / legacy owner name when no account
+  // Walk-in phone number. Lets the shop call or WhatsApp a customer who has
+  // no account, and lets the public tracker check "last 4 digits" for them.
+  customerPhone       String?
   deviceType          DeviceType
   brand               String?
   model               String?

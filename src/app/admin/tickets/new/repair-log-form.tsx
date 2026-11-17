@@ -74,6 +74,21 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
           />
           <FieldError errors={state?.fieldErrors?.customerName} />
         </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="customerPhone">
+            Phone number{" "}
+            <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <Input
+            id="customerPhone"
+            name="customerPhone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="off"
+            placeholder="07X XXX XXXX"
+          />
+          <FieldError errors={state?.fieldErrors?.customerPhone} />
+        </div>
       </div>
 
       <Separator />

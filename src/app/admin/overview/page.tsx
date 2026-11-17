@@ -1,0 +1,1020 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Banknote,
+  Clock,
+  Inbox,
+  PackageCheck,
+  Users,
+} from "lucide-react";
+import { requireStaff } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+import { LinkedTableRow } from "@/components/linked-table-row";
+import { StatusBadge } from "@/components/status-badge";
+import { doneLabel, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
+import { issuePartsCostOf, parseParts } from "@/lib/parts";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn, formatDate, formatLKR } from "@/lib/utils";
+import {
+  OverviewDashboard,
+  type Kpi,
+  type MonthPoint,
+} from "../overview-dashboard";
+import { ActiveRepairsBoard, type ActiveRepair } from "../active-repairs";
+
+export const metadata: Metadata = {
+  title: "Shop numbers",
+};
+
+const ACTIVE_STATUSES = [
+  "CONFIRMED",
+  "RECEIVED",
+  "DIAGNOSING",
+  "AWAITING_PARTS",
+  "IN_PROGRESS",
+] as const;
+
+const SUCCESS_STATUSES = ["COMPLETED", "READY_FOR_PICKUP", "PICKED_UP"] as const;
+
+const pct = (value: number) => `${value.toFixed(1)}%`;
+const int = (value: number) => Math.round(value).toLocaleString("en-LK");
+
+// A repair is owed money when it has been billed and nothing has been
+// recorded against it — no manual paid amount, no verified online payment.
+const UNPAID_WHERE = {
+  finalCost: { not: null },
+  paidAt: null,
+  paidAmount: null,
+  status: { not: "CANCELLED" },
+  payments: { none: { status: "PAID" } },
+} as const;
+
+function waitingFor(date: Date | null) {
+  if (!date) return "—";
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
+}
+
+// One line in the pending-payment / pending-pickup queues.
+function QueueRow({
+  href,
+  title,
+  subtitle,
+  meta,
+  metaSub,
+  urgent,
+}: {
+  href: string;
+  title: string;
+  subtitle: string;
+  meta: string;
+  metaSub: string;
+  urgent?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card/60 px-3.5 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+    >
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium transition-colors group-hover:text-primary">
+          {title}
+        </p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-semibold tabular-nums">{meta}</p>
+        <p
+          className={cn(
+            "text-[11px]",
+            urgent ? "font-medium text-warning" : "text-muted-foreground",
+          )}
+        >
+          {metaSub}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+export default async function AdminOverviewPage() {
+  const user = await requireStaff();
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [
+    pendingCount,
+    activeCount,
+    readyCount,
+    customerCount,
+    recentTickets,
+    statusCounts,
+    financeTickets,
+    paidByTicket,
+    customerDates,
+    issues,
+    unpaidTickets,
+    unpaidTotals,
+    pickupTickets,
+    activeTickets,
+    attentionCount,
+  ] = await Promise.all([
+    prisma.repairTicket.count({ where: { status: "SUBMITTED" } }),
+    prisma.repairTicket.count({
+      where: { status: { in: [...ACTIVE_STATUSES] } },
+    }),
+    prisma.repairTicket.count({
+      where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
+    }),
+    prisma.user.count({ where: { role: "CUSTOMER" } }),
+    prisma.repairTicket.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      include: { customer: { select: { name: true } } },
+    }),
+    prisma.repairTicket.groupBy({ by: ["status"], _count: true }),
+    prisma.repairTicket.findMany({
+      select: {
+        id: true,
+        status: true,
+        paidAmount: true,
+        partsCost: true,
+        parts: true,
+        createdAt: true,
+        completedAt: true,
+        issues: { select: { parts: true } },
+      },
+    }),
+    prisma.payment.groupBy({
+      by: ["ticketId"],
+      where: { status: "PAID", ticketId: { not: null } },
+      _sum: { amount: true },
+    }),
+    prisma.user.findMany({
+      where: { role: "CUSTOMER" },
+      select: { createdAt: true },
+    }),
+    prisma.repairIssue.findMany({
+      select: { ticketId: true, status: true, parts: true, reportedAt: true },
+    }),
+    // Billed, still owed — oldest invoice first, that's the one to chase.
+    prisma.repairTicket.findMany({
+      where: UNPAID_WHERE,
+      orderBy: { billGeneratedAt: { sort: "asc", nulls: "last" } },
+      take: 5,
+      select: {
+        id: true,
+        ticketNumber: true,
+        brand: true,
+        model: true,
+        finalCost: true,
+        billGeneratedAt: true,
+        createdAt: true,
+        customerName: true,
+        customer: { select: { name: true } },
+      },
+    }),
+    prisma.repairTicket.aggregate({
+      where: UNPAID_WHERE,
+      _count: { _all: true },
+      _sum: { finalCost: true },
+    }),
+    // Fixed and still on the shelf — longest wait first.
+    prisma.repairTicket.findMany({
+      where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
+      orderBy: { completedAt: { sort: "asc", nulls: "last" } },
+      take: 5,
+      select: {
+        id: true,
+        ticketNumber: true,
+        brand: true,
+        model: true,
+        completedAt: true,
+        createdAt: true,
+        finalCost: true,
+        paidAt: true,
+        paidAmount: true,
+        customerName: true,
+        customer: { select: { name: true } },
+        payments: { where: { status: "PAID" }, select: { id: true }, take: 1 },
+      },
+    }),
+    // On the bench right now — quietest first, so the repair nobody has
+    // touched in days is the first card the shop sees.
+    prisma.repairTicket.findMany({
+      where: { status: { in: [...ACTIVE_STATUSES] } },
+      orderBy: { updatedAt: "asc" },
+      take: 9,
+      select: {
+        id: true,
+        ticketNumber: true,
+        deviceType: true,
+        brand: true,
+        model: true,
+        issueTitle: true,
+        status: true,
+        technician: true,
+        estimatedCost: true,
+        finalCost: true,
+        createdAt: true,
+        updatedAt: true,
+        customerName: true,
+        customer: { select: { name: true } },
+        issues: { where: { status: "PENDING" }, select: { id: true } },
+      },
+    }),
+    prisma.repairTicket.count({
+      where: {
+        status: { in: [...ACTIVE_STATUSES] },
+        OR: [
+          { updatedAt: { lt: new Date(Date.now() - 3 * 86_400_000) } },
+          { issues: { some: { status: "PENDING" } } },
+        ],
+      },
+    }),
+  ]);
+
+  // ── Financials (repairs only) ──────────────────────────────────
+  // Revenue per ticket: verified online payments first, otherwise the
+  // shop's own paid-amount record — same preference the bill uses.
+  const paidPaymentByTicket = new Map(
+    paidByTicket.map((p) => [p.ticketId as string, Number(p._sum.amount ?? 0)]),
+  );
+  const revenueOf = (t: (typeof financeTickets)[number]) => {
+    const paymentSum = paidPaymentByTicket.get(t.id) ?? 0;
+    return paymentSum > 0 ? paymentSum : t.paidAmount ? Number(t.paidAmount) : 0;
+  };
+
+  let revenue = 0;
+  let revenueThisMonth = 0;
+  let costs = 0;
+  let costsThisMonth = 0;
+  // Split the cost side: parts for the repair itself vs parts we had to buy
+  // because something went wrong on our bench.
+  let repairPartsCost = 0;
+  let benchErrorCost = 0;
+
+  for (const t of financeTickets) {
+    const ticketRevenue = revenueOf(t);
+    const ticketCost = t.partsCost ? Number(t.partsCost) : 0;
+    revenue += ticketRevenue;
+    costs += ticketCost;
+    const issueCost = issuePartsCostOf(t.issues);
+    benchErrorCost += issueCost;
+    repairPartsCost += Math.max(0, ticketCost - issueCost);
+    if (t.completedAt && t.completedAt >= monthStart) {
+      revenueThisMonth += ticketRevenue;
+      costsThisMonth += ticketCost;
+    }
+  }
+
+  const profit = revenue - costs;
+  const profitThisMonth = revenueThisMonth - costsThisMonth;
+  const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+  // ── Monthly series — the spine of every dialog chart ───────────
+  const monthFormat = new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    timeZone: "Asia/Colombo",
+  });
+  const months: MonthPoint[] = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+    return {
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      label: monthFormat.format(d),
+      revenue: 0,
+      costs: 0,
+      profit: 0,
+      completed: 0,
+      created: 0,
+      customers: 0,
+      errors: 0,
+    };
+  });
+  const bucketOf = (date: Date) =>
+    months.find((m) => m.key === `${date.getFullYear()}-${date.getMonth()}`);
+
+  for (const t of financeTickets) {
+    const created = bucketOf(t.createdAt);
+    if (created) created.created += 1;
+    // Money lands in the month the repair finished — that's when it's earned.
+    const earned = bucketOf(t.completedAt ?? t.createdAt);
+    if (earned) {
+      earned.revenue += revenueOf(t);
+      earned.costs += t.partsCost ? Number(t.partsCost) : 0;
+    }
+    if (t.completedAt) {
+      const done = bucketOf(t.completedAt);
+      if (done) done.completed += 1;
+    }
+  }
+  for (const c of customerDates) {
+    const bucket = bucketOf(c.createdAt);
+    if (bucket) bucket.customers += 1;
+  }
+  for (const issue of issues) {
+    const bucket = bucketOf(issue.reportedAt);
+    if (bucket) bucket.errors += 1;
+  }
+  for (const m of months) m.profit = m.revenue - m.costs;
+
+  const thisMonthBucket = months[months.length - 1];
+  const lastMonthBucket = months[months.length - 2];
+  const bestMonth = [...months].sort((a, b) => b.profit - a.profit)[0];
+  const avgMonthlyProfit =
+    months.reduce((sum, m) => sum + m.profit, 0) / months.length;
+  const profitLastMonth = lastMonthBucket?.profit ?? 0;
+
+  // ── Repair outcomes ───────────────────────────────────────────
+  const countByStatus = Object.fromEntries(
+    statusCounts.map((s) => [s.status, s._count]),
+  );
+  const totalTickets = statusCounts.reduce((sum, s) => sum + s._count, 0);
+  const succeeded = SUCCESS_STATUSES.reduce(
+    (sum, s) => sum + (countByStatus[s] ?? 0),
+    0,
+  );
+  const cancelled = countByStatus["CANCELLED"] ?? 0;
+  const closed = succeeded + cancelled;
+  const successRate = closed > 0 ? (succeeded / closed) * 100 : null;
+  const completedThisMonth = thisMonthBucket?.completed ?? 0;
+  const paidRepairs = financeTickets.filter(
+    (t) => revenueOf(t) > 0,
+  ).length;
+  const avgPerRepair = paidRepairs > 0 ? revenue / paidRepairs : 0;
+  const pipelineTotal = STATUS_PIPELINE.reduce(
+    (sum, s) => sum + (countByStatus[s] ?? 0),
+    0,
+  );
+
+  const unpaidCount = unpaidTotals._count._all;
+  const unpaidTotal = Number(unpaidTotals._sum.finalCost ?? 0);
+
+  // ── Bench errors ──────────────────────────────────────────────
+  const affectedTickets = new Set(issues.map((i) => i.ticketId)).size;
+  const errorRate =
+    totalTickets > 0 ? (affectedTickets / totalTickets) * 100 : 0;
+  const errorsThisMonth = thisMonthBucket?.errors ?? 0;
+
+  // Which parts eat the most money, for the costs dialog.
+  const partSpend = new Map<string, number>();
+  for (const t of financeTickets) {
+    for (const part of parseParts(t.parts)) {
+      if (!part.cost) continue;
+      const key = part.part.toLowerCase();
+      partSpend.set(key, (partSpend.get(key) ?? 0) + part.cost);
+    }
+  }
+  const topPartSpend = [...partSpend.entries()]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  const pipelineBreakdown = STATUS_PIPELINE.map((status) => ({
+    label: doneLabel(status),
+    value: countByStatus[status] ?? 0,
+  })).filter((s) => s.value > 0);
+
+  const profitTone = profit >= 0 ? "success" : "destructive";
+
+  // The hero's own dialog — the full profit story.
+  const profitKpi: Kpi = {
+    id: "profit",
+    label: "Net profit",
+    value: formatLKR(profit),
+    raw: profit,
+    sub: `${formatLKR(profitThisMonth)} this month`,
+    icon: "trendingUp",
+    tone: profitTone,
+    detail: {
+      description:
+        "What's left after parts and the cost of putting our own mistakes right. Revenue counts verified online payments first, then what the shop recorded as paid.",
+      field: "profit",
+      seriesLabel: "Profit by month",
+      format: "lkr",
+      stats: [
+        { label: "This month", value: formatLKR(profitThisMonth) },
+        { label: "Last month", value: formatLKR(profitLastMonth) },
+        { label: "Monthly average", value: formatLKR(avgMonthlyProfit) },
+        {
+          label: "Best month",
+          value: bestMonth ? `${bestMonth.label} · ${formatLKR(bestMonth.profit)}` : "—",
+        },
+      ],
+      breakdown: [
+        { label: "Revenue", value: revenue },
+        { label: "Repair parts", value: repairPartsCost },
+        { label: "Fixing our own mistakes", value: benchErrorCost },
+        { label: "Profit", value: profit },
+      ],
+      breakdownFormat: "lkr",
+      link: { href: "/admin/reports", label: "Open full reports" },
+    },
+  };
+
+  const kpis: Kpi[] = [
+    {
+      id: "revenue",
+      label: "Revenue",
+      value: formatLKR(revenue),
+      raw: revenue,
+      sub: `${formatLKR(revenueThisMonth)} this month`,
+      icon: "banknote",
+      tone: "success",
+      detail: {
+        description:
+          "Everything customers have paid for repairs, counted in the month the repair finished.",
+        field: "revenue",
+        seriesLabel: "Revenue by month",
+        format: "lkr",
+        stats: [
+          { label: "This month", value: formatLKR(revenueThisMonth) },
+          { label: "Last month", value: formatLKR(lastMonthBucket?.revenue ?? 0) },
+          { label: "Paid repairs", value: int(paidRepairs) },
+          { label: "Avg. per repair", value: formatLKR(avgPerRepair) },
+        ],
+        link: { href: "/admin/payments", label: "Review payments" },
+      },
+    },
+    {
+      id: "costs",
+      label: "Parts & costs",
+      value: formatLKR(costs),
+      raw: costs,
+      sub: `${formatLKR(costsThisMonth)} this month`,
+      icon: "wallet",
+      tone: "warning",
+      detail: {
+        description:
+          "What the shop spent on parts — the repair's own parts plus anything bought to fix a mistake on the bench.",
+        field: "costs",
+        seriesLabel: "Costs by month",
+        format: "lkr",
+        stats: [
+          { label: "Repair parts", value: formatLKR(repairPartsCost) },
+          { label: "Bench errors", value: formatLKR(benchErrorCost) },
+          {
+            label: "Cost ratio",
+            value: revenue > 0 ? pct((costs / revenue) * 100) : "—",
+          },
+        ],
+        breakdown:
+          topPartSpend.length > 0
+            ? topPartSpend
+            : [
+                { label: "Repair parts", value: repairPartsCost },
+                { label: "Bench errors", value: benchErrorCost },
+              ],
+        breakdownFormat: "lkr",
+        link: { href: "/admin/errors", label: "See what errors cost us" },
+      },
+    },
+    {
+      id: "margin",
+      label: "Profit margin",
+      value: pct(profitMargin),
+      raw: profitMargin,
+      sub: "of revenue kept as profit",
+      icon: "percent",
+      tone: profitTone,
+      detail: {
+        description:
+          "The share of revenue left after costs. The chart shows profit itself — margin only means something next to the money behind it.",
+        field: "profit",
+        seriesLabel: "Profit by month",
+        format: "lkr",
+        stats: [
+          { label: "Revenue", value: formatLKR(revenue) },
+          { label: "Costs", value: formatLKR(costs) },
+          { label: "Profit", value: formatLKR(profit) },
+        ],
+        link: { href: "/admin/reports", label: "Open full reports" },
+      },
+    },
+    {
+      id: "avg",
+      label: "Avg. per repair",
+      value: formatLKR(avgPerRepair),
+      raw: avgPerRepair,
+      sub: `across ${paidRepairs} paid repair${paidRepairs === 1 ? "" : "s"}`,
+      icon: "banknote",
+      tone: "primary",
+      detail: {
+        description:
+          "Average revenue per repair that has actually been paid for.",
+        field: "revenue",
+        seriesLabel: "Revenue by month",
+        format: "lkr",
+        stats: [
+          { label: "Paid repairs", value: int(paidRepairs) },
+          { label: "Total revenue", value: formatLKR(revenue) },
+          {
+            label: "Completed this month",
+            value: int(completedThisMonth),
+          },
+        ],
+        link: { href: "/admin/tickets", label: "Browse repairs" },
+      },
+    },
+    {
+      id: "repairs",
+      label: "Total repairs",
+      value: int(totalTickets),
+      raw: totalTickets,
+      sub: `${completedThisMonth} completed this month`,
+      icon: "smartphone",
+      tone: "primary",
+      detail: {
+        description: "Every repair logged, however it arrived.",
+        field: "created",
+        seriesLabel: "New repairs by month",
+        format: "int",
+        stats: [
+          { label: "In progress", value: int(activeCount) },
+          { label: "Awaiting pickup", value: int(readyCount) },
+          { label: "Needs confirmation", value: int(pendingCount) },
+        ],
+        breakdown: pipelineBreakdown,
+        breakdownFormat: "int",
+        link: { href: "/admin/tickets", label: "Browse repairs" },
+      },
+    },
+    {
+      id: "success",
+      label: "Success rate",
+      value: successRate === null ? "—" : pct(successRate),
+      raw: successRate ?? 0,
+      sub: `${succeeded} succeeded · ${cancelled} cancelled`,
+      icon: "target",
+      tone: "success",
+      detail: {
+        description:
+          "Of the repairs that reached an end, the share that ended fixed rather than cancelled.",
+        field: "completed",
+        seriesLabel: "Repairs completed by month",
+        format: "int",
+        stats: [
+          { label: "Succeeded", value: int(succeeded) },
+          { label: "Cancelled", value: int(cancelled) },
+          { label: "Still open", value: int(totalTickets - closed) },
+        ],
+        breakdown: [
+          { label: "Repaired", value: succeeded },
+          { label: "Cancelled", value: cancelled },
+        ],
+        breakdownFormat: "int",
+        link: { href: "/admin/tickets", label: "Browse repairs" },
+      },
+    },
+    {
+      id: "errors",
+      label: "Bench errors",
+      value: int(issues.length),
+      raw: issues.length,
+      sub: `${pct(errorRate)} of repairs · ${formatLKR(benchErrorCost)} cost`,
+      icon: "triangleAlert",
+      tone: issues.length > 0 ? "warning" : "success",
+      detail: {
+        description:
+          "Times something went wrong on our side of the bench, and what putting it right cost us in parts.",
+        field: "errors",
+        seriesLabel: "Errors reported by month",
+        format: "int",
+        stats: [
+          { label: "This month", value: int(errorsThisMonth) },
+          { label: "Repairs affected", value: int(affectedTickets) },
+          { label: "Error rate", value: pct(errorRate) },
+          { label: "Cost to us", value: formatLKR(benchErrorCost) },
+        ],
+        breakdown: [
+          {
+            label: "Fixed free",
+            value: issues.filter((i) => i.status === "ACCEPTED").length,
+          },
+          {
+            label: "Cancelled with refund",
+            value: issues.filter((i) => i.status === "DECLINED").length,
+          },
+          {
+            label: "Awaiting customer",
+            value: issues.filter((i) => i.status === "PENDING").length,
+          },
+        ],
+        breakdownFormat: "int",
+        link: { href: "/admin/errors", label: "Open bench errors" },
+      },
+    },
+    {
+      id: "customers",
+      label: "Customers",
+      value: int(customerCount),
+      raw: customerCount,
+      sub: `${thisMonthBucket?.customers ?? 0} joined this month`,
+      icon: "users",
+      tone: "info",
+      detail: {
+        description: "Registered customer accounts, by the month they joined.",
+        field: "customers",
+        seriesLabel: "New customers by month",
+        format: "int",
+        stats: [
+          { label: "This month", value: int(thisMonthBucket?.customers ?? 0) },
+          { label: "Last month", value: int(lastMonthBucket?.customers ?? 0) },
+          {
+            label: "Repairs per customer",
+            value:
+              customerCount > 0
+                ? (totalTickets / customerCount).toFixed(1)
+                : "—",
+          },
+        ],
+        link: { href: "/admin/customers", label: "Open customers" },
+      },
+    },
+  ];
+
+  // ── The bench ─────────────────────────────────────────────────
+  // Serialised for the board: Decimals become numbers, dates ISO strings.
+  // Anything with an unanswered bench error jumps the queue, then whatever
+  // has gone quietest (the fetch already ordered by that).
+  const activeRepairs: ActiveRepair[] = activeTickets
+    .map((t) => ({
+      id: t.id,
+      ticketNumber: t.ticketNumber,
+      deviceType: t.deviceType,
+      brand: t.brand,
+      model: t.model,
+      issueTitle: t.issueTitle,
+      status: t.status,
+      customer: t.customer?.name ?? t.customerName ?? "Walk-in",
+      technician: t.technician,
+      cost: t.finalCost
+        ? Number(t.finalCost)
+        : t.estimatedCost
+          ? Number(t.estimatedCost)
+          : null,
+      costIsQuote: !t.finalCost && t.estimatedCost !== null,
+      createdAt: t.createdAt.toISOString(),
+      updatedAt: t.updatedAt.toISOString(),
+      openIssues: t.issues.length,
+    }))
+    .sort((a, b) => Number(b.openIssues > 0) - Number(a.openIssues > 0))
+    .slice(0, 6);
+
+  const activeStageCounts = ACTIVE_STATUSES.map((status) => ({
+    status,
+    count: countByStatus[status] ?? 0,
+  })).filter((s) => s.count > 0);
+
+  // Small "right now" links — navigation, not insight, so they stay links.
+  // A technician gets the bench, not the books: the profit dashboard and the
+  // customer directory are the owner's. Everything else here — what needs
+  // confirming, what's waiting for payment, what's on the shelf — is the work.
+  const showMoney = can(user, "report:read");
+
+  const todayLinks = [
+    {
+      label: "Needs confirmation",
+      value: pendingCount,
+      href: "/admin/tickets?status=SUBMITTED",
+      icon: Inbox,
+      tone: pendingCount > 0 ? "text-warning" : "text-muted-foreground",
+      highlight: pendingCount > 0,
+    },
+    {
+      label: "Awaiting pickup",
+      value: readyCount,
+      href: "/admin/tickets?status=COMPLETED",
+      icon: Clock,
+      tone: "text-warning",
+      highlight: false,
+    },
+    ...(can(user, "customer:manage")
+      ? [
+          {
+            label: "Customers",
+            value: customerCount,
+            href: "/admin/customers",
+            icon: Users,
+            tone: "text-info",
+            highlight: false,
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
+          Shop numbers
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          {showMoney
+            ? "How the shop is doing — tap any card for the trend behind it."
+            : "What's on the bench today, and what's waiting on someone."}
+        </p>
+      </div>
+
+      {/* What's on the bench right now — the first thing the shop needs. */}
+      <ActiveRepairsBoard
+        repairs={activeRepairs}
+        total={activeCount}
+        attention={attentionCount}
+        stageCounts={activeStageCounts}
+        pendingCount={pendingCount}
+      />
+
+      {showMoney ? (
+        <OverviewDashboard
+          hero={{
+            profit,
+            profitThisMonth,
+            profitLastMonth,
+            margin: profitMargin,
+            revenue,
+            costs,
+            revenueThisMonth,
+            costsThisMonth,
+          }}
+          profitKpi={profitKpi}
+          kpis={kpis}
+          months={months}
+        />
+      ) : null}
+
+      {/* Right now */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {todayLinks.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={cn(
+              "group rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg",
+              item.highlight
+                ? "border-warning/40 bg-warning/5 hover:border-warning/60"
+                : "border-border hover:border-primary/40",
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">{item.label}</p>
+              <item.icon className={cn("size-4", item.tone)} />
+            </div>
+            <p className="font-display mt-2 text-3xl font-bold">{item.value}</p>
+            <p className="mt-1 inline-flex items-center gap-1 text-xs text-primary opacity-0 transition-opacity group-hover:opacity-100">
+              Open list <ArrowRight className="size-3" />
+            </p>
+          </Link>
+        ))}
+      </div>
+
+      {/* Two things that need chasing: money owed, devices on the shelf */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-display flex items-center gap-2 text-lg font-semibold">
+                <Banknote className="size-5 text-warning" /> Pending payment
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {unpaidCount === 0
+                  ? "Every bill is settled."
+                  : `${unpaidCount} bill${unpaidCount === 1 ? "" : "s"} · ${formatLKR(unpaidTotal)} outstanding`}
+              </p>
+            </div>
+            {unpaidCount > 0 ? (
+              <Link
+                href="/admin/tickets?status=unpaid"
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                View all <ArrowRight className="size-3.5" />
+              </Link>
+            ) : null}
+          </div>
+
+          {unpaidTickets.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
+              <BadgeCheck className="mx-auto size-6 text-success" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nothing outstanding — every invoice has been paid.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {unpaidTickets.map((ticket) => {
+                const billed = ticket.billGeneratedAt ?? ticket.createdAt;
+                const days = Math.floor(
+                  (Date.now() - billed.getTime()) / 86_400_000,
+                );
+                return (
+                  <QueueRow
+                    key={ticket.id}
+                    href={`/admin/tickets/${ticket.id}`}
+                    title={
+                      [ticket.brand, ticket.model].filter(Boolean).join(" ") ||
+                      ticket.ticketNumber
+                    }
+                    subtitle={`${ticket.customer?.name ?? ticket.customerName ?? "Walk-in"} · ${ticket.ticketNumber}`}
+                    meta={formatLKR(Number(ticket.finalCost ?? 0))}
+                    metaSub={`waiting ${waitingFor(billed)}`}
+                    urgent={days >= 7}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-display flex items-center gap-2 text-lg font-semibold">
+                <PackageCheck className="size-5 text-primary" /> Pending pickup
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {readyCount === 0
+                  ? "The shelf is clear."
+                  : `${readyCount} device${readyCount === 1 ? "" : "s"} fixed and waiting to be collected`}
+              </p>
+            </div>
+            {readyCount > 0 ? (
+              <Link
+                href="/admin/tickets?status=COMPLETED"
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                View all <ArrowRight className="size-3.5" />
+              </Link>
+            ) : null}
+          </div>
+
+          {pickupTickets.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
+              <PackageCheck className="mx-auto size-6 text-success" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nothing waiting to be collected.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {pickupTickets.map((ticket) => {
+                const since = ticket.completedAt ?? ticket.createdAt;
+                const days = Math.floor(
+                  (Date.now() - since.getTime()) / 86_400_000,
+                );
+                const settled =
+                  ticket.payments.length > 0 ||
+                  ticket.paidAt !== null ||
+                  ticket.paidAmount !== null;
+                return (
+                  <QueueRow
+                    key={ticket.id}
+                    href={`/admin/tickets/${ticket.id}`}
+                    title={
+                      [ticket.brand, ticket.model].filter(Boolean).join(" ") ||
+                      ticket.ticketNumber
+                    }
+                    subtitle={`${ticket.customer?.name ?? ticket.customerName ?? "Walk-in"} · ${ticket.ticketNumber}`}
+                    meta={settled ? "Paid" : "Unpaid"}
+                    metaSub={`ready ${waitingFor(since)}`}
+                    urgent={days >= 5}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Pipeline breakdown */}
+      {pipelineTotal > 0 ? (
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <h2 className="font-display text-lg font-semibold">Pipeline</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Where every open repair currently sits.
+          </p>
+          <div className="mt-4 flex h-3 w-full gap-0.5 overflow-hidden rounded-full">
+            {STATUS_PIPELINE.map((status) => {
+              const count = countByStatus[status] ?? 0;
+              if (count === 0) return null;
+              return (
+                <div
+                  key={status}
+                  className={cn(
+                    "h-full transition-all duration-500 hover:brightness-110",
+                    STATUS_META[status].dotClassName,
+                  )}
+                  style={{ width: `${(count / pipelineTotal) * 100}%` }}
+                  title={`${doneLabel(status)}: ${count}`}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            {STATUS_PIPELINE.map((status) => {
+              const count = countByStatus[status] ?? 0;
+              if (count === 0) return null;
+              return (
+                <span
+                  key={status}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
+                  <span
+                    className={cn(
+                      "size-2 rounded-full",
+                      STATUS_META[status].dotClassName,
+                    )}
+                  />
+                  {doneLabel(status)} · {count}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Recent tickets */}
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-lg font-semibold">Recent repairs</h2>
+          <Link
+            href="/admin/tickets"
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          >
+            All repairs <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Repair</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Device</TableHead>
+                <TableHead>Issue</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recentTickets.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="py-10 text-center text-muted-foreground"
+                  >
+                    No repairs yet — they&apos;ll appear here as customers submit
+                    repair requests.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                recentTickets.map((ticket) => (
+                  <LinkedTableRow
+                    key={ticket.id}
+                    href={`/admin/tickets/${ticket.id}`}
+                  >
+                    <TableCell className="font-mono text-xs">
+                      <Link
+                        href={`/admin/tickets/${ticket.id}`}
+                        className="hover:underline"
+                      >
+                        {ticket.ticketNumber}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {ticket.customer?.name ?? ticket.customerName ?? "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {[ticket.brand, ticket.model].filter(Boolean).join(" ") ||
+                        "—"}
+                    </TableCell>
+                    <TableCell className="max-w-50 truncate text-muted-foreground">
+                      {ticket.issueTitle}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={ticket.status} />
+                    </TableCell>
+                    <TableCell className="text-right text-xs whitespace-nowrap text-muted-foreground">
+                      {formatDate(ticket.createdAt)}
+                    </TableCell>
+                  </LinkedTableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+    </div>
+  );
+}

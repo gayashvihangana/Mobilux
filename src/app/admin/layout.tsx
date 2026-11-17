@@ -26,7 +26,7 @@ type GuardedLink = {
 };
 
 const PRIMARY_LINKS: GuardedLink[] = [
-  { href: "/admin", label: "Overview", icon: "overview" },
+  { href: "/admin", label: "Today", icon: "overview" },
   { href: "/admin/tickets", label: "Repairs", icon: "repairs" },
   { href: "/admin/customers", label: "Customers", icon: "customers", need: "customer:manage" },
   { href: "/admin/payments", label: "Payments", icon: "payments", need: "payment:verify" },
@@ -45,6 +45,7 @@ const NAV_GROUPS: (Omit<AdminNavGroup, "links"> & { links: GuardedLink[] })[] = 
   {
     label: "Insight",
     links: [
+      { href: "/admin/overview", label: "Shop numbers", hint: "Profit, success rate, pipeline", icon: "overview", need: "report:read" },
       { href: "/admin/reports", label: "Reports", hint: "Revenue & repair trends", icon: "reports", need: "report:read" },
       { href: "/admin/errors", label: "Bench errors", hint: "What went wrong, and its cost", icon: "errors", need: "report:read" },
       { href: "/admin/notes", label: "Notes", hint: "Lessons from the bench", icon: "notes", need: "report:read" },

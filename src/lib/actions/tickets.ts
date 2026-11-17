@@ -165,6 +165,7 @@ export async function createTicket(
 const adminTicketSchema = z.object({
   customerId: optionalText(50),
   customerName: optionalText(120),
+  customerPhone: optionalText(30),
   deviceType: z.enum(DEVICE_TYPES),
   brand: optionalText(60),
   model: optionalText(80),
@@ -245,6 +246,7 @@ function parseAdminTicketForm(formData: FormData) {
   return adminTicketSchema.safeParse({
     customerId: formData.get("customerId"),
     customerName: formData.get("customerName"),
+    customerPhone: formData.get("customerPhone") ?? "",
     deviceType: formData.get("deviceType"),
     brand: formData.get("brand"),
     model: formData.get("model"),
@@ -338,6 +340,16 @@ export async function adminCreateTicket(
   if (!customerId && !data.customerName) {
     return { error: "Pick a customer account or enter a customer name." };
   }
+  // A phone number that cannot be dialled is worse than none: the tracker's
+  // "last 4 digits" check and the Call / WhatsApp buttons both rely on it.
+  if (data.customerPhone) {
+    const digitCount = data.customerPhone.replace(/\D/g, "").length;
+    if (digitCount < 9 || digitCount > 15) {
+      return {
+        fieldErrors: { customerPhone: ["Enter a full phone number."] },
+      };
+    }
+  }
 
   const completedAt = resolveCompletedAt(data.status, data.completedAt);
 
@@ -348,6 +360,7 @@ export async function adminCreateTicket(
         ticketNumber,
         customerId: customerId ?? null,
         customerName: data.customerName ?? null,
+        customerPhone: data.customerPhone ?? null,
         deviceType: data.deviceType,
         brand: data.brand ?? null,
         model: data.model ?? null,
