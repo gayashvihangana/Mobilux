@@ -166,11 +166,17 @@ function historyFor(t: SeedTicket): { status: TicketStatus; note?: string; daysA
 }
 
 export async function seedDemoData(prisma: PrismaClient) {
-  // ── Shop identity — clearly fictional, so nobody mistakes this for a
-  // real shop's data. ─────────────────────────────────────────────────
+  // ── Shop identity — everything here is invented except the WhatsApp
+  // number, so nobody mistakes this for a real shop's data. ───────────
+  //
+  // The shop is named after the product rather than given a fictional
+  // trading name: this instance exists to be shown to buyers, so the name
+  // they see should be the one they're buying. It's also short, which the
+  // header needs — a long name is what made this a demo of a broken
+  // header on a phone.
   await prisma.setting.createMany({
     data: [
-      { key: "shop_name", value: "Ceylon Device Care" },
+      { key: "shop_name", value: "Mobilux" },
       { key: "shop_tagline", value: "Fix. Track. Trust. — this is a demo." },
       { key: "shop_phone", value: "0112345678" },
       { key: "shop_email", value: "hello@demo.mobilux.lk" },
@@ -182,7 +188,7 @@ export async function seedDemoData(prisma: PrismaClient) {
       // number. Everything else here stays invented.
       { key: "shop_whatsapp", value: "94719495825" },
       { key: "shop_bank_accounts", value: JSON.stringify([
-        { id: "demo-1", bankName: "Demo Bank", branch: "Colombo 03", accountName: "Ceylon Device Care", accountNumber: "0000000000" },
+        { id: "demo-1", bankName: "Demo Bank", branch: "Colombo 03", accountName: "Mobilux", accountNumber: "0000000000" },
       ]) },
       { key: "phones_storefront_visible", value: "true" },
       { key: "testimonials_section_visible", value: "true" },

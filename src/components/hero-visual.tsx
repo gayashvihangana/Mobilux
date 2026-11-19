@@ -33,7 +33,7 @@ export function HeroVisual({ brand }: { brand: ShopBrand }) {
           <div className="space-y-3 px-4 pt-1 pb-6">
             {/* Mini app header */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-1.5">
                 <span className="grid size-5 place-items-center overflow-hidden rounded-md bg-primary/15">
                   {brand.logoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -44,7 +44,9 @@ export function HeroVisual({ brand }: { brand: ShopBrand }) {
                     <Smartphone className="size-3 text-primary" />
                   )}
                 </span>
-                <span className="font-display text-xs font-bold">{brand.name}</span>
+                <span className="font-display truncate text-xs font-bold">
+                  {brand.name}
+                </span>
               </div>
               <span className="relative">
                 <Bell className="size-3.5 text-muted-foreground" />

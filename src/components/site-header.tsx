@@ -65,7 +65,7 @@ export async function SiteHeader() {
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <ThemeToggle />
             {user ? (
               <>

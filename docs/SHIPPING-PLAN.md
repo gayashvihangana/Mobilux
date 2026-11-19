@@ -396,7 +396,8 @@ seeded and verified against the real deployment.
       its own `AUTH_SECRET`. Vercel's Deployment Protection is on by
       default on a new project and had to be turned off, or the demo
       redirects every visitor to a Vercel SSO login.
-- [x] `prisma/seed-demo.ts` — a **fictional** shop ("Ceylon Device Care"),
+- [x] `prisma/seed-demo.ts` — a shop named for the product ("Mobilux") with
+      otherwise **invented** details,
       8 customers, 25 repairs across all 10 `TicketStatus` values, several
       paid bills, 7 products, 4 reviews, one open dispute (`RepairIssue`
       left `PENDING`), 3 storefront orders. Shared with the reset route via
