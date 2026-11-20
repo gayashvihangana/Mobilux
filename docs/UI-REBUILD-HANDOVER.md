@@ -62,18 +62,20 @@ Checked in the browser on 20 Nov 2026 (local database, 375px and 1366px): Today,
 
 Local testing: sign in at `/staff/login` as the demo owner (`src/lib/demo-accounts.ts`); the local database holds demo data.
 
-Left undone in step 2 on purpose: the Today hero says "Open repair" rather than changing status in one tap; there is no "returning customer" hint under the phone field; `customerPhone` is not shown or editable on the repair page yet.
+Left undone in step 2 on purpose: there is no "returning customer" hint under the phone field.
+
+Step 3, Board and repair page (done):
+- **Status meaning changed (owner's decision, option A).** A status is now what is happening *now*: DIAGNOSING means being diagnosed, AWAITING_PARTS means waiting for a part. Before, it meant the last step *finished*. `src/lib/status.ts` has one name per status (`statusLabel`); `doneLabel`, `currentActivityLabel` and `pendingLabel` are gone. Repairs that were open on the live site when this ships will each read one step earlier; the owner should check them. Finished repairs are not affected.
+- `src/app/admin/tickets/page.tsx` is the Board (columns on laptop, swipeable tabs on phone in `board-columns.tsx`), with search (REP, name, phone digits, device), and Finished and Unpaid lists, 20 per page. Old `?status=` links still work.
+- `src/components/admin/next-step-button.tsx`: the one-tap button (Board, Today, repair page) with an Undo message. "Send price" asks for the price and "needs a part" or "no part". Server side: `moveTicket` and `undoTicketMove` in `src/lib/actions/tickets.ts`; Undo uses the existing rewind, which sends the customer nothing.
+- `src/app/admin/tickets/[id]/page.tsx` is the new repair page; the "⋯" menu is in `repair-actions.tsx`. The customer's name and phone are edited there (`updateTicketContact`); Call and WhatsApp links come from `src/lib/phone.ts` (07X numbers become 947X for WhatsApp).
+- New colour tokens `warning-soft`, `warning-tint` and `amber` for the sample's soft amber; `--warning` stays the darker orange for text.
 
 ## Steps left
 
-1. **Check steps 1 and 2 in the browser** at phone and laptop sizes and fix what is broken.
-2. **Step 3, Board and repair page** as described above. Also:
-   - Show and edit `customerPhone`, with Call (`tel:`) and WhatsApp (`wa.me`) links.
-   - One-tap next step on the Board cards and the Today hero. Status changes notify the customer, so make them easy to undo.
-   - One status wording everywhere. `src/lib/status.ts` deliberately has three label forms: `doneLabel` (for example "Repair Started"), the current activity (`currentActivityLabel`, for example "Repairing") and `pendingLabel`. Lists currently show `doneLabel` while the detail page shows the activity, so the same repair reads differently. Use the current activity everywhere, including the public tracking page and the bill. Note COMPLETED is the shop's "Ready for pickup" step and READY_FOR_PICKUP is a legacy status treated as COMPLETED.
-3. **Step 4, homepage** as described above. Also fix the sideways scroll on phones (the slide-in animations and glow blobs make the page 399px wide on a 375px screen) and the WhatsApp button overlapping the footer.
-4. **Step 5, the rest of the admin pages** restyled. The admin header is still the old top bar with a More menu.
-5. **Step 6, Settings** as described above.
+1. **Step 4, homepage** as described above. Also fix the sideways scroll on phones (the slide-in animations and glow blobs make the page 399px wide on a 375px screen) and the WhatsApp button overlapping the footer.
+2. **Step 5, the rest of the admin pages** restyled. The admin header is still the old top bar with a More menu.
+3. **Step 6, Settings** as described above.
 
 Other known problems: the seven shop products are the sample products from `prisma/seed.ts`; Settings still says "Colombo, Sri Lanka" (the owner can change it himself).
 

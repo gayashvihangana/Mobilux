@@ -14,7 +14,7 @@ import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
 import {
-  doneLabel,
+  statusLabel,
   isRewind,
   milestoneDescription,
   pickupNote,
@@ -162,6 +162,14 @@ export async function createTicket(
   revalidatePath("/dashboard");
   revalidatePath("/admin");
   redirect(`/repairs/${ticket.id}?created=1`);
+}
+
+// A phone number that cannot be dialled is worse than none: the tracker's
+// "last 4 digits" check and the Call / WhatsApp buttons both rely on it.
+function phoneError(phone: string | undefined): string | null {
+  if (!phone) return null;
+  const digitCount = phone.replace(/\D/g, "").length;
+  return digitCount < 9 || digitCount > 15 ? "Enter a full phone number." : null;
 }
 
 // ── Admin: manual repair log ─────────────────────────────────────
@@ -344,16 +352,8 @@ export async function adminCreateTicket(
   if (!customerId && !data.customerName) {
     return { error: "Pick a customer account or enter a customer name." };
   }
-  // A phone number that cannot be dialled is worse than none: the tracker's
-  // "last 4 digits" check and the Call / WhatsApp buttons both rely on it.
-  if (data.customerPhone) {
-    const digitCount = data.customerPhone.replace(/\D/g, "").length;
-    if (digitCount < 9 || digitCount > 15) {
-      return {
-        fieldErrors: { customerPhone: ["Enter a full phone number."] },
-      };
-    }
-  }
+  const badPhone = phoneError(data.customerPhone);
+  if (badPhone) return { fieldErrors: { customerPhone: [badPhone] } };
 
   const completedAt = resolveCompletedAt(data.status, data.completedAt);
 
@@ -971,7 +971,8 @@ export async function deleteStatusUpdate(
 const updateStatusSchema = z.object({
   ticketId: z.string().min(1),
   status: z.enum(TICKET_STATUSES),
-  note: z.string().trim().max(500).optional().or(z.literal("")),
+  // nullish: the one-tap buttons send no note field at all.
+  note: z.string().trim().max(500).nullish().or(z.literal("")).transform((v) => v || undefined),
 });
 
 // Items logged by the Mark-as-Received dialog ("what did the customer hand
@@ -1208,7 +1209,7 @@ export async function updateTicketStatus(
         { label: "Repair", value: ticket.ticketNumber },
         { label: "Device", value: hasDevice ? deviceName : "" },
         { label: "Issue", value: ticket.issueTitle },
-        { label: "Status", value: doneLabel(status as TicketStatus) },
+        { label: "Status", value: statusLabel(status as TicketStatus) },
       ],
       lines: [`Hi ${ticket.customer.name},`, message],
       cta: {
@@ -1223,6 +1224,137 @@ export async function updateTicketStatus(
   revalidatePath("/admin");
   revalidatePath(`/repairs/${ticketId}`);
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+// ── Admin: one-tap next step, and its undo ───────────────────────
+
+export type MoveResult =
+  | { ok: true; from: TicketStatus; to: TicketStatus }
+  | { ok: false; error: string };
+
+/**
+ * The Board and Today buttons: move a repair to `status` in one tap, going
+ * through the same path as the status form (timeline entry, customer
+ * notification and email). Returns the status it came from so the button can
+ * offer Undo. "Send price" also saves the quoted price.
+ */
+export async function moveTicket(input: {
+  ticketId: string;
+  status: TicketStatus;
+  estimatedCost?: number;
+}): Promise<MoveResult> {
+  if (!(await actionPermission("repair:write"))) {
+    return { ok: false, error: "Not authorized." };
+  }
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: input.ticketId },
+    select: { status: true },
+  });
+  if (!ticket) return { ok: false, error: "Repair not found." };
+  if (isRewind(ticket.status, input.status)) {
+    return { ok: false, error: "This repair has already moved on. Refresh the page." };
+  }
+
+  if (input.estimatedCost !== undefined) {
+    const price = Number(input.estimatedCost);
+    if (!Number.isFinite(price) || price < 0) {
+      return { ok: false, error: "Enter a price of 0 or more." };
+    }
+    await prisma.repairTicket.update({
+      where: { id: input.ticketId },
+      data: { estimatedCost: Math.round(price) },
+    });
+  }
+
+  const form = new FormData();
+  form.set("ticketId", input.ticketId);
+  form.set("status", input.status);
+  const result = await updateTicketStatus(null, form);
+  if (!result?.success) {
+    return { ok: false, error: result?.error ?? "Could not update the repair." };
+  }
+  return { ok: true, from: ticket.status, to: input.status };
+}
+
+/**
+ * Undo for a one-tap move: steps the repair back to `to`. Uses the rewind
+ * path, so the timeline entry just added is removed and the customer gets no
+ * new message (an email that already went out cannot be recalled).
+ */
+export async function undoTicketMove(input: {
+  ticketId: string;
+  to: TicketStatus;
+}): Promise<MoveResult> {
+  if (!(await actionPermission("repair:write"))) {
+    return { ok: false, error: "Not authorized." };
+  }
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: input.ticketId },
+    select: { status: true },
+  });
+  if (!ticket) return { ok: false, error: "Repair not found." };
+  if (!isRewind(ticket.status, input.to)) {
+    return { ok: false, error: "Nothing to undo — the repair has changed since." };
+  }
+  const form = new FormData();
+  form.set("ticketId", input.ticketId);
+  form.set("status", input.to);
+  const result = await updateTicketStatus(null, form);
+  if (!result?.success) {
+    return { ok: false, error: result?.error ?? "Could not undo." };
+  }
+  return { ok: true, from: ticket.status, to: input.to };
+}
+
+// ── Admin: the customer's name and phone on a repair ─────────────
+
+const contactSchema = z.object({
+  ticketId: z.string().min(1),
+  customerName: optionalText(120),
+  customerPhone: optionalText(30),
+});
+
+export async function updateTicketContact(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  if (!(await actionPermission("repair:write"))) {
+    return { error: "Not authorized." };
+  }
+  const parsed = contactSchema.safeParse({
+    ticketId: formData.get("ticketId"),
+    customerName: formData.get("customerName"),
+    customerPhone: formData.get("customerPhone"),
+  });
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const { ticketId, customerName, customerPhone } = parsed.data;
+
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: ticketId },
+    select: { customerId: true },
+  });
+  if (!ticket) return { error: "Repair not found." };
+  // A walk-in is known only by the name typed here, so it cannot be blank.
+  if (!ticket.customerId && !customerName) {
+    return { fieldErrors: { customerName: ["Enter the customer's name."] } };
+  }
+  const badPhone = phoneError(customerPhone);
+  if (badPhone) return { fieldErrors: { customerPhone: [badPhone] } };
+
+  await prisma.repairTicket.update({
+    where: { id: ticketId },
+    data: {
+      ...(ticket.customerId ? {} : { customerName: customerName ?? null }),
+      customerPhone: customerPhone ?? null,
+    },
+  });
+
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
   return { success: true };
 }
 

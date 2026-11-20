@@ -18,7 +18,7 @@ import { FieldError } from "@/components/forms/field-error";
 import { FormAutosave } from "@/components/forms/form-autosave";
 import { PartsEditor } from "@/components/forms/parts-editor";
 import { adminCreateTicket } from "@/lib/actions/tickets";
-import { DEVICE_TYPES, doneLabel, STATUS_PIPELINE } from "@/lib/status";
+import { DEVICE_TYPES, statusLabel, STATUS_PIPELINE } from "@/lib/status";
 
 export type CustomerOption = { id: string; name: string; email: string };
 
@@ -177,7 +177,7 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
                 .filter((value) => value !== "SUBMITTED" && value !== "CONFIRMED")
                 .map((value) => (
                   <SelectItem key={value} value={value}>
-                    {doneLabel(value)}
+                    {statusLabel(value)}
                   </SelectItem>
                 ))}
             </SelectContent>

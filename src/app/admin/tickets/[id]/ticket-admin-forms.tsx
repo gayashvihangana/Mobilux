@@ -10,6 +10,7 @@ import {
   Link2,
   Loader2,
   Package,
+  Pencil,
   Plus,
   Trash2,
   TriangleAlert,
@@ -50,6 +51,7 @@ import {
   withdrawRepairIssue,
   updateBillNotes,
   updateTicketDetails,
+  updateTicketContact,
   updateTicketStatus,
   type TicketFormState,
 } from "@/lib/actions/tickets";
@@ -63,7 +65,8 @@ import type { PartEntry } from "@/lib/parts";
 import { cn, formatDateTime, formatLKR } from "@/lib/utils";
 import {
   DEVICE_TYPES,
-  doneLabel,
+  NEXT_STEP_ACTION,
+  statusLabel,
   nextStatus,
   prevStatus,
   STATUS_PIPELINE,
@@ -97,27 +100,19 @@ function FormError({ state }: { state: TicketFormState }) {
 // else. CANCELLED is reached via the dedicated Cancel button instead.
 const STATUS_OPTIONS = STATUS_PIPELINE.map((value) => ({
   value,
-  label: doneLabel(value),
+  label: statusLabel(value),
 }));
 
-// Description shown under each forward button, keyed by the status the
-// ticket is leaving. The button's TITLE is derived from the milestone it
-// creates — doneLabel(next) — so "click X → an X entry appears" always
-// holds. These lines just say plainly what the click does.
+// What the forward button does, keyed by the status the repair is leaving.
+// The button's title is the same action name the Board uses.
 const STEP_DESCRIPTION: Partial<Record<TicketStatus, string>> = {
   CONFIRMED: "The device has arrived at the shop.",
-  RECEIVED: "You've identified the fault.",
-  DIAGNOSING: "Replacement parts are in.",
-  AWAITING_PARTS: "Repair work is starting.",
-  IN_PROGRESS: "Repair finished and tested — the customer can come and collect.",
+  RECEIVED: "Start finding out what is wrong.",
+  DIAGNOSING: "A replacement part is on order.",
+  AWAITING_PARTS: "The part is in — start the repair.",
+  IN_PROGRESS: "Repaired and tested — the customer can come and collect.",
   COMPLETED: "Device handed back to the customer.",
   READY_FOR_PICKUP: "Device handed back to the customer.",
-};
-
-// A nicer verb for the one transition where "Mark as Repair Started"
-// would read awkwardly.
-const STEP_TITLE_OVERRIDE: Partial<Record<TicketStatus, string>> = {
-  AWAITING_PARTS: "Start Repair",
 };
 
 export function StatusUpdateForm({
@@ -197,7 +192,7 @@ export function StatusUpdateForm({
               ) : (
                 <CheckCircle2 className="size-4" />
               )}
-              {STEP_TITLE_OVERRIDE[currentStatus] ?? `Mark as ${doneLabel(next)}`}
+              {NEXT_STEP_ACTION[currentStatus] ?? `Move to ${statusLabel(next)}`}
             </span>
             {STEP_DESCRIPTION[currentStatus] ? (
               <span className="text-xs font-normal opacity-80">
@@ -225,12 +220,12 @@ export function StatusUpdateForm({
               disabled={pending}
             >
               <Undo2 className="size-3.5" />
-              Go back to {doneLabel(prev)}
+              Go back to {statusLabel(prev)}
             </Button>
             {/* Going back rewinds rather than appends, so the admin is
                 deleting history — say so before they click, not after. */}
-            <p className="text-center text-[11px] text-muted-foreground">
-              Rewinds the timeline: the steps after {doneLabel(prev)} are
+            <p className="text-center text-xs text-muted-foreground">
+              Rewinds the timeline: the steps after {statusLabel(prev)} are
               deleted, notes and all. The customer isn&apos;t notified.
             </p>
           </div>
@@ -250,7 +245,7 @@ export function StatusUpdateForm({
             <Label htmlFor="status" className="text-xs text-muted-foreground">
               Set any status directly
             </Label>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Jumping forward adds a step. Jumping back rewinds — everything
               after that step is deleted from the timeline.
             </p>
@@ -307,7 +302,14 @@ type ReceivedDraft = {
 // tempered glass…) with a short detail per item (SIM operator, cover
 // colour…). Items are saved on the ticket and, when no custom note is
 // written, become the timeline note the customer sees.
-function MarkReceivedDialog({ ticketId }: { ticketId: string }) {
+export function MarkReceivedDialog({
+  ticketId,
+  trigger,
+}: {
+  ticketId: string;
+  /** Replaces the default two-line button, e.g. the header's main button. */
+  trigger?: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(updateTicketStatus, null);
   useSuccessToast(state, "Marked as Received — items logged.");
@@ -353,6 +355,7 @@ function MarkReceivedDialog({ ticketId }: { ticketId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
+        {trigger ?? (
         <Button
           type="button"
           className="h-auto w-full flex-col items-start gap-0.5 py-3 text-left whitespace-normal"
@@ -364,6 +367,7 @@ function MarkReceivedDialog({ ticketId }: { ticketId: string }) {
             The device has arrived — log what came in with it.
           </span>
         </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <form action={formAction} className="space-y-4">
@@ -943,11 +947,19 @@ export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
 export function DeleteTicketDialog({
   ticketId,
   ticketNumber,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   ticketId: string;
   ticketNumber: string;
+  /** Opened from a menu: the dialog renders without its own button. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const controlled = controlledOpen !== undefined;
+  const open = controlled ? controlledOpen : ownOpen;
+  const setOpen = controlled ? (onOpenChange ?? (() => {})) : setOwnOpen;
   const [state, formAction, pending] = useActionState(deleteTicket, null);
 
   useEffect(() => {
@@ -956,15 +968,13 @@ export function DeleteTicketDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-destructive hover:text-destructive"
-        >
-          <Trash2 className="size-4" /> Delete record
-        </Button>
-      </DialogTrigger>
+      {controlled ? null : (
+        <DialogTrigger asChild>
+          <Button variant="outline" className="text-destructive hover:text-destructive">
+            <Trash2 className="size-4" /> Delete record
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form action={formAction} className="space-y-4">
           <input type="hidden" name="ticketId" value={ticketId} />
@@ -994,6 +1004,146 @@ export function DeleteTicketDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+// Cancel from the repair page's menu. A reason is required: it is shown to
+// the customer and printed on the bill.
+export function CancelRepairDialog({
+  ticketId,
+  open,
+  onOpenChange,
+}: {
+  ticketId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [state, formAction, pending] = useActionState(updateTicketStatus, null);
+  useSuccessToast(state, "Repair cancelled.");
+  useEffect(() => {
+    if (state?.success) onOpenChange(false);
+  }, [state, onOpenChange]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <input type="hidden" name="status" value="CANCELLED" />
+          <DialogHeader>
+            <DialogTitle>Cancel this repair?</DialogTitle>
+            <DialogDescription>
+              The customer sees the reason, and it is printed on the bill.
+            </DialogDescription>
+          </DialogHeader>
+          <FormError state={state} />
+          <div className="space-y-1.5">
+            <Label htmlFor="cancel-reason">Reason</Label>
+            <Textarea
+              id="cancel-reason"
+              name="note"
+              rows={3}
+              required
+              placeholder="e.g. Customer decided not to go ahead — the repair cost too much."
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Keep repair
+            </Button>
+            <Button type="submit" variant="destructive" disabled={pending}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : <Ban className="size-4" />}
+              Cancel repair
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit the customer's name and phone on a repair. The phone is what the
+// Call / WhatsApp buttons and the tracker's "last 4 digits" use.
+export function ContactEditDialog({
+  ticketId,
+  customerName,
+  customerPhone,
+  hasAccount,
+}: {
+  ticketId: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  /** Linked to an account: the name comes from the account, not from here. */
+  hasAccount: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(updateTicketContact, null);
+  useSuccessToast(state, "Customer details saved.");
+  useEffect(() => {
+    if (state?.success) setOpen(false);
+  }, [state]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Edit name and phone">
+          <Pencil />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <form action={formAction} className="space-y-4">
+          <input type="hidden" name="ticketId" value={ticketId} />
+          <DialogHeader>
+            <DialogTitle>Customer details</DialogTitle>
+            <DialogDescription>
+              Used for Call, WhatsApp and the tracker&apos;s last-4-digits check.
+            </DialogDescription>
+          </DialogHeader>
+          <FormError state={state} />
+          {hasAccount ? null : (
+            <div className="space-y-1.5">
+              <Label htmlFor="contact-name">Name</Label>
+              <Input
+                id="contact-name"
+                name="customerName"
+                required
+                defaultValue={customerName ?? ""}
+                autoComplete="off"
+              />
+              <FieldMessage errors={state?.fieldErrors?.customerName} />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="contact-phone">Phone number</Label>
+            <Input
+              id="contact-phone"
+              name="customerPhone"
+              type="tel"
+              inputMode="tel"
+              defaultValue={customerPhone ?? ""}
+              placeholder="07X XXX XXXX"
+              autoComplete="off"
+            />
+            <FieldMessage errors={state?.fieldErrors?.customerPhone} />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Close
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Save
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FieldMessage({ errors }: { errors?: string[] }) {
+  if (!errors?.length) return null;
+  return <p className="text-sm text-destructive">{errors[0]}</p>;
 }
 
 export function LinkCustomerForm({

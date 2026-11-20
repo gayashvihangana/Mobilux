@@ -15,9 +15,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteStatusUpdate, updateStatusNote } from "@/lib/actions/tickets";
-import { IssueRow, issueEvents, PendingRow } from "@/components/status-timeline";
+import {
+  entryDescription,
+  IssueRow,
+  issueEvents,
+  PendingRow,
+} from "@/components/status-timeline";
 import type { IssueSummary } from "@/lib/repair-issue";
-import { doneLabel, milestoneDescription, STATUS_META } from "@/lib/status";
+import { statusLabel, milestoneDescription, STATUS_META } from "@/lib/status";
 import type { TicketStatus } from "@prisma/client";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -101,11 +106,11 @@ function DeleteConfirm({
           <input type="hidden" name="updateId" value={update.id} />
           <DialogHeader>
             <DialogTitle>
-              Delete the “{doneLabel(update.status)}” entry?
+              Delete the “{statusLabel(update.status)}” entry?
             </DialogTitle>
             <DialogDescription>
               {isNewest && rollbackTo
-                ? `This is the latest entry, so the repair will roll back to “${doneLabel(rollbackTo)}” — the status card and the pipeline bar will follow.`
+                ? `This is the latest entry, so the repair will roll back to “${statusLabel(rollbackTo)}” — the status card and the pipeline bar will follow.`
                 : "This removes the entry and its note from the timeline. The steps after it stay exactly as they are, so the repair will NOT roll back to this step."}
             </DialogDescription>
           </DialogHeader>
@@ -187,12 +192,9 @@ export function EditableStatusHistory({
 
   return (
     <ol className="space-y-0">
-      {status ? (
-        <PendingRow
-          status={status}
-          issuePending={!!issues?.some((i) => i.status === "PENDING")}
-        />
-      ) : null}
+      <PendingRow
+        issuePending={!!issues?.some((i) => i.status === "PENDING")}
+      />
       {rows.map((row, index) => {
         const withLine = index < rows.length - 1;
         if (row.kind === "issue") {
@@ -229,7 +231,7 @@ export function EditableStatusHistory({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className={cn("text-sm font-semibold", latest && "text-foreground")}>
-                  {doneLabel(update.status)}
+                  {statusLabel(update.status)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTime(update.createdAt)}
@@ -242,8 +244,8 @@ export function EditableStatusHistory({
                         setDeletingId(null);
                         setEditingId(update.id);
                       }}
-                      className="rounded-md p-1 text-muted-foreground opacity-60 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                      aria-label={`Edit note for ${doneLabel(update.status)}`}
+                      className="grid size-11 place-items-center rounded-lg text-muted-foreground opacity-60 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                      aria-label={`Edit note for ${statusLabel(update.status)}`}
                     >
                       <Pencil className="size-3.5" />
                     </button>
@@ -254,8 +256,8 @@ export function EditableStatusHistory({
                         setEditingId(null);
                         setDeletingId(update.id);
                       }}
-                      className="rounded-md p-1 text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                      aria-label={`Delete ${doneLabel(update.status)} entry`}
+                      className="grid size-11 place-items-center rounded-lg text-muted-foreground opacity-60 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                      aria-label={`Delete ${statusLabel(update.status)} entry`}
                     >
                       <Trash2 className="size-3.5" />
                     </button>
@@ -267,7 +269,11 @@ export function EditableStatusHistory({
               ) : (
                 <>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    {update.note ?? milestoneDescription(update.status)}
+                    {update.note ??
+                      entryDescription(
+                        update.status,
+                        update.id === newestUpdateId && update.status === status,
+                      )}
                   </p>
                   {update.photo ? (
                     <a

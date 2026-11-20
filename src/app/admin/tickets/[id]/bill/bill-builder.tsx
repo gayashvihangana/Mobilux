@@ -45,7 +45,7 @@ import {
   type BillTicket,
 } from "@/lib/bill";
 import { BANK_DETAILS } from "@/lib/config";
-import { doneLabel } from "@/lib/status";
+import { statusLabel } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import {
   generateBill,
@@ -543,7 +543,7 @@ export function BillBuilder({
     {
       device:
         [bill.brand, bill.model].filter(Boolean).join(" ") || "Not recorded",
-      status: doneLabel(bill.status),
+      status: statusLabel(bill.status),
       notes: bill.billNotes?.trim() || "None added yet",
       track: `Ticket ${bill.ticketNumber}`,
     };

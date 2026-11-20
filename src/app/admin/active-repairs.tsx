@@ -13,8 +13,7 @@ import {
   Wrench,
 } from "lucide-react";
 import {
-  currentActivityLabel,
-  doneLabel,
+  statusLabel,
   STATUS_META,
   STATUS_PIPELINE,
   statusRank,
@@ -113,7 +112,7 @@ function PipelineTrack({
       {STATUS_PIPELINE.map((step, i) => (
         <span
           key={step}
-          title={doneLabel(step)}
+          title={statusLabel(step)}
           className={cn(
             "h-1.5 flex-1 rounded-full transition-all duration-500",
             i < rank && "bg-muted-foreground/40",
@@ -208,7 +207,7 @@ function RepairCard({ repair, index }: { repair: ActiveRepair; index: number }) 
             />
             <span className={cn("relative size-1.5 rounded-full", tone.fill)} />
           </span>
-          {currentActivityLabel(repair.status)}
+          {statusLabel(repair.status)}
         </span>
         {repair.technician ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
@@ -338,7 +337,7 @@ export function ActiveRepairsBoard({
                   STATUS_META[status].dotClassName,
                 )}
               />
-              {doneLabel(status)}
+              {statusLabel(status)}
               <span className="font-semibold tabular-nums text-foreground">
                 {count}
               </span>

@@ -14,7 +14,7 @@ import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { LinkedTableRow } from "@/components/linked-table-row";
 import { StatusBadge } from "@/components/status-badge";
-import { doneLabel, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
+import { statusLabel, STATUS_META, STATUS_PIPELINE } from "@/lib/status";
 import { issuePartsCostOf, parseParts } from "@/lib/parts";
 import {
   Table,
@@ -383,7 +383,7 @@ export default async function AdminOverviewPage() {
     .slice(0, 5);
 
   const pipelineBreakdown = STATUS_PIPELINE.map((status) => ({
-    label: doneLabel(status),
+    label: statusLabel(status),
     value: countByStatus[status] ?? 0,
   })).filter((s) => s.value > 0);
 
@@ -916,7 +916,7 @@ export default async function AdminOverviewPage() {
                     STATUS_META[status].dotClassName,
                   )}
                   style={{ width: `${(count / pipelineTotal) * 100}%` }}
-                  title={`${doneLabel(status)}: ${count}`}
+                  title={`${statusLabel(status)}: ${count}`}
                 />
               );
             })}
@@ -936,7 +936,7 @@ export default async function AdminOverviewPage() {
                       STATUS_META[status].dotClassName,
                     )}
                   />
-                  {doneLabel(status)} · {count}
+                  {statusLabel(status)} · {count}
                 </span>
               );
             })}

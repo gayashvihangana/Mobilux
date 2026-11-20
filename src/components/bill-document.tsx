@@ -5,7 +5,7 @@ import {
   type BillPayTo,
   type BillTicket,
 } from "@/lib/bill";
-import { doneLabel } from "@/lib/status";
+import { statusLabel } from "@/lib/status";
 import { formatDate, formatLKR, formatPhoneIntl, formatTime } from "@/lib/utils";
 
 export type { BillTicket };
@@ -170,7 +170,7 @@ export function BillDocument({
               <div className="flex gap-2 sm:justify-end">
                 <span className="text-neutral-400">Status:</span>
                 <span className="font-semibold text-neutral-800">
-                  {doneLabel(ticket.status)}
+                  {statusLabel(ticket.status)}
                 </span>
               </div>
             ) : null}

@@ -119,7 +119,6 @@ export default async function RepairDetailPage({
         <div className="flex flex-col items-end gap-2">
           <StatusBadge
             status={ticket.status}
-            activity
             className="px-3 py-1.5 text-sm"
           />
           {ticket.finalCost ? (

@@ -4,9 +4,11 @@ import { ArrowRight, Plus } from "lucide-react";
 import { requireStaff } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import { currentActivityLabel, statusRank } from "@/lib/status";
+import { statusLabel, statusRank } from "@/lib/status";
 import { cn, formatLKR } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { NextStepButton } from "@/components/admin/next-step-button";
+import { PhoneGlyph } from "@/components/admin/phone-glyph";
 import { QuickRepairForm } from "./tickets/new/quick-repair-form";
 
 export const metadata: Metadata = {
@@ -74,25 +76,6 @@ function greeting(now: Date) {
   return "Good evening";
 }
 
-// A plain phone outline, standing in until repairs carry their own photo.
-function PhoneGlyph({
-  className,
-  body = "fill-ink",
-  screen = "fill-card",
-}: {
-  className?: string;
-  body?: string;
-  screen?: string;
-}) {
-  return (
-    <svg viewBox="0 0 40 72" aria-hidden="true" className={className}>
-      <rect x="2" y="2" width="36" height="68" rx="8" className={body} />
-      <rect x="6" y="6" width="28" height="60" rx="5" className={screen} />
-      <rect x="15" y="9" width="10" height="3" rx="1.5" className={body} />
-    </svg>
-  );
-}
-
 export default async function TodayPage() {
   const user = await requireStaff();
   const showMoney = can(user, "report:read");
@@ -111,6 +94,7 @@ export default async function TodayPage() {
           model: true,
           issueTitle: true,
           status: true,
+          estimatedCost: true,
           createdAt: true,
           updatedAt: true,
           customerName: true,
@@ -243,20 +227,27 @@ export default async function TodayPage() {
               </h2>
               <p className="max-w-[26ch] text-base text-ink-foreground/80 sm:max-w-[34ch]">
                 {next.issueTitle} · {ownerName(next)} ·{" "}
-                {currentActivityLabel(next.status)}, {dayOf(next.createdAt, now)}
+                {statusLabel(next.status)}, {dayOf(next.createdAt, now)}
               </p>
               <div className="mt-2 flex flex-wrap gap-2.5">
-                <Button asChild size="lg">
-                  <Link href={`/admin/tickets/${next.id}`}>
-                    Open repair <ArrowRight />
-                  </Link>
-                </Button>
+                <NextStepButton
+                  ticketId={next.id}
+                  status={next.status}
+                  deviceName={deviceName(next)}
+                  estimatedCost={
+                    next.estimatedCost ? Number(next.estimatedCost) : null
+                  }
+                  tone="primary"
+                  size="lg"
+                />
                 <Button
                   asChild
                   size="lg"
                   className="bg-ink-foreground/15 text-ink-foreground hover:bg-ink-foreground/25"
                 >
-                  <Link href="/admin/tickets">All repairs</Link>
+                  <Link href={`/admin/tickets/${next.id}`}>
+                    Open repair <ArrowRight />
+                  </Link>
                 </Button>
               </div>
               <PhoneGlyph
@@ -342,7 +333,7 @@ export default async function TodayPage() {
               className={cn(
                 "flex flex-col gap-1 rounded-[1.75rem] p-5 transition-opacity hover:opacity-90",
                 unpaid._count._all > 0
-                  ? "bg-warning/15 text-foreground"
+                  ? "bg-warning-soft text-foreground"
                   : "bg-card",
               )}
             >
@@ -427,13 +418,13 @@ export default async function TodayPage() {
                   href={`/admin/tickets/${t.id}`}
                   className={cn(
                     "flex items-center gap-3 rounded-2xl p-2 transition-colors",
-                    stale ? "bg-warning/10 hover:bg-warning/15" : "hover:bg-accent",
+                    stale ? "bg-warning-soft hover:bg-warning-tint" : "hover:bg-accent",
                   )}
                 >
                   <span
                     className={cn(
                       "grid size-13 shrink-0 place-items-center rounded-xl",
-                      stale ? "bg-warning/25" : "bg-accent",
+                      stale ? "bg-warning-tint" : "bg-accent",
                     )}
                   >
                     <PhoneGlyph className="h-9" screen="fill-primary/60" />
@@ -450,7 +441,7 @@ export default async function TodayPage() {
                           : "text-muted-foreground",
                       )}
                     >
-                      {currentActivityLabel(t.status)} · {dayOf(t.createdAt, now)}
+                      {statusLabel(t.status)} · {dayOf(t.createdAt, now)}
                     </span>
                   </span>
                 </Link>

@@ -36,6 +36,11 @@
   --ink-foreground: #ffffff;
   --success: oklch(0.527 0.137 150);
   --warning: oklch(0.554 0.147 55);
+  /* Soft amber surfaces for "waiting" (the approved samples). --warning stays
+     the dark orange used for text, which needs AA contrast. */
+  --warning-soft: #fff4d6;
+  --warning-tint: #ffe9a8;
+  --amber: #f2b705;
   --info: oklch(0.5 0.105 237);
 
   /* theme-tuned effect variables */
@@ -76,6 +81,9 @@
   --ink-foreground: #0b1b33;
   --success: oklch(0.723 0.16 150);
   --warning: oklch(0.75 0.155 65);
+  --warning-soft: oklch(0.27 0.045 80);
+  --warning-tint: oklch(0.36 0.07 80);
+  --amber: oklch(0.8 0.15 85);
   --info: oklch(0.746 0.13 230);
 
   --glass-bg: oklch(0.185 0.024 260 / 65%);
@@ -130,6 +138,9 @@
   --color-ink-foreground: var(--ink-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-tint: var(--warning-tint);
+  --color-amber: var(--amber);
   --color-info: var(--info);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

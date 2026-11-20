@@ -2,81 +2,75 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ArrowLeft,
-  Banknote,
-  Eye,
-  Inbox,
-  Mail,
-  NotebookPen,
-  Phone,
-  Receipt,
-  User,
-  UserX,
-  Wrench,
-} from "lucide-react";
+import { ArrowLeft, Mail, MessageCircle, Phone, Send, X } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { StatusBadge } from "@/components/status-badge";
 import { TrackingLink } from "@/components/tracking-link";
 import { trackUrl } from "@/lib/track-qr";
 import { StatusStepper } from "@/components/status-timeline";
-import { EditableStatusHistory } from "./editable-status-history";
+import { PhoneGlyph } from "@/components/admin/phone-glyph";
 import { JournalNote } from "@/components/journal-note";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DEVICE_TYPES, doneLabel } from "@/lib/status";
+import { DEVICE_TYPES, isRewind, prevStatus, statusLabel } from "@/lib/status";
 import { parseReceivedItems } from "@/lib/received-items";
 import { parseParts, partsTotalCost, partsWithFallback } from "@/lib/parts";
 import { issueChip } from "@/lib/repair-issue";
+import { telHref, whatsappHref } from "@/lib/phone";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
-import { getShopInfo } from "@/lib/settings";
+import { EditableStatusHistory } from "./editable-status-history";
+import { MainAction, RepairMenu } from "./repair-actions";
 import {
   AcceptTicketForm,
   BillNotesForm,
-  DeleteTicketDialog,
+  ContactEditDialog,
   LinkCustomerForm,
   RepairIssuePanel,
-  StatusUpdateForm,
   TicketDetailsForm,
 } from "./ticket-admin-forms";
 
 export const metadata: Metadata = {
-  title: "Ticket details",
+  title: "Repair",
 };
+
+const TERMINAL = ["PICKED_UP", "CANCELLED"];
 
 function toDateInput(date: Date | null) {
   if (!date) return null;
   return date.toISOString().slice(0, 10);
 }
 
+function initials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
+}
+
+const rupees = (value: number) => formatLKR(Math.round(value));
+
+// The repair page: a blue header card with the one main action, the six
+// steps in words, then who the customer is and what the money looks like.
+// The timeline, bench issues, bill notes and payments follow below. On a
+// phone the main action moves to a bar fixed at the bottom of the screen.
 export default async function AdminTicketDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; edit?: string }>;
 }) {
-  const [{ id }, { created }] = await Promise.all([params, searchParams]);
+  const [{ id }, { created, edit }] = await Promise.all([params, searchParams]);
 
-  const [ticket, customers, shop] = await Promise.all([
+  const [ticket, customers] = await Promise.all([
     prisma.repairTicket.findUnique({
       where: { id },
       include: {
         customer: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            completedRepairs: true,
-          },
+          select: { id: true, name: true, email: true, phone: true },
         },
         statusUpdates: { orderBy: { createdAt: "desc" } },
         issues: { orderBy: { reportedAt: "asc" } },
@@ -88,16 +82,35 @@ export default async function AdminTicketDetailPage({
       select: { id: true, name: true, email: true },
       orderBy: { name: "asc" },
     }),
-    getShopInfo(),
   ]);
   if (!ticket) notFound();
+
+  // Earlier repairs for the same person: the same account, or the same
+  // phone number for walk-ins.
+  const sameCustomer = [
+    ...(ticket.customerId ? [{ customerId: ticket.customerId }] : []),
+    ...(ticket.customerPhone ? [{ customerPhone: ticket.customerPhone }] : []),
+  ];
+  const earlierRepairs =
+    sameCustomer.length > 0
+      ? await prisma.repairTicket.count({
+          where: {
+            id: { not: ticket.id },
+            createdAt: { lt: ticket.createdAt },
+            OR: sameCustomer,
+          },
+        })
+      : 0;
 
   const deviceLabel =
     DEVICE_TYPES.find((d) => d.value === ticket.deviceType)?.label ?? "Device";
   const deviceName =
     [ticket.brand, ticket.model].filter(Boolean).join(" ") ||
     `Unknown ${deviceLabel.toLowerCase()}`;
-  const ownerName = ticket.customer?.name ?? ticket.customerName ?? "Unknown";
+  const ownerName = ticket.customer?.name ?? ticket.customerName ?? "Walk-in";
+  const phone = ticket.customerPhone || ticket.customer?.phone || null;
+  const link = trackUrl(ticket.trackToken);
+  const firstName = ownerName.split(/\s+/)[0];
 
   // Quick-insert chips for the bill-notes editor: the diagnosis and
   // cancellation notes first (the two most-wanted), then any other note
@@ -113,7 +126,7 @@ export default async function AdminTicketDetailPage({
       .filter(
         (u) => u.note && u.status !== "DIAGNOSING" && u.status !== "CANCELLED",
       )
-      .map((u) => ({ label: doneLabel(u.status), text: u.note as string })),
+      .map((u) => ({ label: statusLabel(u.status), text: u.note as string })),
   ];
 
   const receivedItems = parseReceivedItems(ticket.receivedItems);
@@ -135,533 +148,510 @@ export default async function AdminTicketDetailPage({
     0,
   );
 
+  // ── Money ──────────────────────────────────────────────────────
+  const quoted = ticket.estimatedCost ? Number(ticket.estimatedCost) : null;
+  const billed = ticket.finalCost ? Number(ticket.finalCost) : null;
   const paid = ticket.paidAmount ? Number(ticket.paidAmount) : null;
-  const parts = ticket.partsCost ? Number(ticket.partsCost) : null;
-  const profit =
-    paid !== null || parts !== null ? (paid ?? 0) - (parts ?? 0) : null;
+  const partsCost = ticket.partsCost ? Number(ticket.partsCost) : 0;
+  const price = billed ?? quoted;
+  const profit = price !== null ? price - partsCost : null;
+
+  const estimatedCost = quoted;
+  const terminal = TERMINAL.includes(ticket.status);
+  // "Go back" returns to the step the repair was really at before, which is
+  // not always the one before it in the list (steps can be skipped).
+  const previousStep =
+    ticket.statusUpdates.find(
+      (u) => u.status !== ticket.status && isRewind(ticket.status, u.status),
+    )?.status ?? prevStatus(ticket.status);
+  const editHref = `/admin/tickets/${ticket.id}?edit=1#edit`;
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-4", !terminal && "pb-24 md:pb-0")}>
       <Link
         href="/admin/tickets"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ArrowLeft className="size-4" /> All tickets
+        <ArrowLeft className="size-4" /> All repairs
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-mono text-sm text-muted-foreground">
-            {ticket.ticketNumber} · {formatDate(ticket.createdAt)}
+      {/* ── Header card ─────────────────────────────────────────── */}
+      <section className="flex gap-6 rounded-[28px] bg-primary p-5 text-primary-foreground sm:p-6">
+        <div className="hidden size-40 shrink-0 place-items-end justify-center overflow-hidden rounded-[22px] bg-black/15 sm:grid">
+          <PhoneGlyph
+            className="-mb-6 h-36"
+            body="fill-ink"
+            screen="fill-primary-foreground"
+          />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
+          <p className="text-sm font-semibold text-primary-foreground/85">
+            {ticket.ticketNumber} · received {formatDate(ticket.createdAt)}
           </p>
-          <h1 className="font-display mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+          <h1 className="font-display text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl">
             {deviceName}
           </h1>
-          <p className="mt-1 text-muted-foreground">
-            {ticket.issueTitle} · {ownerName}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {chip ? (
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap",
-                  chip.className,
-                )}
-              >
-                {chip.label}
-              </span>
-            ) : null}
-            <StatusBadge
+          <p className="text-base text-primary-foreground/85">{ticket.issueTitle}</p>
+          {chip || terminal ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {terminal ? (
+                <StatusBadge
+                  status={ticket.status}
+                  className="border-transparent bg-primary-foreground text-foreground"
+                />
+              ) : null}
+              {chip ? (
+                <span className="inline-flex items-center rounded-full bg-primary-foreground px-2.5 py-1 text-xs font-semibold text-warning">
+                  {chip.label}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="mt-3 flex flex-wrap gap-2.5">
+            <MainAction
+              ticketId={ticket.id}
               status={ticket.status}
-              activity
-              className="px-3 py-1.5 text-sm"
+              deviceName={deviceName}
+              estimatedCost={estimatedCost}
+              tone="onPrimary"
+              className="hidden md:inline-flex"
             />
-          </div>
-          <div className="flex gap-2">
-            <Button asChild size="sm">
-              <Link href={`/admin/tickets/${ticket.id}/bill`}>
-                <Receipt className="size-4" /> Create bill
-              </Link>
+            <Button
+              asChild
+              size="lg"
+              className="bg-black/15 text-primary-foreground hover:bg-black/25"
+            >
+              <Link href={`/admin/tickets/${ticket.id}/bill`}>Bill</Link>
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/bill/${ticket.id}`} target="_blank">
-                <Eye className="size-4" /> View bill
-              </Link>
-            </Button>
-            <DeleteTicketDialog
+            <RepairMenu
               ticketId={ticket.id}
               ticketNumber={ticket.ticketNumber}
+              status={ticket.status}
+              previous={previousStep}
+              deviceName={deviceName}
+              className="bg-black/15 text-primary-foreground hover:bg-black/25"
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      <Card>
-        <CardContent className="pt-2 pb-5">
-          <StatusStepper
-            status={ticket.status}
-            cancelledFrom={
-              ticket.statusUpdates.find((u) => u.status !== "CANCELLED")
-                ?.status ?? null
-            }
-            issuePending={ticket.issues.some((i) => i.status === "PENDING")}
+      {/* ── Steps ───────────────────────────────────────────────── */}
+      <section className="rounded-3xl bg-card p-4 sm:p-5">
+        <StatusStepper
+          status={ticket.status}
+          cancelledFrom={
+            ticket.statusUpdates.find((u) => u.status !== "CANCELLED")?.status ??
+            null
+          }
+          issuePending={ticket.issues.some((i) => i.status === "PENDING")}
+        />
+      </section>
+
+      {edit ? (
+        <section id="edit" className="scroll-mt-20 rounded-3xl bg-card p-5 sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-extrabold">Edit repair details</h2>
+            <Button asChild variant="ghost" size="icon" aria-label="Close editing">
+              <Link href={`/admin/tickets/${ticket.id}`} scroll={false}>
+                <X />
+              </Link>
+            </Button>
+          </div>
+          <TicketDetailsForm
+            values={{
+              ticketId: ticket.id,
+              deviceType: ticket.deviceType,
+              brand: ticket.brand,
+              model: ticket.model,
+              issueTitle: ticket.issueTitle,
+              issueDescription: ticket.issueDescription,
+              solution: ticket.solution,
+              status: ticket.status,
+              completedAt: toDateInput(ticket.completedAt),
+              estimatedCost: ticket.estimatedCost?.toString() ?? null,
+              finalCost: ticket.finalCost?.toString() ?? null,
+              partsCost: ticket.partsCost?.toString() ?? null,
+              paidAmount: ticket.paidAmount?.toString() ?? null,
+              duration: ticket.duration,
+              parts: partsList,
+              issues: issuesWithParts.map((issue) => ({
+                id: issue.id,
+                note: issue.note,
+                status: issue.status,
+                reportedAt: issue.reportedAt,
+                parts: issue.parts,
+              })),
+              adminNotes: ticket.adminNotes,
+              forgottenParts: ticket.forgottenParts,
+            }}
           />
-        </CardContent>
-      </Card>
+        </section>
+      ) : null}
 
-      {/* Highlighted straight after logging a repair: handing this link over
-          is the last step of taking in a walk-in device. */}
-      <TrackingLink
-        url={trackUrl(ticket.trackToken)}
-        ticketNumber={ticket.ticketNumber}
-        className={created ? "border-primary/40 bg-primary/[0.04]" : undefined}
-      />
+      {ticket.status === "SUBMITTED" ? (
+        <section
+          id="accept"
+          className="scroll-mt-20 rounded-3xl bg-warning/10 p-5 sm:p-6"
+        >
+          <h2 className="font-display text-lg font-extrabold text-warning">
+            New repair request
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            Sent online by the customer. Accepting asks them to bring the
+            device in; mark it received once it is at the shop.
+          </p>
+          <AcceptTicketForm ticketId={ticket.id} />
+        </section>
+      ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3">
-          <Tabs defaultValue="overview">
-            <TabsList className="w-full sm:w-auto">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="notes" className="gap-1.5">
-                <NotebookPen className="size-3.5" />
-                Notes & Lessons
-                {ticket.adminNotes ? (
-                  <span className="ml-0.5 size-1.5 rounded-full bg-warning" />
-                ) : null}
-              </TabsTrigger>
-              <TabsTrigger value="edit">Edit</TabsTrigger>
-            </TabsList>
+      {/* Highlighted straight after booking a repair in: handing this link
+          over is the last step of taking in a walk-in device. */}
+      {created ? (
+        <TrackingLink
+          url={link}
+          ticketNumber={ticket.ticketNumber}
+          className="border-primary/40 bg-primary/[0.04]"
+        />
+      ) : null}
 
-            {/* ── Overview ─────────────────────────────────── */}
-            <TabsContent value="overview" className="mt-4 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-display flex items-center gap-2 text-lg">
-                    <Banknote className="size-5 text-primary" /> Money
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Parts cost</p>
-                      <p className="font-display mt-1 text-lg font-bold">
-                        {parts !== null ? formatLKR(parts) : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Customer paid
-                      </p>
-                      <p className="font-display mt-1 text-lg font-bold">
-                        {paid !== null ? formatLKR(paid) : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Profit</p>
-                      <p
-                        className={cn(
-                          "font-display mt-1 text-lg font-bold",
-                          profit !== null && profit > 0 && "text-success",
-                          profit !== null && profit < 0 && "text-destructive",
-                        )}
-                      >
-                        {profit !== null ? formatLKR(profit) : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  {partsList.length > 0 || issuePartsCost > 0 || ticket.duration ? (
-                    <>
-                      <Separator className="my-4" />
-                      {partsList.length > 0 ? (
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Parts used
-                          </p>
-                          <ul className="mt-1.5 space-y-1 text-sm">
-                            {partsList.map((entry, i) => (
-                              <li
-                                key={`${entry.part}-${i}`}
-                                className="flex flex-wrap items-baseline justify-between gap-x-3 rounded-lg bg-muted/40 px-2.5 py-1.5"
-                              >
-                                <span className="font-medium">{entry.part}</span>
-                                <span className="flex items-baseline gap-3 text-xs text-muted-foreground">
-                                  <span>
-                                    {entry.supplier ?? "No supplier recorded"}
-                                  </span>
-                                  {entry.cost !== undefined ? (
-                                    <span className="font-semibold text-foreground tabular-nums">
-                                      {formatLKR(entry.cost)}
-                                    </span>
-                                  ) : null}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+      {/* ── Customer and money ──────────────────────────────────── */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-extrabold">Customer</h2>
+            <ContactEditDialog
+              ticketId={ticket.id}
+              customerName={ticket.customerName}
+              customerPhone={ticket.customerPhone}
+              hasAccount={!!ticket.customer}
+            />
+          </div>
+          <div className="mt-2 flex items-center gap-3">
+            <span className="grid size-12 shrink-0 place-items-center rounded-full bg-primary/10 font-extrabold text-primary">
+              {initials(ownerName)}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-bold">{ownerName}</p>
+              <p className="text-sm text-muted-foreground">
+                {phone ?? "No phone number yet"}
+                {earlierRepairs > 0
+                  ? ` · ${earlierRepairs} earlier repair${earlierRepairs === 1 ? "" : "s"}`
+                  : ""}
+              </p>
+            </div>
+          </div>
+          {ticket.customer?.email ? (
+            <a
+              href={`mailto:${ticket.customer.email}`}
+              className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <Mail className="size-4" /> {ticket.customer.email}
+            </a>
+          ) : null}
+          <ContactButtons
+            phone={phone}
+            message={`Hi ${firstName}, you can follow your ${deviceName} repair (${ticket.ticketNumber}) here: ${link}`}
+          />
+        </section>
+
+        <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6">
+          <h2 className="font-display text-lg font-extrabold">Money</h2>
+          <dl className="mt-3 space-y-2 text-[15px]">
+            <MoneyRow label="Quoted to customer" value={quoted} />
+            {billed !== null ? <MoneyRow label="Bill total" value={billed} /> : null}
+            {partsList.map((entry, i) => (
+              <MoneyRow
+                key={`${entry.part}-${i}`}
+                label={[entry.part, entry.supplier].filter(Boolean).join(" · ")}
+                value={entry.cost ?? null}
+              />
+            ))}
+            {issuePartsCost > 0 ? (
+              <MoneyRow
+                label="Parts to fix our own mistakes"
+                value={issuePartsCost}
+                className="text-warning"
+              />
+            ) : null}
+            {partsList.length === 0 && partsCost > 0 ? (
+              <MoneyRow label="Parts and costs" value={partsCost} />
+            ) : null}
+          </dl>
+          <dl className="mt-3 space-y-2 border-t border-border pt-3 text-[15px]">
+            <MoneyRow
+              label={paid !== null ? "Profit" : "Profit if paid in full"}
+              value={paid !== null ? paid - partsCost : profit}
+              className={
+                (paid !== null ? paid - partsCost : (profit ?? 0)) < 0
+                  ? "text-destructive"
+                  : undefined
+              }
+            />
+            {paid !== null ? <MoneyRow label="Customer paid" value={paid} /> : null}
+          </dl>
+          {ticket.forgottenParts ? (
+            <p className="mt-3 rounded-xl bg-warning/10 px-3 py-2 text-sm text-warning">
+              Forgotten parts: {ticket.forgottenParts}
+            </p>
+          ) : null}
+          <Link
+            href={editHref}
+            className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-primary underline-offset-4 hover:underline"
+          >
+            Add part or cost
+          </Link>
+        </section>
+      </div>
+
+      {/* ── Everything else ─────────────────────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        <div className="min-w-0 space-y-4 lg:col-span-3">
+          <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6">
+            <h2 className="font-display text-lg font-extrabold">Timeline</h2>
+            <p className="mt-1 mb-4 text-sm text-muted-foreground">
+              The customer sees these notes. Use the pencil to fix one.
+            </p>
+            <EditableStatusHistory
+              updates={ticket.statusUpdates}
+              status={ticket.status}
+              issues={ticket.issues}
+            />
+          </section>
+
+          <section className="space-y-4 rounded-3xl bg-card p-5 text-sm sm:p-6">
+            <h2 className="font-display text-lg font-extrabold">Repair record</h2>
+            <div>
+              <p className="text-muted-foreground">Problem</p>
+              <p className="mt-0.5 font-semibold">{ticket.issueTitle}</p>
+              {ticket.issueDescription ? (
+                <p className="mt-1 leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                  {ticket.issueDescription}
+                </p>
+              ) : null}
+            </div>
+            {ticket.solution ? (
+              <div>
+                <p className="text-muted-foreground">Solution</p>
+                <p className="mt-0.5 leading-relaxed font-semibold whitespace-pre-wrap">
+                  {ticket.solution}
+                </p>
+              </div>
+            ) : null}
+            {ticket.duration ? (
+              <div>
+                <p className="text-muted-foreground">Time taken</p>
+                <p className="mt-0.5 font-semibold">{ticket.duration}</p>
+              </div>
+            ) : null}
+            {receivedItems.length > 0 ? (
+              <div>
+                <p className="text-muted-foreground">Came in with</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {receivedItems.map((item, index) => (
+                    <span
+                      key={`${item.label}-${index}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5"
+                    >
+                      <span className="font-semibold">{item.label}</span>
+                      {item.detail ? (
+                        <span className="text-muted-foreground">— {item.detail}</span>
                       ) : null}
-                      {issuePartsCost > 0 ? (
-                        <p className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
-                          <span>Parts to fix our own mistakes</span>
-                          <span className="font-semibold tabular-nums">
-                            {formatLKR(issuePartsCost)}
-                          </span>
-                        </p>
-                      ) : null}
-                      {ticket.duration ? (
-                        <div className="mt-3 text-sm">
-                          <p className="text-xs text-muted-foreground">
-                            Duration
-                          </p>
-                          <p className="mt-0.5 font-medium">{ticket.duration}</p>
-                        </div>
-                      ) : null}
-                    </>
-                  ) : null}
-                  {ticket.forgottenParts ? (
-                    <p className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                      Forgotten parts: {ticket.forgottenParts}
-                    </p>
-                  ) : null}
-                </CardContent>
-              </Card>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {ticket.photos.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                {ticket.photos.map((photo) => (
+                  <a
+                    key={photo}
+                    href={photo}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="relative aspect-square overflow-hidden rounded-xl"
+                  >
+                    <Image
+                      src={photo}
+                      alt="Device photo"
+                      fill
+                      sizes="150px"
+                      className="object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : null}
+            <div>
+              <p className="text-muted-foreground">Notes and lessons (only you see these)</p>
+              {ticket.adminNotes ? (
+                <div className="mt-1.5">
+                  <JournalNote text={ticket.adminNotes} />
+                </div>
+              ) : (
+                <Link
+                  href={editHref}
+                  className="inline-flex min-h-11 items-center font-bold text-primary underline-offset-4 hover:underline"
+                >
+                  Add a note
+                </Link>
+              )}
+            </div>
+          </section>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-display flex items-center gap-2 text-lg">
-                    <Wrench className="size-5 text-primary" /> Repair record
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Issue</p>
-                    <p className="mt-0.5 font-medium">{ticket.issueTitle}</p>
-                    {ticket.issueDescription ? (
-                      <p className="mt-1 leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                        {ticket.issueDescription}
-                      </p>
-                    ) : null}
-                  </div>
-                  {ticket.solution ? (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Solution</p>
-                      <p className="mt-0.5 leading-relaxed font-medium whitespace-pre-wrap">
-                        {ticket.solution}
-                      </p>
-                    </div>
-                  ) : null}
-                  {receivedItems.length > 0 ? (
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Received with
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {receivedItems.map((item, index) => (
-                          <span
-                            key={`${item.label}-${index}`}
-                            className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs"
-                          >
-                            <span className="font-medium">{item.label}</span>
-                            {item.detail ? (
-                              <span className="text-muted-foreground">
-                                — {item.detail}
-                              </span>
-                            ) : null}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  {ticket.photos.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-                      {ticket.photos.map((photo) => (
-                        <a
-                          key={photo}
-                          href={photo}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="group relative aspect-square overflow-hidden rounded-xl border border-border"
-                        >
-                          <Image
-                            src={photo}
-                            alt="Device photo"
-                            fill
-                            sizes="150px"
-                            className="object-cover transition-transform group-hover:scale-105"
-                          />
-                        </a>
-                      ))}
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-display text-lg">Timeline</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Notes here are visible to the customer — use the pencil to
-                    fix one, or the trash to remove an entry.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <EditableStatusHistory
-                    updates={ticket.statusUpdates}
-                    status={ticket.status}
-                    issues={ticket.issues}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ── Notes & Lessons ──────────────────────────── */}
-            <TabsContent value="notes" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-display flex items-center gap-2 text-lg">
-                    <NotebookPen className="size-5 text-muted-foreground" />{" "}
-                    Notes & lessons
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Private to you — mistakes, advice to yourself, things you
-                    learned on this repair. Never shown to the customer.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {ticket.adminNotes ? (
-                    <JournalNote text={ticket.adminNotes} />
-                  ) : (
-                    <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                      Nothing written yet. Add a note from the Edit tab.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ── Edit ─────────────────────────────────────── */}
-            <TabsContent value="edit" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-display text-lg">
-                    Edit repair details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <TicketDetailsForm
-                    values={{
-                      ticketId: ticket.id,
-                      deviceType: ticket.deviceType,
-                      brand: ticket.brand,
-                      model: ticket.model,
-                      issueTitle: ticket.issueTitle,
-                      issueDescription: ticket.issueDescription,
-                      solution: ticket.solution,
-                      status: ticket.status,
-                      completedAt: toDateInput(ticket.completedAt),
-                      estimatedCost: ticket.estimatedCost?.toString() ?? null,
-                      finalCost: ticket.finalCost?.toString() ?? null,
-                      partsCost: ticket.partsCost?.toString() ?? null,
-                      paidAmount: ticket.paidAmount?.toString() ?? null,
-                      duration: ticket.duration,
-                      parts: partsList,
-                      issues: issuesWithParts.map((issue) => ({
-                        id: issue.id,
-                        note: issue.note,
-                        status: issue.status,
-                        reportedAt: issue.reportedAt,
-                        parts: issue.parts,
-                      })),
-                      adminNotes: ticket.adminNotes,
-                      forgottenParts: ticket.forgottenParts,
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          {!created ? (
+            <TrackingLink url={link} ticketNumber={ticket.ticketNumber} />
+          ) : null}
         </div>
 
-        <div className="space-y-6 lg:col-span-2">
-          {/* Awaiting acceptance */}
-          {ticket.status === "SUBMITTED" ? (
-            <Card className="border-warning/40 bg-warning/5">
-              <CardHeader>
-                <CardTitle className="font-display flex items-center gap-2 text-lg text-warning">
-                  <Inbox className="size-5" /> New repair request
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Submitted online by the customer. Accepting confirms the
-                  request and asks them to bring the device in — mark it
-                  Received once it&apos;s physically at the shop.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <AcceptTicketForm ticketId={ticket.id} />
-              </CardContent>
-            </Card>
-          ) : null}
+        <div className="min-w-0 space-y-4 lg:col-span-2">
+          <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6">
+            <h2 className="font-display text-lg font-extrabold">Problem during repair</h2>
+            <p className="mt-1 mb-4 text-sm text-muted-foreground">
+              Something went wrong on the bench? Report it, and the customer
+              chooses a free fix or cancelling with a refund.
+            </p>
+            <RepairIssuePanel
+              ticketId={ticket.id}
+              status={ticket.status}
+              issues={issuesWithParts}
+            />
+          </section>
 
-          {/* Customer */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Customer</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {ticket.customer ? (
-                <>
-                  <p className="flex items-center gap-2 font-medium">
-                    <User className="size-4 text-muted-foreground" />
-                    {ticket.customer.name}
-                  </p>
-                  <a
-                    href={`mailto:${ticket.customer.email}`}
-                    className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <Mail className="size-4" />
-                    {ticket.customer.email}
-                  </a>
-                  {ticket.customer.phone ? (
-                    <a
-                      href={`tel:${ticket.customer.phone}`}
-                      className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                    >
-                      <Phone className="size-4" />
-                      {ticket.customer.phone}
-                    </a>
-                  ) : null}
-                  <p className="text-muted-foreground">
-                    {ticket.customer.completedRepairs} completed repair
-                    {ticket.customer.completedRepairs === 1 ? "" : "s"} with{" "}
-                    {shop.name}
-                  </p>
-                </>
-              ) : (
-                <p className="flex items-center gap-2 font-medium">
-                  <UserX className="size-4 text-muted-foreground" />
-                  {ticket.customerName ?? "Unknown"}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    (no account)
-                  </span>
-                </p>
-              )}
-              <Separator />
-              <p className="text-xs text-muted-foreground">
-                Link this repair to a registered account:
-              </p>
-              <LinkCustomerForm
-                ticketId={ticket.id}
-                currentCustomerId={ticket.customer?.id ?? null}
-                customers={customers}
-              />
-            </CardContent>
-          </Card>
+          <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6">
+            <h2 className="font-display text-lg font-extrabold">Bill notes</h2>
+            <p className="mt-1 mb-4 text-sm text-muted-foreground">
+              Printed on the bill for the customer.
+            </p>
+            <BillNotesForm
+              ticketId={ticket.id}
+              billNotes={ticket.billNotes}
+              suggestions={billNoteSuggestions}
+            />
+          </section>
 
-          {/* Status update */}
-          <Card className="border-primary/30">
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Update status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <StatusUpdateForm
-                ticketId={ticket.id}
-                currentStatus={ticket.status}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Issue during repair (damage/dispute) */}
-          <Card
-            className={ticket.issues.length > 0 ? "border-warning/40" : undefined}
-          >
-            <CardHeader>
-              <CardTitle className="font-display text-lg">
-                Issue during repair
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Something went wrong on the bench? Report it — the customer
-                decides between a free fix or cancelling with a refund.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <RepairIssuePanel
-                ticketId={ticket.id}
-                status={ticket.status}
-                issues={issuesWithParts}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Bill notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Bill notes</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Shown to the customer on the bill and PDF.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <BillNotesForm
-                ticketId={ticket.id}
-                billNotes={ticket.billNotes}
-                suggestions={billNoteSuggestions}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Online payments */}
           {ticket.payments.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-display text-lg">Online payments</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {ticket.payments.map((payment) => (
-                  <div
-                    key={payment.id}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {formatLKR(payment.amount.toString())}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(payment.createdAt)} · Bank transfer
-                      </p>
-                    </div>
-                    <span
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-xs font-medium",
-                        payment.status === "PAID" &&
-                          "border-success/30 bg-success/15 text-success",
-                        payment.status === "PENDING_VERIFICATION" &&
-                          "border-warning/30 bg-warning/15 text-warning",
-                        payment.status === "REJECTED" &&
-                          "border-destructive/30 bg-destructive/15 text-destructive",
-                      )}
-                    >
-                      {payment.status === "PAID"
-                        ? "Paid"
-                        : payment.status === "PENDING_VERIFICATION"
-                          ? "Under review"
-                          : payment.status === "REJECTED"
-                            ? "Rejected"
-                            : payment.status}
-                    </span>
+            <section className="space-y-3 rounded-3xl bg-card p-5 text-sm sm:p-6">
+              <h2 className="font-display text-lg font-extrabold">Online payments</h2>
+              {ticket.payments.map((payment) => (
+                <div key={payment.id} className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{formatLKR(payment.amount.toString())}</p>
+                    <p className="text-muted-foreground">
+                      {formatDate(payment.createdAt)} · Bank transfer
+                    </p>
                   </div>
-                ))}
-                <Link
-                  href="/admin/payments"
-                  className="block text-xs text-primary hover:underline"
-                >
-                  Manage in Payments →
-                </Link>
-              </CardContent>
-            </Card>
+                  <PaymentBadge status={payment.status} />
+                </div>
+              ))}
+              <Link
+                href="/admin/payments"
+                className="inline-flex min-h-11 items-center font-bold text-primary underline-offset-4 hover:underline"
+              >
+                Manage in Payments
+              </Link>
+            </section>
           ) : null}
+
+          <section className="min-w-0 rounded-3xl bg-card p-5 sm:p-6">
+            <h2 className="font-display text-lg font-extrabold">Customer account</h2>
+            <p className="mt-1 mb-3 text-sm text-muted-foreground">
+              {ticket.customer
+                ? "This repair is linked to the account above."
+                : "Link this repair to a customer who has an account."}
+            </p>
+            <LinkCustomerForm
+              ticketId={ticket.id}
+              currentCustomerId={ticket.customer?.id ?? null}
+              customers={customers}
+            />
+          </section>
         </div>
       </div>
+
+      {/* Phone: the main action stays in reach at the bottom of the screen. */}
+      {!terminal ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+          <MainAction
+            ticketId={ticket.id}
+            status={ticket.status}
+            deviceName={deviceName}
+            estimatedCost={estimatedCost}
+            tone="primary"
+            className="w-full"
+          />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function MoneyRow({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: number | null;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-baseline justify-between gap-3", className)}>
+      <dt className={cn("min-w-0", !className && "text-muted-foreground")}>{label}</dt>
+      <dd className="shrink-0 font-bold tabular-nums">
+        {value !== null ? rupees(value) : "—"}
+      </dd>
+    </div>
+  );
+}
+
+// Call, WhatsApp and "send the tracking link" — all need a phone number.
+function ContactButtons({ phone, message }: { phone: string | null; message: string }) {
+  const chat = phone ? whatsappHref(phone) : null;
+  const sendLink = phone ? whatsappHref(phone, message) : null;
+  const items = [
+    { label: "Call", href: phone ? telHref(phone) : null, icon: Phone, external: false },
+    { label: "WhatsApp", href: chat, icon: MessageCircle, external: true },
+    { label: "Send link", href: sendLink, icon: Send, external: true },
+  ];
+  return (
+    <div className="mt-4 grid grid-cols-3 gap-2">
+      {items.map(({ label, href, icon: Icon, external }) =>
+        href ? (
+          <Button key={label} asChild variant="secondary" className="px-2">
+            <a
+              href={href}
+              {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
+            >
+              <Icon className="hidden sm:block" /> {label}
+            </a>
+          </Button>
+        ) : (
+          <Button
+            key={label}
+            variant="secondary"
+            className="px-2"
+            disabled
+            title="Add a phone number first"
+          >
+            {label}
+          </Button>
+        ),
+      )}
+    </div>
+  );
+}
+
+function PaymentBadge({ status }: { status: string }) {
+  const styles: Record<string, { label: string; className: string }> = {
+    PAID: { label: "Paid", className: "bg-success/15 text-success" },
+    PENDING_VERIFICATION: { label: "Under review", className: "bg-warning/15 text-warning" },
+    REJECTED: { label: "Rejected", className: "bg-destructive/15 text-destructive" },
+  };
+  const style = styles[status] ?? { label: status, className: "bg-secondary" };
+  return (
+    <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", style.className)}>
+      {style.label}
+    </span>
   );
 }
