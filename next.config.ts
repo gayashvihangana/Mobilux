@@ -11,9 +11,15 @@ import type { NextConfig } from "next";
 // escaped (see jsonLdScript), so the practical XSS surface is already closed;
 // this policy is the second layer, and `frame-ancestors` / `form-action` /
 // `base-uri` below do real work regardless.
+// The dev server's bundles are evaluated with eval() (source maps and React's
+// dev-only stack traces), so without 'unsafe-eval' no client code runs in
+// `next dev`: nothing hydrates and every form is dead. Production bundles do
+// not need it, so it is allowed in development only.
+const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${devEval}`,
   "style-src 'self' 'unsafe-inline'",
   // data: for QR codes, blob: for the client-rendered PDF bill.
   "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com https://res.cloudinary.com",

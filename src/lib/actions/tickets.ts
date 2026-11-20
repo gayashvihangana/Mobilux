@@ -63,12 +63,16 @@ const TICKET_STATUSES = [
 
 const DEVICE_TYPES = ["PHONE", "TABLET", "LAPTOP", "SMARTWATCH", "OTHER"] as const;
 
+// Both helpers accept null: formData.get() returns null for a field the form
+// does not render at all, and several forms share one schema (the quick
+// new-repair form sends five fields of the long one). Rejecting null failed
+// those saves with errors for fields nobody could see.
 function optionalText(max: number) {
   return z
     .string()
     .trim()
     .max(max)
-    .optional()
+    .nullish()
     .or(z.literal(""))
     .transform((v) => v || undefined);
 }
@@ -76,8 +80,8 @@ function optionalText(max: number) {
 function optionalMoney() {
   return z
     .union([z.literal(""), z.coerce.number().min(0)])
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? undefined : v));
+    .nullish()
+    .transform((v) => (v === "" || v == null ? undefined : v));
 }
 
 // ── Customer self-service submission ─────────────────────────────

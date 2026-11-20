@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldError } from "@/components/forms/field-error";
+import { FormAutosave } from "@/components/forms/form-autosave";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,14 @@ const COMMON_PROBLEMS = [
   "Not charging",
   "Battery drain",
 ];
+
+// Fields that render their own error message below.
+const SHOWN_FIELDS = new Set([
+  "customerName",
+  "customerPhone",
+  "issueTitle",
+  "estimatedCost",
+]);
 
 // Booking a device in at the counter: who, how to reach them, what it is and
 // what is wrong. Everything else (parts, costs, notes) is added on the repair
@@ -28,16 +37,32 @@ export function QuickRepairForm({ compact = false }: { compact?: boolean }) {
   // dialog), so ids are prefixed to keep each label tied to its own input.
   const id = (name: string) => `${compact ? "quick" : "new"}-${name}`;
 
+  // The save action validates the long form's schema. An error on a field
+  // this form does not show would otherwise fail the save without a word.
+  const hiddenFieldError = Object.keys(state?.fieldErrors ?? {}).some(
+    (field) => !SHOWN_FIELDS.has(field),
+  );
+  const message =
+    state?.error ??
+    (hiddenFieldError ? "The repair could not be saved. Try again." : null);
+
   return (
     <form action={formAction} className={cn(compact ? "space-y-3" : "space-y-5")}>
+      <FormAutosave
+        storageKey={compact ? "quick-repair" : "new-repair-admin"}
+        signal={state}
+      />
       <input type="hidden" name="customerId" value="none" />
       <input type="hidden" name="deviceType" value="PHONE" />
       <input type="hidden" name="status" value="RECEIVED" />
 
-      {state?.error ? (
-        <div className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      {message ? (
+        <div
+          role="alert"
+          className="flex items-center gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
           <TriangleAlert className="size-4 shrink-0" />
-          {state.error}
+          {message}
         </div>
       ) : null}
 
