@@ -1,8 +1,51 @@
 import type { RepairIssueStatus, TicketStatus } from "@prisma/client";
 import { BANK_DETAILS } from "@/lib/config";
 
-// One line on the itemised bill, e.g. { label: "Battery", amount: 4500 }.
-export type BillLineItem = { label: string; amount: number };
+// One line on the itemised bill. `amount` is always the line total, so bills
+// saved before quantities existed ({ label, amount }) still read correctly;
+// newer lines also carry `qty` and `unitPrice` (amount = qty x unitPrice).
+export type BillLineItem = {
+  label: string;
+  amount: number;
+  qty?: number;
+  unitPrice?: number;
+};
+
+// A payment the shop recorded by hand on the bill page (cash at the counter,
+// a card, a transfer it checked itself). Stored oldest first in the ticket's
+// `billPayments` JSON column; `paidAmount` is kept equal to their sum so the
+// reports, Board and Today page keep reading one number.
+export type BillPaymentEntry = {
+  id: string;
+  amount: number;
+  method: string;
+  /** ISO date-time string. */
+  at: string;
+  /** Who recorded it (staff name), for the admin list only. */
+  by?: string | null;
+};
+
+export const PAYMENT_METHODS = ["Cash", "Card", "Bank transfer", "Other"] as const;
+
+/** Reads the `billPayments` JSON column into clean entries (never throws). */
+export function parseBillPayments(raw: unknown): BillPaymentEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r) => {
+    if (!r || typeof r !== "object") return [];
+    const e = r as Record<string, unknown>;
+    const amount = Number(e.amount);
+    if (typeof e.id !== "string" || !(amount > 0)) return [];
+    return [
+      {
+        id: e.id,
+        amount: Math.round(amount * 100) / 100,
+        method: typeof e.method === "string" ? e.method : "Other",
+        at: typeof e.at === "string" ? e.at : new Date(0).toISOString(),
+        by: typeof e.by === "string" ? e.by : null,
+      },
+    ];
+  });
+}
 
 // A human invoice number derived from the repair's ticket number, so the bill
 // can show both a distinct "Invoice No." and the underlying "Repair ID"
@@ -119,6 +162,7 @@ export type BillTicket = {
   partsUsed: string | null;
   billNotes: string | null;
   customerName: string | null;
+  customerPhone: string | null;
   // Admin-built itemised bill (see computeBill). When billItems is a
   // non-empty array the bill renders these rows instead of the single line.
   technician: string | null;
@@ -129,6 +173,8 @@ export type BillTicket = {
   billGeneratedAt: Date | null;
   paidAt: Date | null;
   paidMethod: string | null;
+  /** Payments recorded by hand on the bill page. */
+  billPayments: BillPaymentEntry[];
   warrantyPeriod: string | null;
   warrantyParts: string | null;
   // Issue-during-repair block: the issues themselves come from the ticket
@@ -138,7 +184,22 @@ export type BillTicket = {
   issueWarranty: string | null;
   billShow: BillShow | null;
   customer: { name: string; email: string; phone: string | null } | null;
-  paidPayment: { amount: string; createdAt: Date } | null;
+  /** Bank transfers the customer uploaded and the shop verified. */
+  onlinePayments: { amount: string; createdAt: Date }[];
+};
+
+/** Where the bill is: nothing saved yet, saved and owed, part paid, paid. */
+export type BillState = "draft" | "issued" | "partial" | "paid";
+
+/** One row in the bill's payment list, whichever way the money came in. */
+export type BillPaymentRow = {
+  id: string;
+  amount: number;
+  method: string;
+  at: Date;
+  by: string | null;
+  /** A verified online transfer: managed under Payments, not removable here. */
+  online: boolean;
 };
 
 export type BillTotals = {
@@ -148,15 +209,24 @@ export type BillTotals = {
   billDate: Date;
   warrantyEnd: Date | null;
   // When true, render `items` as separate rows with a subtotal; otherwise
-  // the legacy single-line layout (solution + parts subtext).
+  // the single line made from the repair (solution + parts subtext).
   isItemized: boolean;
-  items: BillLineItem[];
+  items: Required<BillLineItem>[];
   subtotal: number;
   discountLabel: string;
   discountAmount: number;
   total: number;
+  /** Every payment, oldest first. */
+  payments: BillPaymentRow[];
+  paidTotal: number;
+  /** What is still owed (never below zero). */
+  balance: number;
+  state: BillState;
+  /** Paid in full: the bill reads as a receipt. */
   isSettled: boolean;
+  /** When the last payment landed, once paid in full. */
   paidDate: Date | null;
+  /** "Cash", or "Cash + Card" when it came in more than one way. */
   paidMethod: string | null;
   // Resolved bank details to print in the "How to pay" block (unpaid only).
   payTo: Required<BillPayTo>;
@@ -164,24 +234,34 @@ export type BillTotals = {
   show: BillShow;
 };
 
-// Normalises whatever is stored in the billItems JSON column into a clean
-// array of well-formed line items (label present, amount a finite number).
-function normaliseItems(raw: BillTicket["billItems"]): BillLineItem[] {
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// Normalises whatever is stored in the billItems JSON column into clean line
+// items: a label, a whole quantity of at least 1, a unit price, and the line
+// total. Old items without a quantity read as one of `amount`.
+export function normaliseItems(
+  raw: BillTicket["billItems"],
+): Required<BillLineItem>[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter(
       (i): i is BillLineItem =>
         !!i && typeof i.label === "string" && i.label.trim().length > 0,
     )
-    .map((i) => ({
-      label: i.label.trim(),
-      amount: Number.isFinite(Number(i.amount)) ? Number(i.amount) : 0,
-    }));
+    .map((i) => {
+      const qty = Math.max(1, Math.round(Number(i.qty) || 1));
+      const amount = Number.isFinite(Number(i.amount)) ? Number(i.amount) : 0;
+      const unitPrice =
+        i.unitPrice !== undefined && Number.isFinite(Number(i.unitPrice))
+          ? Number(i.unitPrice)
+          : round2(amount / qty);
+      return { label: i.label.trim(), qty, unitPrice, amount: round2(amount) };
+    });
 }
 
 // Per-bill overrides win, then the shop's default account from Settings, then
 // the build-time env values. A generated bill stores its own `billPayTo`, so
-// changing banks never rewrites an invoice that has already been issued — the
+// changing banks never rewrites an invoice that has already been issued; the
 // fallback chain only matters for bills that predate the bill builder.
 function resolvePayTo(
   override: BillPayTo | null,
@@ -201,11 +281,50 @@ function resolvePayTo(
   };
 }
 
-// Single source of truth for bill math — the on-screen bill and the
-// downloaded PDF must always show identical figures.
+// Every payment on the repair, oldest first: the ones recorded on the bill
+// page, verified online transfers, and (for repairs from before the bill page
+// could record payments) the single hand-entered "Customer paid".
+function paymentRows(ticket: BillTicket): BillPaymentRow[] {
+  const rows: BillPaymentRow[] = ticket.billPayments.map((p) => ({
+    id: p.id,
+    amount: p.amount,
+    method: p.method,
+    at: new Date(p.at),
+    by: p.by ?? null,
+    online: false,
+  }));
+  if (
+    rows.length === 0 &&
+    ticket.paidAmount !== null &&
+    Number(ticket.paidAmount) > 0
+  ) {
+    rows.push({
+      id: "legacy",
+      amount: Number(ticket.paidAmount),
+      method: ticket.paidMethod ?? "Cash",
+      at: ticket.paidAt ?? ticket.completedAt ?? ticket.createdAt,
+      by: null,
+      online: false,
+    });
+  }
+  ticket.onlinePayments.forEach((p, i) =>
+    rows.push({
+      id: `online-${i}`,
+      amount: Number(p.amount),
+      method: "Bank transfer",
+      at: p.createdAt,
+      by: null,
+      online: true,
+    }),
+  );
+  return rows.sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
+// Single source of truth for bill math: the admin page, the customer's link
+// and the printed PDF must always show identical figures.
 export function computeBill(
   ticket: BillTicket,
-  /** The shop's current default account, from Settings → Bank accounts. */
+  /** The shop's current default account, from Settings > Bank accounts. */
   shopPayTo?: BillPayTo,
 ): BillTotals {
   const deviceName =
@@ -216,83 +335,60 @@ export function computeBill(
   const billDate =
     ticket.billGeneratedAt ?? ticket.completedAt ?? ticket.createdAt;
   const warrantyEnd = warrantyEndDate(billDate, ticket.warrantyPeriod);
-
-  // Prefer a verified online payment; otherwise fall back to the
-  // shop's own paid-amount record; otherwise the quoted price.
-  const paid = ticket.paidPayment
-    ? Number(ticket.paidPayment.amount)
-    : ticket.paidAmount !== null
-      ? Number(ticket.paidAmount)
-      : null;
-  const isSettled = paid !== null;
-  const paidDate = isSettled
-    ? (ticket.paidPayment?.createdAt ?? ticket.paidAt ?? null)
-    : null;
-  const paidMethod = isSettled
-    ? (ticket.paidMethod ?? (ticket.paidPayment ? "Bank transfer" : null))
-    : null;
   const payTo = resolvePayTo(ticket.billPayTo, shopPayTo);
   const show = resolveBillShow(ticket.billShow);
 
+  const payments = paymentRows(ticket);
+  const paidTotal = round2(payments.reduce((sum, p) => sum + p.amount, 0));
+
   const items = normaliseItems(ticket.billItems);
+  const isItemized = items.length > 0;
 
-  // ── Itemised bill (admin-built) ────────────────────────────────
-  // The admin's explicit line items + discount define the bill total;
-  // the loyalty discountPercent is intentionally ignored on this path.
-  if (items.length > 0) {
-    const subtotal =
-      Math.round(items.reduce((sum, i) => sum + i.amount, 0) * 100) / 100;
+  let subtotal: number;
+  let discountAmount = 0;
+  let discountLabel = "";
 
-    const fixed = ticket.billDiscountAmount
-      ? Number(ticket.billDiscountAmount)
-      : 0;
-    const pct = ticket.billDiscountPercent
-      ? Number(ticket.billDiscountPercent)
-      : 0;
-
-    let discountAmount = 0;
-    let discountLabel = "";
+  if (isItemized) {
+    // Itemised bill (admin-built): the admin's line items + discount define
+    // the total; the loyalty discountPercent is intentionally ignored here.
+    subtotal = round2(items.reduce((sum, i) => sum + i.amount, 0));
+    const fixed = ticket.billDiscountAmount ? Number(ticket.billDiscountAmount) : 0;
+    const pct = ticket.billDiscountPercent ? Number(ticket.billDiscountPercent) : 0;
     if (fixed > 0) {
-      discountAmount = Math.min(Math.round(fixed * 100) / 100, subtotal);
+      discountAmount = Math.min(round2(fixed), subtotal);
       discountLabel = "Discount";
     } else if (pct > 0) {
-      discountAmount = Math.round(subtotal * (pct / 100) * 100) / 100;
+      discountAmount = round2(subtotal * (pct / 100));
       discountLabel = `Discount (${pct}%)`;
     }
-
-    return {
-      deviceName,
-      owner,
-      technician: ticket.technician,
-      billDate,
-      warrantyEnd,
-      isItemized: true,
-      items,
-      subtotal,
-      discountLabel,
-      discountAmount,
-      total: Math.round((subtotal - discountAmount) * 100) / 100,
-      isSettled,
-      paidDate,
-      paidMethod,
-      payTo,
-      show,
-    };
+  } else {
+    // No bill made yet: the confirmed price, else the quote.
+    const finalCost = ticket.finalCost ? Number(ticket.finalCost) : null;
+    const pct = ticket.discountPercent ? Number(ticket.discountPercent) : 0;
+    subtotal =
+      finalCost ?? (ticket.estimatedCost ? Number(ticket.estimatedCost) : 0);
+    if (pct > 0 && finalCost !== null) {
+      discountAmount = round2(finalCost * (pct / 100));
+      discountLabel = `Loyalty discount (${pct}%)`;
+    }
+    // An old repair marked paid by hand with no price on file: the amount
+    // paid is the bill.
+    if (subtotal === 0 && paidTotal > 0) subtotal = paidTotal;
   }
 
-  // ── Legacy single-line bill (auto-computed from ticket fields) ──
-  const finalCost = ticket.finalCost ? Number(ticket.finalCost) : null;
-  const discountPercent = ticket.discountPercent
-    ? Number(ticket.discountPercent)
-    : 0;
+  const total = round2(Math.max(0, subtotal - discountAmount));
+  const balance = round2(Math.max(0, total - paidTotal));
+  const isSettled = paidTotal > 0 && balance === 0;
+  const state: BillState = isSettled
+    ? "paid"
+    : paidTotal > 0
+      ? "partial"
+      : isItemized
+        ? "issued"
+        : "draft";
 
-  const subtotal =
-    finalCost ?? paid ?? (ticket.estimatedCost ? Number(ticket.estimatedCost) : 0);
-  const discountAmount =
-    discountPercent > 0 && finalCost !== null
-      ? Math.round(finalCost * (discountPercent / 100) * 100) / 100
-      : 0;
-  const total = paid ?? subtotal - discountAmount;
+  const last = payments[payments.length - 1];
+  const methods = [...new Set(payments.map((p) => p.method))];
 
   return {
     deviceName,
@@ -300,17 +396,25 @@ export function computeBill(
     technician: ticket.technician,
     billDate,
     warrantyEnd,
-    isItemized: false,
-    items: [],
+    isItemized,
+    items,
     subtotal,
-    discountLabel:
-      discountAmount > 0 ? `Loyalty discount (${discountPercent}%)` : "",
+    discountLabel,
     discountAmount,
     total,
+    payments,
+    paidTotal,
+    balance,
+    state,
     isSettled,
-    paidDate,
-    paidMethod,
+    paidDate: isSettled ? (last?.at ?? null) : null,
+    paidMethod: methods.length > 0 ? methods.join(" + ") : null,
     payTo,
     show,
   };
+}
+
+/** The customer's bill link: no sign-in, keyed on the unguessable token. */
+export function invoicePath(trackToken: string): string {
+  return `/invoice/${encodeURIComponent(trackToken)}`;
 }

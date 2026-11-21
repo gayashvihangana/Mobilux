@@ -873,10 +873,12 @@ export default async function AdminOverviewPage() {
                 const days = Math.floor(
                   (Date.now() - since.getTime()) / 86_400_000,
                 );
+                // Part paid still counts as unpaid: something is owed.
                 const settled =
                   ticket.payments.length > 0 ||
                   ticket.paidAt !== null ||
-                  ticket.paidAmount !== null;
+                  (ticket.paidAmount !== null &&
+                    Number(ticket.paidAmount) >= Number(ticket.finalCost ?? 0));
                 return (
                   <QueueRow
                     key={ticket.id}

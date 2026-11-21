@@ -23,7 +23,7 @@ export async function PaymentCard({
   latestPayment,
   discountPercent,
 }: {
-  ticket: Pick<RepairTicket, "id" | "estimatedCost" | "finalCost">;
+  ticket: Pick<RepairTicket, "id" | "estimatedCost" | "finalCost" | "paidAmount" | "billItems">;
   latestPayment: Payment | null;
   discountPercent: number;
 }) {
@@ -59,7 +59,13 @@ export async function PaymentCard({
   }
 
   const finalCost = Number(ticket.finalCost);
-  const payable = applyDiscount(finalCost, discountPercent);
+  // A bill made on the bill page already has its discount in finalCost.
+  const itemised = Array.isArray(ticket.billItems) && ticket.billItems.length > 0;
+  const shownDiscount = itemised ? 0 : discountPercent;
+  const afterDiscount = applyDiscount(finalCost, shownDiscount);
+  // A deposit or part payment taken at the shop comes off what is left to pay.
+  const paidAtShop = Number(ticket.paidAmount ?? 0);
+  const payable = Math.max(0, Math.round((afterDiscount - paidAtShop) * 100) / 100);
 
   // Paid
   if (latestPayment?.status === "PAID") {
@@ -139,6 +145,25 @@ export async function PaymentCard({
     );
   }
 
+  // Paid in full at the shop
+  if (payable <= 0 && paidAtShop > 0) {
+    return (
+      <Card className="border-success/30">
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2 text-lg">
+            <CheckCircle2 className="size-5 text-success" /> Paid
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Amount</span>
+          <span className="font-display text-lg font-bold text-success">
+            {formatLKR(paidAtShop)}
+          </span>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Payable (no payment yet, or last one was rejected)
   return (
     <Card className="border-primary/30">
@@ -159,15 +184,21 @@ export async function PaymentCard({
             <span className="text-muted-foreground">Repair cost</span>
             <span className="font-medium">{formatLKR(finalCost)}</span>
           </div>
-          {discountPercent > 0 ? (
+          {shownDiscount > 0 ? (
             <div className="flex items-center justify-between text-success">
               <span className="flex items-center gap-1.5">
                 <BadgePercent className="size-3.5" />
-                Loyalty discount ({discountPercent}%)
+                Loyalty discount ({shownDiscount}%)
               </span>
               <span className="font-medium">
-                −{formatLKR(finalCost - payable)}
+                −{formatLKR(finalCost - afterDiscount)}
               </span>
+            </div>
+          ) : null}
+          {paidAtShop > 0 ? (
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Already paid</span>
+              <span className="font-medium">−{formatLKR(paidAtShop)}</span>
             </div>
           ) : null}
           <Separator />

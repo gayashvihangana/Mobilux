@@ -6,13 +6,13 @@ import {
   type BillTicket,
 } from "@/lib/bill";
 import { statusLabel } from "@/lib/status";
-import { formatDate, formatLKR, formatPhoneIntl, formatTime } from "@/lib/utils";
+import { formatDate, formatPhoneIntl, formatTime } from "@/lib/utils";
 
 export type { BillTicket };
 
 // The letterhead. Passed in rather than imported from config because the bill
 // builder renders a live preview of this component on the client, where the
-// database is unreachable — and because the shop's real name lives in
+// database is unreachable, and because the shop's real name lives in
 // Settings, not in a build-time env var.
 export type BillShopInfo = {
   name: string;
@@ -26,9 +26,21 @@ export type BillShopInfo = {
   billMessage?: string;
 };
 
-// A classic, print-ready invoice on white "paper" — serif letterhead, a
-// meta block (invoice no. / repair id / date / time) top-right, and a
-// warranty + thank-you footer. Looks the same regardless of site theme.
+/** "4,500.00": the bill's money format, with the currency in the headings. */
+function money(n: number) {
+  return n.toLocaleString("en-LK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+const LABEL = "text-[11px] font-bold tracking-[0.08em] text-neutral-500 uppercase";
+
+// The printable bill, as in docs/design-samples/bill.html (section 4): a
+// white A4 sheet with the shop and "Invoice" (or "Receipt" once paid) at the
+// top, who / what / when underneath, a table of items with quantity and
+// price, the totals with every payment and the balance due, then how to pay
+// and the QR code. Looks the same whatever the site theme.
 export function BillDocument({
   ticket,
   shop,
@@ -37,169 +49,110 @@ export function BillDocument({
 }: {
   ticket: BillTicket;
   shop: BillShopInfo;
-  /** Settings → Bank accounts default, used only when the bill saved none. */
+  /** Settings > Bank accounts default, used only when the bill saved none. */
   shopPayTo?: BillPayTo;
   trackQr?: string;
 }) {
-  const {
-    deviceName,
-    owner,
-    technician,
-    billDate,
-    isItemized,
-    items,
-    subtotal,
-    discountLabel,
-    discountAmount,
-    total,
-    isSettled,
-    paidDate,
-    paidMethod,
-    payTo,
-    show,
-    warrantyEnd,
-  } = computeBill(ticket, shopPayTo);
+  const bill = computeBill(ticket, shopPayTo);
+  const { show } = bill;
+  const number = invoiceNumber(ticket.ticketNumber);
 
-  const showSubtotal = isItemized && (items.length > 1 || discountAmount > 0);
-  const showTechnician = show.technician && !!technician;
-  const showDeviceBox = show.device || show.status;
+  const showTechnician = show.technician && !!bill.technician;
   const showIssue = show.issue && !!ticket.issueTitle;
   const showSolution = show.solution && !!ticket.solution;
   const showWarranty = show.warranty && !!ticket.warrantyPeriod;
-  // Only issues the customer was actually told about belong on the bill —
-  // a withdrawn report never existed as far as the invoice is concerned.
+  // Only issues the customer was actually told about belong on the bill.
   const billIssues = ticket.issues.filter((i) => i.note.trim().length > 0);
   const showRepairIssue = show.repairIssue && billIssues.length > 0;
-  const phone = ticket.customer?.phone ?? null;
-  const paidMeta = [paidMethod, paidDate ? formatDate(paidDate) : null]
-    .filter(Boolean)
-    .join(" · ");
+  const phone = ticket.customerPhone || ticket.customer?.phone || null;
+  const showPayBlock = !bill.isSettled && show.payment && bill.balance > 0;
 
-  const meta: { label: string; value: string }[] = [
-    { label: "Invoice No.", value: invoiceNumber(ticket.ticketNumber) },
-    { label: "Repair ID", value: ticket.ticketNumber },
-    { label: "Date", value: formatDate(billDate) },
-    { label: "Time", value: formatTime(billDate) },
-  ];
+  const lines = bill.isItemized
+    ? bill.items
+    : [
+        {
+          label: ticket.solution || ticket.issueTitle,
+          qty: 1,
+          unitPrice: bill.subtotal,
+          amount: bill.subtotal,
+        },
+      ];
 
   return (
-    <div
-      className="mx-auto max-w-3xl overflow-hidden rounded-sm border border-neutral-300 bg-white text-neutral-800 shadow-xl print:rounded-none print:border-0 print:shadow-none"
-      style={{
-        fontFamily:
-          "var(--font-newsreader), Georgia, 'Times New Roman', Times, serif",
-      }}
-    >
-      <div className="px-9 py-9 sm:px-12">
-        {/* ── Letterhead ─────────────────────────────────────── */}
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <p className="text-3xl font-bold tracking-tight text-neutral-900">
-              {shop.name}
-            </p>
-            <p className="mt-0.5 text-sm tracking-wide text-neutral-500 italic">
-              {shop.tagline}
-            </p>
-            <p className="mt-3 text-xs leading-relaxed text-neutral-500">
-              {shop.address}
-              <br />
-              {shop.phone} · {shop.email}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-lg font-semibold tracking-[0.3em] text-neutral-900 uppercase">
-              Invoice
-            </p>
-            <dl className="mt-3 space-y-1 text-xs">
-              {meta.map((m) => (
-                <div
-                  key={m.label}
-                  className="flex items-baseline justify-end gap-3"
-                >
-                  <dt className="text-neutral-400 uppercase">{m.label}</dt>
-                  <dd className="min-w-24 text-right font-semibold text-neutral-800 tabular-nums">
-                    {m.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
-
-        <div className="my-7 border-t-2 border-neutral-800" />
-
-        {/* ── Parties: Bill to / Technician ─────────────────── */}
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-              Bill to
-            </p>
-            <p className="mt-1.5 text-base font-semibold text-neutral-900">
-              {owner}
-            </p>
-            {phone ? (
-              <p className="text-sm text-neutral-500">
-                {formatPhoneIntl(phone)}
-              </p>
-            ) : null}
-            {ticket.customer?.email ? (
-              <p className="text-sm text-neutral-500">{ticket.customer.email}</p>
-            ) : null}
-          </div>
-          {showTechnician ? (
-            <div className="text-right">
-              <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-                Served by
-              </p>
-              <p className="mt-1.5 text-base font-semibold text-neutral-900">
-                {technician}
-              </p>
-              <p className="text-sm text-neutral-500">Technician</p>
+    <div className="@container relative mx-auto max-w-3xl overflow-hidden rounded-sm bg-white font-sans text-[13px] text-neutral-900 shadow-xl print:rounded-none print:shadow-none">
+      <div className="px-6 py-8 @lg:px-12 @lg:py-12">
+        {/* ── Shop and title ────────────────────────────────── */}
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              aria-hidden="true"
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-lg font-extrabold text-white"
+            >
+              {shop.name.trim().charAt(0).toUpperCase() || "M"}
             </div>
-          ) : null}
+            <div className="min-w-0">
+              <p className="text-base font-extrabold">{shop.name}</p>
+              <p className="text-neutral-500">
+                {[shop.address, shop.phone].filter(Boolean).join(" · ")}
+              </p>
+              {shop.email ? <p className="text-neutral-500">{shop.email}</p> : null}
+            </div>
+          </div>
+          <div className="@lg:text-right">
+            <p className="text-[28px] leading-none font-extrabold tracking-tight">
+              {bill.isSettled ? "Receipt" : "Invoice"}
+            </p>
+            <p className="mt-1.5 text-neutral-500 tabular-nums">{number}</p>
+          </div>
         </div>
 
-        {/* ── Device / status ───────────────────────────────── */}
-        {showDeviceBox ? (
-          <div className="mt-7 grid gap-3 border-y border-neutral-200 py-4 text-sm sm:grid-cols-2">
-            {show.device ? (
-              <div className="flex gap-2">
-                <span className="text-neutral-400">Device:</span>
-                <span className="font-semibold text-neutral-800">
-                  {deviceName}
-                </span>
-              </div>
-            ) : null}
-            {show.status ? (
-              <div className="flex gap-2 sm:justify-end">
-                <span className="text-neutral-400">Status:</span>
-                <span className="font-semibold text-neutral-800">
-                  {statusLabel(ticket.status)}
-                </span>
-              </div>
+        {/* ── Who, what, when ───────────────────────────────── */}
+        <div className="mt-8 mb-6 grid gap-6 @lg:grid-cols-3">
+          <div>
+            <p className={LABEL}>Bill to</p>
+            <p className="mt-1 font-bold">{bill.owner}</p>
+            {phone ? <p className="text-neutral-600">{formatPhoneIntl(phone)}</p> : null}
+            {ticket.customer?.email ? (
+              <p className="break-all text-neutral-600">{ticket.customer.email}</p>
             ) : null}
           </div>
-        ) : null}
+          {show.device || show.status ? (
+            <div>
+              <p className={LABEL}>Device</p>
+              {show.device ? <p className="mt-1 font-bold">{bill.deviceName}</p> : null}
+              <p className="text-neutral-600">Repair {ticket.ticketNumber}</p>
+              {show.status ? (
+                <p className="text-neutral-600">{statusLabel(ticket.status)}</p>
+              ) : null}
+            </div>
+          ) : (
+            <div />
+          )}
+          <div>
+            <p className={LABEL}>Dates</p>
+            <p className="mt-1">
+              Issued {formatDate(bill.billDate)}, {formatTime(bill.billDate)}
+            </p>
+            {bill.paidDate ? <p>Paid {formatDate(bill.paidDate)}</p> : null}
+            {showTechnician ? <p className="text-neutral-600">Served by {bill.technician}</p> : null}
+          </div>
+        </div>
 
-        {/* ── Repair details ────────────────────────────────── */}
+        {/* ── What was wrong / what we did ──────────────────── */}
         {showIssue || showSolution ? (
-          <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <div className="mb-6 grid gap-5 rounded-lg bg-neutral-50 p-4 @lg:grid-cols-2">
             {showIssue ? (
               <div>
-                <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-                  Reported issue
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
+                <p className={LABEL}>Reported problem</p>
+                <p className="mt-1 leading-relaxed whitespace-pre-wrap text-neutral-700">
                   {ticket.issueTitle}
                 </p>
               </div>
             ) : null}
             {showSolution ? (
               <div>
-                <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-                  Work carried out
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
+                <p className={LABEL}>Work done</p>
+                <p className="mt-1 leading-relaxed whitespace-pre-wrap text-neutral-700">
                   {ticket.solution}
                 </p>
               </div>
@@ -207,262 +160,194 @@ export function BillDocument({
           </div>
         ) : null}
 
+        {/* ── Items ─────────────────────────────────────────── */}
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b-[1.5px] border-neutral-900 text-left">
+              <th className={`${LABEL} py-2 font-bold`}>Item</th>
+              <th className={`${LABEL} w-12 py-2 text-right font-bold`}>Qty</th>
+              <th className={`${LABEL} hidden w-28 py-2 text-right font-bold @lg:table-cell`}>
+                Price
+              </th>
+              <th className={`${LABEL} w-28 py-2 text-right font-bold`}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line, i) => (
+              <tr key={`${line.label}-${i}`} className="border-b border-neutral-200 align-top">
+                <td className="py-2.5 pr-3">
+                  {line.label}
+                  {!bill.isItemized && ticket.partsUsed ? (
+                    <span className="block text-xs text-neutral-500">
+                      Parts: {ticket.partsUsed}
+                    </span>
+                  ) : null}
+                </td>
+                <td className="py-2.5 text-right tabular-nums">{line.qty}</td>
+                <td className="hidden py-2.5 text-right tabular-nums @lg:table-cell">
+                  {money(line.unitPrice)}
+                </td>
+                <td className="py-2.5 text-right tabular-nums">{money(line.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* ── Totals, payments, balance ─────────────────────── */}
+        <div className="mt-4 ml-auto flex w-full max-w-xs flex-col gap-1.5 break-inside-avoid">
+          {bill.discountAmount > 0 ? (
+            <>
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="tabular-nums">{money(bill.subtotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{bill.discountLabel}</span>
+                <span className="tabular-nums">− {money(bill.discountAmount)}</span>
+              </div>
+            </>
+          ) : null}
+          <div className="flex justify-between border-t-[1.5px] border-neutral-900 pt-2 text-base font-extrabold">
+            <span>Total (LKR)</span>
+            <span className="tabular-nums">{money(bill.total)}</span>
+          </div>
+          {bill.payments.map((p) => (
+            <div key={p.id} className="flex justify-between text-neutral-600">
+              <span>
+                Paid {formatDate(p.at)} · {p.method}
+              </span>
+              <span className="tabular-nums">− {money(p.amount)}</span>
+            </div>
+          ))}
+          {bill.isSettled ? null : (
+            <div className="mt-1 flex justify-between rounded bg-neutral-900 px-2.5 py-2 text-[15px] font-extrabold text-white">
+              <span>Balance due</span>
+              <span className="tabular-nums">LKR {money(bill.balance)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── PAID stamp ────────────────────────────────────── */}
+        {bill.isSettled ? (
+          <div className="mt-6 flex justify-center break-inside-avoid @lg:justify-start">
+            <div className="-rotate-3 rounded-md border-[3px] border-green-700/80 px-8 py-2 text-center">
+              <p className="text-4xl leading-none font-black tracking-[0.15em] text-green-700/90">
+                PAID
+              </p>
+              <p className="mt-1 text-[10px] font-bold tracking-[0.15em] text-green-800/80 uppercase">
+                {[bill.paidMethod, bill.paidDate ? formatDate(bill.paidDate) : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {/* ── Issue during the repair (free-of-charge work) ─── */}
         {showRepairIssue ? (
-          <div className="mt-6 break-inside-avoid border-l-2 border-neutral-800 bg-neutral-50 py-3 pr-4 pl-4">
-            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-              Issue during the repair
-            </p>
+          <div className="mt-6 break-inside-avoid rounded-lg border-l-[3px] border-neutral-900 bg-neutral-50 p-4">
+            <p className={LABEL}>Issue during the repair</p>
             <div className="mt-2 space-y-3">
               {billIssues.map((issue, i) => (
-                <div key={i} className="text-sm">
+                <div key={i}>
                   <p className="leading-relaxed whitespace-pre-wrap text-neutral-700">
-                    <span className="font-semibold text-neutral-800">
-                      What happened:{" "}
-                    </span>
+                    <b className="text-neutral-900">What happened: </b>
                     {issue.note}
                   </p>
                   {issue.solution ? (
                     <p className="mt-1 leading-relaxed whitespace-pre-wrap text-neutral-700">
-                      <span className="font-semibold text-neutral-800">
-                        Put right at no charge:{" "}
-                      </span>
+                      <b className="text-neutral-900">Put right at no charge: </b>
                       {issue.solution}
                     </p>
                   ) : null}
                   <p className="mt-1 text-xs text-neutral-500">
                     {issue.status === "ACCEPTED"
-                      ? "Free fix approved by the customer and completed."
+                      ? "The customer agreed to the free fix."
                       : issue.status === "DECLINED"
-                        ? "The customer chose not to continue — a refund was agreed."
-                        : "Awaiting the customer's decision."}
+                        ? "The customer chose not to continue, and a refund was agreed."
+                        : "Waiting for the customer's decision."}
                   </p>
                 </div>
               ))}
             </div>
             {ticket.issueWarranty ? (
-              <p className="mt-3 text-sm text-neutral-700">
-                <span className="font-semibold text-neutral-800">
-                  Warranty on this work:{" "}
-                </span>
+              <p className="mt-3 text-neutral-700">
+                <b className="text-neutral-900">Warranty on this work: </b>
                 {ticket.issueWarranty}
               </p>
             ) : null}
             <p className="mt-3 text-xs text-neutral-500">
-              Nothing above has been charged on this invoice — replacement parts
-              and labour for it were covered by us.
+              None of this is charged on this bill. We covered the parts and labour.
             </p>
           </div>
         ) : null}
 
-        {/* ── Line items ────────────────────────────────────── */}
-        <table className="mt-7 w-full text-sm">
-          <thead>
-            <tr className="border-b-2 border-neutral-800 text-left text-[11px] tracking-widest text-neutral-500 uppercase">
-              <th className="pb-2 font-semibold">Description</th>
-              <th className="pb-2 text-right font-semibold">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isItemized ? (
-              items.map((item, i) => (
-                <tr
-                  key={`${item.label}-${i}`}
-                  className="border-b border-neutral-200"
-                >
-                  <td className="py-3 align-top text-neutral-800">
-                    {item.label}
-                  </td>
-                  <td className="py-3 text-right align-top whitespace-nowrap text-neutral-800 tabular-nums">
-                    {formatLKR(item.amount)}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr className="border-b border-neutral-200">
-                <td className="py-3.5 align-top">
-                  <p className="text-neutral-800">
-                    {ticket.solution || ticket.issueTitle}
-                  </p>
-                  {ticket.partsUsed ? (
-                    <p className="mt-0.5 text-xs text-neutral-500">
-                      Parts: {ticket.partsUsed}
-                    </p>
-                  ) : null}
-                </td>
-                <td className="py-3.5 text-right align-top whitespace-nowrap text-neutral-800 tabular-nums">
-                  {formatLKR(subtotal)}
-                </td>
-              </tr>
-            )}
-            {showSubtotal ? (
-              <tr>
-                <td className="pt-3 text-right text-neutral-500">Subtotal</td>
-                <td className="pt-3 text-right whitespace-nowrap text-neutral-600 tabular-nums">
-                  {formatLKR(subtotal)}
-                </td>
-              </tr>
-            ) : null}
-            {discountAmount > 0 ? (
-              <tr>
-                <td className="py-1.5 text-right text-neutral-500">
-                  {discountLabel}
-                </td>
-                <td className="py-1.5 text-right whitespace-nowrap text-neutral-600 tabular-nums">
-                  −{formatLKR(discountAmount)}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-neutral-800">
-              <td className="pt-3 text-right text-sm font-semibold tracking-widest text-neutral-500 uppercase">
-                Total
-              </td>
-              <td className="pt-3 text-right text-2xl font-bold whitespace-nowrap text-neutral-900 tabular-nums">
-                {formatLKR(total)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-
-        {/* ── Paid seal / balance due ───────────────────────── */}
-        {isSettled ? (
-          <div className="mt-8 flex justify-center break-inside-avoid">
-            <div className="rounded-md border-[3px] border-green-700/70 px-10 py-3 text-center">
-              <p className="text-5xl leading-none font-black tracking-[0.15em] text-green-700/85 uppercase">
-                Paid
-              </p>
-              {paidMeta ? (
-                <p className="mt-1.5 text-[9px] leading-tight font-medium tracking-[0.2em] text-green-800/70 uppercase">
-                  {paidMeta}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-8 flex items-center justify-between border border-neutral-300 bg-neutral-50 px-4 py-3">
-            <p className="text-sm font-semibold tracking-wide text-neutral-700 uppercase">
-              Balance due
-            </p>
-            <p className="text-lg font-bold text-neutral-900 tabular-nums">
-              {formatLKR(total)}
-            </p>
-          </div>
-        )}
-
-        {/* ── How to pay ────────────────────────────────────── */}
-        {!isSettled && show.payment && total > 0 ? (
-          <div className="mt-6 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
-            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-              How to pay
-            </p>
-            <p className="mt-2 text-sm text-neutral-600">
-              Transfer to the account below and keep your receipt, or pay in
-              store. Quote{" "}
-              <span className="font-semibold text-neutral-900">
-                {ticket.ticketNumber}
-              </span>{" "}
-              as the reference.
-            </p>
-            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              <div className="flex gap-2">
-                <span className="text-neutral-400">Bank:</span>
-                <span className="font-semibold text-neutral-800">
-                  {payTo.bankName}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-neutral-400">Branch:</span>
-                <span className="font-semibold text-neutral-800">
-                  {payTo.branch}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-neutral-400">Account name:</span>
-                <span className="font-semibold text-neutral-800">
-                  {payTo.accountName}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <span className="text-neutral-400">Account no:</span>
-                <span className="font-semibold text-neutral-800 tabular-nums">
-                  {payTo.accountNumber}
-                </span>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* ── Specific warranty (when a period is set) ──────── */}
+        {/* ── Warranty ──────────────────────────────────────── */}
         {showWarranty ? (
-          <div className="mt-6 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
-            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-              Warranty
+          <div className="mt-6 break-inside-avoid rounded-lg bg-neutral-50 p-4">
+            <p className={LABEL}>Warranty</p>
+            <p className="mt-1 text-neutral-700">
+              <b className="text-neutral-900">{ticket.warrantyPeriod}</b> warranty
+              {ticket.warrantyParts ? <> on {ticket.warrantyParts}</> : null}
+              {bill.warrantyEnd ? <>, valid until {formatDate(bill.warrantyEnd)}</> : null}.
             </p>
-            <p className="mt-2 text-sm text-neutral-700">
-              <span className="font-semibold">{ticket.warrantyPeriod}</span>{" "}
-              warranty
-              {ticket.warrantyParts ? <> on {ticket.warrantyParts}</> : null}.
-            </p>
-            {warrantyEnd ? (
-              <p className="mt-1 text-sm text-neutral-700">
-                Valid until{" "}
-                <span className="font-semibold">
-                  {formatDate(warrantyEnd)}, 11:59 PM
-                </span>
-                .
-              </p>
-            ) : null}
           </div>
         ) : null}
 
         {/* ── Notes ─────────────────────────────────────────── */}
         {show.notes && ticket.billNotes ? (
-          <div className="mt-6 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
-            <p className="text-[11px] font-semibold tracking-widest text-neutral-400 uppercase">
-              Notes
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-neutral-700">
+          <div className="mt-6 break-inside-avoid rounded-lg bg-neutral-50 p-4">
+            <p className={LABEL}>Notes</p>
+            <p className="mt-1 leading-relaxed whitespace-pre-wrap text-neutral-700">
               {ticket.billNotes}
             </p>
           </div>
         ) : null}
 
-        {/* ── Scan to track ─────────────────────────────────── */}
-        {show.track && trackQr ? (
-          <div className="mt-6 flex items-center gap-4 break-inside-avoid border border-neutral-200 bg-neutral-50 p-4">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static data URL */}
-            <img
-              src={trackQr}
-              alt={`QR code to track repair ${ticket.ticketNumber}`}
-              className="size-20 shrink-0 rounded-sm border border-neutral-200 bg-white p-1"
-            />
-            <div>
-              <p className="text-sm font-semibold text-neutral-900">
-                Track this repair anytime
-              </p>
-              <p className="mt-0.5 text-xs text-neutral-500">
-                Scan the code or enter ticket {ticket.ticketNumber} on our
-                online tracker — live status, no sign-in needed.
-              </p>
+        {/* ── How to pay + QR ───────────────────────────────── */}
+        {showPayBlock || (show.track && trackQr) ? (
+          <div className="mt-7 flex flex-col gap-6 border-t border-neutral-200 pt-5 break-inside-avoid @lg:flex-row @lg:items-start">
+            <div className="flex-1">
+              {showPayBlock ? (
+                <>
+                  <p className="font-bold">How to pay</p>
+                  <p className="mt-1 leading-relaxed text-neutral-700">
+                    {bill.payTo.bankName}
+                    {bill.payTo.branch ? `, ${bill.payTo.branch}` : ""} ·{" "}
+                    {bill.payTo.accountName} ·{" "}
+                    <span className="tabular-nums">{bill.payTo.accountNumber}</span>
+                    <br />
+                    Reference: <b>{number}</b>. Or pay at the shop when you collect.
+                  </p>
+                </>
+              ) : (
+                <p className="font-bold">Thank you.</p>
+              )}
             </div>
+            {show.track && trackQr ? (
+              <div className="flex items-center gap-3 @lg:flex-col @lg:text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- static data URL */}
+                <img
+                  src={trackQr}
+                  alt={`QR code to open repair ${ticket.ticketNumber}`}
+                  className="size-20 shrink-0 rounded bg-white"
+                />
+                <p className="max-w-[9rem] text-[11px] text-neutral-500">
+                  Scan to see this repair and bill
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {/* ── Footer ────────────────────────────────────────── */}
-        <div className="mt-9 border-t-2 border-neutral-800 pt-5">
-          <p className="text-center text-sm text-neutral-700 italic">
-            “{shop.billMessage?.trim() || billQuote(shop.name)}”
+        <div className="mt-8 border-t border-neutral-200 pt-4 text-neutral-500">
+          <p className="text-neutral-700">
+            {shop.billMessage?.trim() || billQuote(shop.name)}
           </p>
-          <p className="mt-4 text-[10.5px] leading-relaxed text-neutral-400">
-            <span className="font-semibold text-neutral-500 uppercase">
-              Warranty terms:{" "}
-            </span>
+          <p className="mt-3 text-[11px] leading-relaxed">
+            <b className="text-neutral-600">Warranty terms: </b>
             {warrantyTerms(shop.warrantyDays)}
-          </p>
-          <p className="mt-4 text-center text-[11px] tracking-wide text-neutral-400">
-            {[shop.name, shop.phone, shop.email].filter(Boolean).join(" · ")}
           </p>
         </div>
       </div>

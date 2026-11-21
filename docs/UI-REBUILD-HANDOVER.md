@@ -93,9 +93,17 @@ Step 6, Settings (done):
 - Plain helpers that the browser also needs are in `src/lib/settings-shared.ts`.
 - Not built: renaming the repair steps. Step names are tied to the status meanings and the tracker, so changing them needs its own design.
 
+Step 7, bills and payments (done):
+- Approved sample: `docs/design-samples/bill.html`.
+- Bill page `/admin/tickets/[id]/bill` (`bill-builder.tsx`): items with quantity and price, quick-add chips, discount, a Payments list, a closed "More options" (problem, work done, technician, warranty, pay-to account, bill date, what prints), and on the right the totals and a live preview of the printed bill. Status track Draft → Saved → Part paid → Paid; one main button (Save bill / Record payment / Download receipt); phone has Edit and Preview tabs and a bottom bar with the balance. Staff with `bill:write` can use it, not only admins.
+- Part payments: migration `20261121090000_bill_payments` adds `RepairTicket.billPayments` (JSON list of `{ id, amount, method, at, by }`). `paidAmount` is kept as their sum, so the reports and Board read it unchanged; `paidAt` is set only when nothing is left to pay. Actions `recordBillPayment` and `removeBillPayment` replace `markBillPaid` / `markBillUnpaid`. An old hand-entered "Customer paid" shows as one payment; once payments are recorded, the edit form no longer overwrites the paid amount.
+- `computeBill` in `src/lib/bill.ts` now returns `payments`, `paidTotal`, `balance` and `state`. Line items keep `amount` as the line total, so old bills read the same.
+- Customer bill link `/invoice/[trackToken]` (no sign-in, not indexed): balance due or a green "Paid" receipt, items, bank details with Copy buttons and the bill number as reference, "Send your slip on WhatsApp" (or "Upload payment slip" for the signed-in owner), and print to PDF. The tracker links to it once the repair has a price. Slip uploads now ask for the balance, not the full price.
+- Printed bill (`src/components/bill-document.tsx`) redesigned like the sample: Item / Qty / Price / Total, every payment, a black "Balance due" box, PAID stamp. It sizes by its own width, so the narrow preview stacks neatly.
+
 ## Steps left
 
-All six steps are done. Ideas for later: restyle the insides of the back-office pages (Shop numbers, Customers stat cards), real photos on the homepage, and "returning customer" under the phone field.
+All seven steps are done. Ideas for later: restyle the insides of the back-office pages (Shop numbers, Customers stat cards), real photos on the homepage, and "returning customer" under the phone field.
 
 Other known problems: the seven shop products are the sample products from `prisma/seed.ts`; Settings still says "Colombo, Sri Lanka" (the owner can change it himself).
 
