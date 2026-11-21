@@ -76,6 +76,18 @@ const QUICK_ITEMS = [
   "Diagnosis",
 ];
 
+// Warranty choices. "No warranty" saves nothing, so no warranty prints.
+// Anything else (say "1 year") goes in Other; the end date is worked out from
+// any "N days / weeks / months / years".
+const WARRANTY_OPTIONS = [
+  "7 days",
+  "14 days",
+  "30 days",
+  "2 months",
+  "3 months",
+  "6 months",
+];
+
 // What prints on the bill: each can be switched off in More options.
 const PRINT_TOGGLES: { key: keyof BillShow; label: string }[] = [
   { key: "device", label: "Device name" },
@@ -681,23 +693,14 @@ export function BillBuilder({
                       placeholder="Who did the repair"
                     />
                   </Field>
-                  <Field label="Warranty" id="b-warranty">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        id="b-warranty"
-                        value={values.warrantyPeriod}
-                        onChange={(e) => set("warrantyPeriod", e.target.value)}
-                        placeholder="e.g. 90 days"
-                      />
-                      <Input
-                        aria-label="Warranty covers"
-                        value={values.warrantyParts}
-                        onChange={(e) => set("warrantyParts", e.target.value)}
-                        placeholder="Covers, e.g. screen"
-                      />
-                    </div>
-                  </Field>
                 </div>
+
+                <WarrantyPicker
+                  period={values.warrantyPeriod}
+                  parts={values.warrantyParts}
+                  onPeriod={(v) => set("warrantyPeriod", v)}
+                  onParts={(v) => set("warrantyParts", v)}
+                />
 
                 {bill.issues.length > 0 ? (
                   <div className="space-y-2">
@@ -934,6 +937,102 @@ function RemoveRow({
     >
       <X />
     </Button>
+  );
+}
+
+function WarrantyPicker({
+  period,
+  parts,
+  onPeriod,
+  onParts,
+}: {
+  period: string;
+  parts: string;
+  onPeriod: (value: string) => void;
+  onParts: (value: string) => void;
+}) {
+  const trimmed = period.trim();
+  const preset = WARRANTY_OPTIONS.find((o) => o.toLowerCase() === trimmed.toLowerCase());
+  // Other stays open while its box is being typed in, even when empty.
+  const [other, setOther] = useState(!!trimmed && !preset);
+  // Follow outside changes (Discard, a restored draft) unless typing in Other.
+  useEffect(() => {
+    if (document.activeElement?.id === "b-warranty") return;
+    if (preset) setOther(false);
+    else if (trimmed) setOther(true);
+  }, [trimmed, preset]);
+  const selected = other ? "other" : trimmed ? preset : "none";
+  const chip = (on: boolean) =>
+    cn(
+      "inline-flex h-11 items-center rounded-full px-4 text-sm font-bold transition-colors",
+      on ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-accent",
+    );
+
+  return (
+    <div className="space-y-2">
+      <Label id="b-warranty-label">Warranty</Label>
+      <div role="radiogroup" aria-labelledby="b-warranty-label" className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={selected === "none"}
+          className={chip(selected === "none")}
+          onClick={() => {
+            setOther(false);
+            onPeriod("");
+          }}
+        >
+          No warranty
+        </button>
+        {WARRANTY_OPTIONS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="radio"
+            aria-checked={selected === option}
+            className={chip(selected === option)}
+            onClick={() => {
+              setOther(false);
+              onPeriod(option);
+            }}
+          >
+            {option}
+          </button>
+        ))}
+        <button
+          type="button"
+          role="radio"
+          aria-checked={selected === "other"}
+          className={chip(selected === "other")}
+          onClick={() => {
+            setOther(true);
+            if (preset) onPeriod("");
+            requestAnimationFrame(() => document.getElementById("b-warranty")?.focus());
+          }}
+        >
+          Other
+        </button>
+      </div>
+      <div className={cn("grid gap-2", other && "sm:grid-cols-2")}>
+        {other ? (
+          <Input
+            id="b-warranty"
+            aria-label="Warranty period"
+            value={period}
+            onChange={(e) => onPeriod(e.target.value)}
+            placeholder="e.g. 1 year or 45 days"
+          />
+        ) : null}
+        {selected !== "none" ? (
+          <Input
+            aria-label="Warranty covers"
+            value={parts}
+            onChange={(e) => onParts(e.target.value)}
+            placeholder="Covers (optional), e.g. screen"
+          />
+        ) : null}
+      </div>
+    </div>
   );
 }
 
