@@ -55,7 +55,9 @@ export function billQuote(shopName: string): string {
 
 // Default warranty terms printed in the bill footer. Kept deliberately plain
 // so customers know exactly what the standard warranty does and doesn't cover.
-export const WARRANTY_TERMS = `Unless a specific warranty period is stated above, repairs carry a ${WARRANTY_DAYS}-day warranty on the workmanship and parts listed on this bill. The warranty does not cover water or liquid damage, physical or accidental damage, misuse, tampering, or any fault unrelated to the original repair.`;
+export function warrantyTerms(days: number = WARRANTY_DAYS): string {
+  return `Unless a specific warranty period is stated above, repairs carry a ${days}-day warranty on the workmanship and parts listed on this bill. The warranty does not cover water or liquid damage, physical or accidental damage, misuse, tampering, or any fault unrelated to the original repair.`;
+}
 
 // Canonical site URL (no trailing slash) for links in emails, QR codes,
 // sitemaps and Open Graph tags. A printed bill's QR code is generated from

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 import type { Prisma, TicketStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getShopInfo } from "@/lib/settings";
+import { fillMessage, getShopInfo } from "@/lib/settings";
 import { whatsappHref } from "@/lib/phone";
 import { statusLabel } from "@/lib/status";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
@@ -124,7 +124,7 @@ function ownerName(t: Pick<Ticket, "customerName" | "customer">) {
 
 /** "Tharushi Silva" becomes "Tharushi S." so the day count still fits on a card. */
 function shortName(name: string) {
-  const parts = name.trim().split(/s+/);
+  const parts = name.trim().split(/\s+/);
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : name;
 }
 
@@ -254,7 +254,7 @@ export default async function RepairsPage({
     } else {
       content = tickets.map((t) =>
         column.key === "COMPLETED" ? (
-          <ReadyCard key={t.id} ticket={t} shopName={shop.name} />
+          <ReadyCard key={t.id} ticket={t} shopName={shop.name} template={shop.msgReady} />
         ) : (
           <RepairCard
             key={t.id}
@@ -486,15 +486,28 @@ function RepairCard({
 }
 
 // Ready for pickup: what to collect, a WhatsApp reminder and "Picked up".
-function ReadyCard({ ticket: t, shopName }: { ticket: Ticket; shopName: string }) {
+function ReadyCard({
+  ticket: t,
+  shopName,
+  template,
+}: {
+  ticket: Ticket;
+  shopName: string;
+  /** Settings > Customer messages. */
+  template: string;
+}) {
   const amount = toCollect(t);
   const phone = phoneOf(t);
   const reminder = phone
     ? whatsappHref(
         phone,
-        `Hi ${ownerName(t)}, your ${deviceName(t)} (${t.ticketNumber}) is repaired and ready to collect${
-          amount ? `. Amount to pay: ${formatLKR(amount)}` : ""
-        }. Thank you, ${shopName}`,
+        fillMessage(template, {
+          name: ownerName(t).split(/\s+/)[0],
+          device: deviceName(t),
+          ticket: t.ticketNumber,
+          amount: amount ? formatLKR(amount) : "to be confirmed",
+          shop: shopName,
+        }),
       )
     : null;
   let amountText = "No price yet";

@@ -85,9 +85,17 @@ Step 5, admin menu and the other admin pages (done):
 - Every admin page measured at 375px and 1366px: no sideways scroll (Reports was 441px wide because of its hidden screen-reader table).
 - Not done: the pages' own content is unchanged, so "Shop numbers" still has its glow blobs and many small cards, and the stat cards on Customers stack one per row on a phone. Worth a pass later.
 
+Step 6, Settings (done):
+- `src/app/admin/settings/page.tsx`: section menu (`?section=`), with `settings-form.tsx` (tracks unsaved changes, dark Discard/Save bar) and `sections.tsx` (the fields). No migration: settings are rows in the existing `Setting` key–value table.
+- `saveSettings` in `src/lib/actions/settings.ts` writes only the fields a section sends; the old all-fields `updateShopInfo` and `ShopInfoForm` are gone.
+- New settings, each wired to where it is used: opening hours per day (also saved as the one-line `hours` text every bill and message reads, and drives "Open now / Closed now" on the homepage); warranty days (homepage and bill warranty terms); repair number prefix (`src/lib/next-ticket-number.ts`; a new prefix starts again at 001); common problems (new-repair chips); bill thank-you line; WhatsApp texts for Remind and Send link (`{name}`, `{device}`, `{ticket}`, `{amount}`, `{link}`, `{shop}`).
+- Data: `/admin/export/repairs` and `/admin/export/customers` download CSV (admin only; walk-ins grouped by phone number).
+- Plain helpers that the browser also needs are in `src/lib/settings-shared.ts`.
+- Not built: renaming the repair steps. Step names are tied to the status meanings and the tracker, so changing them needs its own design.
+
 ## Steps left
 
-1. **Step 6, Settings** as described above.
+All six steps are done. Ideas for later: restyle the insides of the back-office pages (Shop numbers, Customers stat cards), real photos on the homepage, and "returning customer" under the phone field.
 
 Other known problems: the seven shop products are the sample products from `prisma/seed.ts`; Settings still says "Colombo, Sri Lanka" (the owner can change it himself).
 

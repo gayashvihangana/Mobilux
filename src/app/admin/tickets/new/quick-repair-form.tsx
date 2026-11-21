@@ -10,14 +10,6 @@ import { FormAutosave } from "@/components/forms/form-autosave";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { cn } from "@/lib/utils";
 
-// The problems that walk in most often — one tap fills the field.
-const COMMON_PROBLEMS = [
-  "Display cracked",
-  "No power",
-  "Not charging",
-  "Battery drain",
-];
-
 // Fields that render their own error message below.
 const SHOWN_FIELDS = new Set([
   "customerName",
@@ -30,7 +22,14 @@ const SHOWN_FIELDS = new Set([
 // what is wrong. Everything else (parts, costs, notes) is added on the repair
 // page once the work starts. The repair is always saved as RECEIVED — logging
 // an old, finished repair is a different job with its own form.
-export function QuickRepairForm({ compact = false }: { compact?: boolean }) {
+export function QuickRepairForm({
+  compact = false,
+  problems = [],
+}: {
+  compact?: boolean;
+  /** One-tap problems, from Settings > Repairs. */
+  problems?: string[];
+}) {
   const [state, formAction, pending] = useActionState(adminCreateTicket, null);
   const problemRef = useRef<HTMLInputElement>(null);
   // Two copies of this form can be on screen at once (the Today card and a
@@ -136,9 +135,9 @@ export function QuickRepairForm({ compact = false }: { compact?: boolean }) {
           placeholder={compact ? "Problem" : "e.g. No power after water damage"}
         />
         <FieldError errors={state?.fieldErrors?.issueTitle} />
-        {compact ? null : (
+        {compact || problems.length === 0 ? null : (
           <div className="flex flex-wrap gap-2">
-            {COMMON_PROBLEMS.map((problem) => (
+            {problems.map((problem) => (
               <Button
                 key={problem}
                 type="button"

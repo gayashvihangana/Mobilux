@@ -1,4 +1,4 @@
-import { billQuote, WARRANTY_TERMS } from "@/lib/config";
+import { billQuote, warrantyTerms } from "@/lib/config";
 import {
   computeBill,
   invoiceNumber,
@@ -20,6 +20,10 @@ export type BillShopInfo = {
   address: string;
   phone: string;
   email: string;
+  /** Settings > Repairs. Falls back to the build-time default. */
+  warrantyDays?: number;
+  /** Settings > Bills and payments: the thank-you line. */
+  billMessage?: string;
 };
 
 // A classic, print-ready invoice on white "paper" — serif letterhead, a
@@ -449,13 +453,13 @@ export function BillDocument({
         {/* ── Footer ────────────────────────────────────────── */}
         <div className="mt-9 border-t-2 border-neutral-800 pt-5">
           <p className="text-center text-sm text-neutral-700 italic">
-            “{billQuote(shop.name)}”
+            “{shop.billMessage?.trim() || billQuote(shop.name)}”
           </p>
           <p className="mt-4 text-[10.5px] leading-relaxed text-neutral-400">
             <span className="font-semibold text-neutral-500 uppercase">
               Warranty terms:{" "}
             </span>
-            {WARRANTY_TERMS}
+            {warrantyTerms(shop.warrantyDays)}
           </p>
           <p className="mt-4 text-center text-[11px] tracking-wide text-neutral-400">
             {[shop.name, shop.phone, shop.email].filter(Boolean).join(" · ")}

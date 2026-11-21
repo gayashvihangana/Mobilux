@@ -16,6 +16,7 @@ import { parseReceivedItems } from "@/lib/received-items";
 import { parseParts, partsTotalCost, partsWithFallback } from "@/lib/parts";
 import { issueChip } from "@/lib/repair-issue";
 import { telHref, whatsappHref } from "@/lib/phone";
+import { fillMessage, getShopInfo } from "@/lib/settings";
 import { cn, formatDate, formatLKR } from "@/lib/utils";
 import { EditableStatusHistory } from "./editable-status-history";
 import { MainAction, RepairMenu } from "./repair-actions";
@@ -65,7 +66,7 @@ export default async function AdminTicketDetailPage({
 }) {
   const [{ id }, { created, edit }] = await Promise.all([params, searchParams]);
 
-  const [ticket, customers] = await Promise.all([
+  const [ticket, customers, shop] = await Promise.all([
     prisma.repairTicket.findUnique({
       where: { id },
       include: {
@@ -82,6 +83,7 @@ export default async function AdminTicketDetailPage({
       select: { id: true, name: true, email: true },
       orderBy: { name: "asc" },
     }),
+    getShopInfo(),
   ]);
   if (!ticket) notFound();
 
@@ -350,7 +352,13 @@ export default async function AdminTicketDetailPage({
           ) : null}
           <ContactButtons
             phone={phone}
-            message={`Hi ${firstName}, you can follow your ${deviceName} repair (${ticket.ticketNumber}) here: ${link}`}
+            message={fillMessage(shop.msgLink, {
+              name: firstName,
+              device: deviceName,
+              ticket: ticket.ticketNumber,
+              link,
+              shop: shop.name,
+            })}
           />
         </section>
 

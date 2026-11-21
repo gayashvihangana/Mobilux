@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { Clock, MapPin, Navigation, Phone } from "lucide-react";
-import { getShopInfo, shopWhatsappLink, type ShopInfo } from "@/lib/settings";
+import {
+  getShopInfo,
+  isOpenNow,
+  shopWhatsappLink,
+  type ShopInfo,
+} from "@/lib/settings";
 import { SITE_URL } from "@/lib/config";
 import { SITE_IMAGES, type SiteImage } from "@/lib/site-images";
 import { telHref } from "@/lib/phone";
@@ -8,9 +13,6 @@ import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/whatsapp";
 import { TestimonialsSection } from "@/components/testimonials-section";
 import { cn, jsonLdScript } from "@/lib/utils";
-
-// Shown in the hero's small print until warranty length is a setting (step 6).
-const WARRANTY = "30-day warranty";
 
 /** "Pannipitiya" from "12 Temple Road, Pannipitiya" — the last part names the town. */
 function townOf(address: string) {
@@ -49,6 +51,7 @@ function buildJsonLd(shop: ShopInfo, town: string) {
 export default async function HomePage() {
   const shop = await getShopInfo();
   const town = townOf(shop.address);
+  const open = isOpenNow(shop.weekHours);
   const photoQuote = shopWhatsappLink(
     shop,
     "Hi! I'd like a price for a repair. Here is a photo of the problem:",
@@ -104,7 +107,7 @@ export default async function HomePage() {
                   {shop.phone}
                 </a>
               ) : null}
-              <span>{WARRANTY}</span>
+              {shop.warrantyDays > 0 ? <span>{shop.warrantyDays}-day warranty</span> : null}
             </p>
           </div>
 
@@ -145,9 +148,20 @@ export default async function HomePage() {
           className="grid scroll-mt-24 gap-6 rounded-[28px] bg-card p-6 sm:p-10 md:grid-cols-[1fr_auto] md:items-center"
         >
           <div className="space-y-3">
-            <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Find us
-            </h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+                Find us
+              </h2>
+              {open ? (
+                <span className="rounded-full bg-success/15 px-3 py-1 text-sm font-bold text-success">
+                  Open now
+                </span>
+              ) : (
+                <span className="rounded-full bg-secondary px-3 py-1 text-sm font-bold text-muted-foreground">
+                  Closed now
+                </span>
+              )}
+            </div>
             {shop.address ? (
               <p className="flex items-start gap-2.5 text-base">
                 <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
