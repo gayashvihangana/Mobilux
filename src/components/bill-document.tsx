@@ -102,9 +102,37 @@ export function BillDocument({
             <p className="text-[28px] leading-none font-extrabold tracking-tight">
               {bill.isSettled ? "Receipt" : "Invoice"}
             </p>
-            <p className="mt-1.5 text-neutral-500 tabular-nums">{number}</p>
+            <p className="mt-1.5 flex items-center gap-2 text-neutral-500 tabular-nums @lg:justify-end">
+              {number}
+              {bill.isSettled ? (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-bold text-green-800">
+                  Paid
+                </span>
+              ) : bill.state === "partial" ? (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                  Part paid
+                </span>
+              ) : null}
+            </p>
           </div>
         </div>
+
+        {/* ── Receipt summary, once fully paid ─────────────── */}
+        {bill.isSettled ? (
+          <div className="mt-8 break-inside-avoid border-y border-neutral-200 py-4">
+            <p className="text-xl font-extrabold tracking-tight tabular-nums">
+              LKR {money(bill.paidTotal)} paid
+              {bill.paidDate ? ` on ${formatDate(bill.paidDate)}` : ""}
+            </p>
+            <p className="mt-0.5 text-neutral-500">
+              {bill.payments.length > 1
+                ? `In ${bill.payments.length} payments: ${[...new Set(bill.payments.map((p) => p.method))].join(", ")}`
+                : bill.payments[0]
+                  ? `Paid by ${bill.payments[0].method.toLowerCase()}`
+                  : null}
+            </p>
+          </div>
+        ) : null}
 
         {/* ── Who, what, when ───────────────────────────────── */}
         <div className="mt-8 mb-6 grid gap-6 @lg:grid-cols-3">
@@ -219,29 +247,18 @@ export function BillDocument({
               <span className="tabular-nums">− {money(p.amount)}</span>
             </div>
           ))}
-          {bill.isSettled ? null : (
+          {bill.isSettled ? (
+            <div className="mt-1 flex justify-between border-t border-neutral-200 pt-2 text-[15px] font-extrabold text-green-800">
+              <span>Balance</span>
+              <span className="tabular-nums">LKR {money(0)}</span>
+            </div>
+          ) : (
             <div className="mt-1 flex justify-between rounded bg-neutral-900 px-2.5 py-2 text-[15px] font-extrabold text-white">
               <span>Balance due</span>
               <span className="tabular-nums">LKR {money(bill.balance)}</span>
             </div>
           )}
         </div>
-
-        {/* ── PAID stamp ────────────────────────────────────── */}
-        {bill.isSettled ? (
-          <div className="mt-6 flex justify-center break-inside-avoid @lg:justify-start">
-            <div className="-rotate-3 rounded-md border-[3px] border-green-700/80 px-8 py-2 text-center">
-              <p className="text-4xl leading-none font-black tracking-[0.15em] text-green-700/90">
-                PAID
-              </p>
-              <p className="mt-1 text-[10px] font-bold tracking-[0.15em] text-green-800/80 uppercase">
-                {[bill.paidMethod, bill.paidDate ? formatDate(bill.paidDate) : null]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            </div>
-          </div>
-        ) : null}
 
         {/* ── Issue during the repair (free-of-charge work) ─── */}
         {showRepairIssue ? (
