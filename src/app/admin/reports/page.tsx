@@ -1,238 +1,113 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { DEVICE_TYPES } from "@/lib/status";
-import { formatLKR } from "@/lib/utils";
+import { cn, formatLKR } from "@/lib/utils";
 import { requirePermission } from "@/lib/auth-guard";
+import { ReportsChart, type ChartBucket } from "./reports-chart";
 
 export const metadata: Metadata = {
   title: "Reports",
 };
 
-// ── Data shaping ─────────────────────────────────────────────────────
+// Reports, in the new look: pick a period at the top and everything below
+// (the headline profit, the tiles, the chart and the top lists) shows that
+// period, compared with the one before it. The chart can switch between
+// money in, profit and repairs finished, and every list row opens the
+// matching repairs.
 
-type MonthBucket = {
-  key: string;
-  label: string;
-  revenue: number;
-  costs: number;
-  profit: number;
-  completed: number;
-};
+const RANGES = {
+  "30d": { label: "30 days", unit: "day", count: 30 },
+  "3m": { label: "3 months", unit: "week", count: 13 },
+  "6m": { label: "6 months", unit: "month", count: 6 },
+  "12m": { label: "12 months", unit: "month", count: 12 },
+} as const;
+type RangeKey = keyof typeof RANGES;
 
-function compactLKR(value: number) {
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000) return `LKR ${(value / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `LKR ${Math.round(value / 1_000)}k`;
-  return `LKR ${Math.round(value)}`;
+// ── Colombo calendar days ───────────────────────────────────────────
+// Each day is a Date at noon UTC, so adding days or months never slips a
+// day, and toISOString().slice(0, 10) is its YYYY-MM-DD key.
+
+function colomboDay(date: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  return new Date(Date.UTC(get("year"), get("month") - 1, get("day"), 12));
+}
+const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+function addDays(d: Date, n: number) {
+  const x = new Date(d);
+  x.setUTCDate(x.getUTCDate() + n);
+  return x;
+}
+function addMonths(d: Date, n: number) {
+  const x = new Date(d);
+  x.setUTCDate(1);
+  x.setUTCMonth(x.getUTCMonth() + n);
+  return x;
 }
 
-function niceMax(value: number) {
-  if (value <= 0) return 1;
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  for (const step of [1, 2, 5, 10]) {
-    if (value <= step * magnitude) return step * magnitude;
+const fmt = (opts: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat("en-GB", { ...opts, timeZone: "UTC" });
+const fmtDay = fmt({ day: "numeric", month: "short" });
+const fmtMonth = fmt({ month: "short" });
+const fmtMonthYear = fmt({ month: "long", year: "numeric" });
+
+/** Bucket start days for the range (oldest first), and the previous period's start. */
+function periods(range: RangeKey, today: Date) {
+  const { unit, count } = RANGES[range];
+  const starts: Date[] = [];
+  let prevStart: Date;
+  if (unit === "day") {
+    for (let i = count - 1; i >= 0; i--) starts.push(addDays(today, -i));
+    prevStart = addDays(starts[0], -count);
+  } else if (unit === "week") {
+    // Weeks start on Monday.
+    const monday = addDays(today, -((today.getUTCDay() + 6) % 7));
+    for (let i = count - 1; i >= 0; i--) starts.push(addDays(monday, -7 * i));
+    prevStart = addDays(starts[0], -7 * count);
+  } else {
+    const first = addMonths(today, 0);
+    for (let i = count - 1; i >= 0; i--) starts.push(addMonths(first, -i));
+    prevStart = addMonths(starts[0], -count);
   }
-  return 10 * magnitude;
+  return { starts, prevStart };
 }
 
-// ── Chart pieces (server-rendered SVG / HTML) ────────────────────────
-
-const CHART = {
-  width: 720,
-  height: 220,
-  padLeft: 52,
-  padRight: 8,
-  padTop: 16,
-  padBottom: 26,
-};
-
-// Bar with only the data-end (top) rounded, flat at the baseline.
-function barPath(x: number, y: number, w: number, h: number) {
-  const r = Math.min(4, h, w / 2);
-  return [
-    `M ${x} ${y + h}`,
-    `L ${x} ${y + r}`,
-    `Q ${x} ${y} ${x + r} ${y}`,
-    `L ${x + w - r} ${y}`,
-    `Q ${x + w} ${y} ${x + w} ${y + r}`,
-    `L ${x + w} ${y + h}`,
-    "Z",
-  ].join(" ");
-}
-
-function MonthlyBarChart({
-  months,
-  value,
-  barClassName,
-  tooltip,
-  title,
-}: {
-  months: MonthBucket[];
-  value: (m: MonthBucket) => number;
-  barClassName: string;
-  tooltip: (m: MonthBucket) => string;
-  title: string;
-}) {
-  const { width, height, padLeft, padRight, padTop, padBottom } = CHART;
-  const plotW = width - padLeft - padRight;
-  const plotH = height - padTop - padBottom;
-
-  const max = niceMax(Math.max(...months.map((m) => Math.max(0, value(m)))));
-  const slot = plotW / months.length;
-  const barW = Math.min(36, slot * 0.55);
-
-  const maxIndex = months.reduce(
-    (best, m, i) => (value(m) > value(months[best]) ? i : best),
-    0,
-  );
-
-  const gridLines = [0.25, 0.5, 0.75, 1];
-
-  return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      className="h-auto w-full"
-      role="img"
-      aria-label={title}
-    >
-      {/* Recessive grid + axis labels */}
-      {gridLines.map((f) => {
-        const y = padTop + plotH * (1 - f);
-        return (
-          <g key={f}>
-            <line
-              x1={padLeft}
-              x2={width - padRight}
-              y1={y}
-              y2={y}
-              className="stroke-border"
-              strokeWidth={1}
-            />
-            <text
-              x={padLeft - 6}
-              y={y + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              fontSize={10}
-            >
-              {compactLKR(max * f)}
-            </text>
-          </g>
-        );
-      })}
-      <line
-        x1={padLeft}
-        x2={width - padRight}
-        y1={padTop + plotH}
-        y2={padTop + plotH}
-        className="stroke-border"
-        strokeWidth={1}
-      />
-
-      {months.map((m, i) => {
-        const v = Math.max(0, value(m));
-        const h = max > 0 ? (v / max) * plotH : 0;
-        const x = padLeft + slot * i + (slot - barW) / 2;
-        const y = padTop + plotH - h;
-        const isLatest = i === months.length - 1;
-        const highlight = v > 0 && (i === maxIndex || isLatest);
-        return (
-          <g key={m.key}>
-            {v > 0 ? (
-              <path d={barPath(x, y, barW, h)} className={barClassName}>
-                <title>{tooltip(m)}</title>
-              </path>
-            ) : (
-              // Zero months keep a faint stub so the axis stays readable.
-              <rect
-                x={x}
-                y={padTop + plotH - 2}
-                width={barW}
-                height={2}
-                className="fill-border"
-              >
-                <title>{tooltip(m)}</title>
-              </rect>
-            )}
-            {/* Selective direct labels: peak + latest only */}
-            {highlight ? (
-              <text
-                x={x + barW / 2}
-                y={y - 5}
-                textAnchor="middle"
-                className="fill-foreground"
-                fontSize={10.5}
-                fontWeight={600}
-              >
-                {compactLKR(v)}
-              </text>
-            ) : null}
-            <text
-              x={padLeft + slot * i + slot / 2}
-              y={height - 8}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              fontSize={10}
-            >
-              {m.label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function RankedBars({
-  items,
-  unit,
-}: {
-  items: { label: string; count: number }[];
-  unit: string;
-}) {
-  if (items.length === 0) {
-    return (
-      <p className="py-6 text-center text-sm text-muted-foreground">
-        Not enough data yet.
-      </p>
-    );
+function bucketLabels(range: RangeKey, start: Date, next: Date | null) {
+  const { unit } = RANGES[range];
+  if (unit === "day") return { short: String(start.getUTCDate()), long: fmtDay.format(start) };
+  if (unit === "week") {
+    const end = addDays(next ?? addDays(start, 7), -1);
+    return { short: fmtDay.format(start), long: `${fmtDay.format(start)} – ${fmtDay.format(end)}` };
   }
-  const max = Math.max(...items.map((i) => i.count));
-  const total = items.reduce((s, i) => s + i.count, 0);
-  return (
-    <ul className="space-y-3">
-      {items.map((item) => (
-        <li key={item.label}>
-          <div className="mb-1 flex items-baseline justify-between gap-3">
-            <span className="truncate text-sm">{item.label}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {item.count} {unit}
-              {item.count === 1 ? "" : "s"} ·{" "}
-              {Math.round((item.count / total) * 100)}%
-            </span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${(item.count / max) * 100}%` }}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
+  return { short: fmtMonth.format(start), long: fmtMonthYear.format(start) };
 }
 
-// ── Page ─────────────────────────────────────────────────────────────
+type Totals = { revenue: number; costs: number; finished: number; paidJobs: number; turnaroundDays: number[] };
+const emptyTotals = (): Totals => ({ revenue: 0, costs: 0, finished: 0, paidJobs: 0, turnaroundDays: [] });
 
-export default async function AdminReportsPage() {
+export default async function AdminReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
   await requirePermission("report:read");
+  const params = await searchParams;
+  const range: RangeKey = params.range && params.range in RANGES ? (params.range as RangeKey) : "6m";
+
   const [tickets, paidByTicket] = await Promise.all([
     prisma.repairTicket.findMany({
       select: {
         id: true,
         status: true,
         paidAmount: true,
+        finalCost: true,
         partsCost: true,
         issueTitle: true,
         deviceType: true,
@@ -248,178 +123,332 @@ export default async function AdminReportsPage() {
     }),
   ]);
 
-  const paidPaymentByTicket = new Map(
+  const onlinePaid = new Map(
     paidByTicket.map((p) => [p.ticketId as string, Number(p._sum.amount ?? 0)]),
   );
-  const revenueOf = (t: (typeof tickets)[number]) => {
-    const paymentSum = paidPaymentByTicket.get(t.id) ?? 0;
-    return paymentSum > 0 ? paymentSum : t.paidAmount ? Number(t.paidAmount) : 0;
+  // What the customer has paid: recorded payments plus verified transfers.
+  const paidOf = (t: (typeof tickets)[number]) =>
+    (t.paidAmount ? Number(t.paidAmount) : 0) + (onlinePaid.get(t.id) ?? 0);
+
+  // ── Periods ──
+  const today = colomboDay(new Date());
+  const todayKey = dayKey(today);
+  const { starts, prevStart } = periods(range, today);
+  const startKeys = starts.map(dayKey);
+  const firstKey = startKeys[0];
+  const prevKey = dayKey(prevStart);
+
+  const buckets: (ChartBucket & { totals: Totals })[] = starts.map((s, i) => {
+    const labels = bucketLabels(range, s, starts[i + 1] ?? null);
+    return { key: startKeys[i], ...labels, revenue: 0, profit: 0, finished: 0, totals: emptyTotals() };
+  });
+  const current = emptyTotals();
+  const previous = emptyTotals();
+  const inRange: (typeof tickets)[number][] = [];
+
+  const add = (into: Totals, t: (typeof tickets)[number]) => {
+    const paid = paidOf(t);
+    into.revenue += paid;
+    if (paid > 0) into.paidJobs += 1;
+    into.costs += t.partsCost ? Number(t.partsCost) : 0;
+    if (t.completedAt) {
+      into.finished += 1;
+      into.turnaroundDays.push((t.completedAt.getTime() - t.createdAt.getTime()) / 86_400_000);
+    }
   };
 
-  // Last 12 calendar months, oldest first.
-  const now = new Date();
-  const monthFormat = new Intl.DateTimeFormat("en-GB", {
-    month: "short",
-    timeZone: "Asia/Colombo",
-  });
-  const months: MonthBucket[] = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-    return {
-      key: `${d.getFullYear()}-${d.getMonth()}`,
-      label: monthFormat.format(d),
-      revenue: 0,
-      costs: 0,
-      profit: 0,
-      completed: 0,
-    };
-  });
-  const bucketByKey = new Map(months.map((m) => [m.key, m]));
-
   for (const t of tickets) {
-    const when = t.completedAt ?? t.createdAt;
-    const bucket = bucketByKey.get(`${when.getFullYear()}-${when.getMonth()}`);
-    if (!bucket) continue;
-    bucket.revenue += revenueOf(t);
-    bucket.costs += t.partsCost ? Number(t.partsCost) : 0;
-    if (t.completedAt) bucket.completed += 1;
+    if (t.status === "CANCELLED") continue;
+    // Money and finished work count when the repair was finished.
+    const key = dayKey(colomboDay(t.completedAt ?? t.createdAt));
+    if (key >= firstKey && key <= todayKey) {
+      let idx = startKeys.length - 1;
+      while (idx > 0 && startKeys[idx] > key) idx--;
+      add(buckets[idx].totals, t);
+      add(current, t);
+    } else if (key >= prevKey && key < firstKey) {
+      add(previous, t);
+    }
+    // The top lists count what came in during the period.
+    const bookedKey = dayKey(colomboDay(t.createdAt));
+    if (bookedKey >= firstKey && bookedKey <= todayKey) inRange.push(t);
   }
-  for (const m of months) m.profit = m.revenue - m.costs;
-
-  const trailingRevenue = months.reduce((s, m) => s + m.revenue, 0);
-  const trailingProfit = months.reduce((s, m) => s + m.profit, 0);
-
-  // Common issues (case-insensitive grouping, keep first-seen casing).
-  const issueCounts = new Map<string, { label: string; count: number }>();
-  for (const t of tickets) {
-    const key = t.issueTitle.trim().toLowerCase();
-    if (!key) continue;
-    const entry = issueCounts.get(key);
-    if (entry) entry.count += 1;
-    else issueCounts.set(key, { label: t.issueTitle.trim(), count: 1 });
+  for (const b of buckets) {
+    b.revenue = Math.round(b.totals.revenue);
+    b.profit = Math.round(b.totals.revenue - b.totals.costs);
+    b.finished = b.totals.finished;
   }
-  const topIssues = [...issueCounts.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
 
-  const deviceLabel = Object.fromEntries(
-    DEVICE_TYPES.map((d) => [d.value, d.label]),
-  );
-  const deviceCounts = new Map<string, number>();
-  const brandCounts = new Map<string, { label: string; count: number }>();
+  const profit = current.revenue - current.costs;
+  const prevProfit = previous.revenue - previous.costs;
+  const avgBill = current.paidJobs ? current.revenue / current.paidJobs : 0;
+  const prevAvgBill = previous.paidJobs ? previous.revenue / previous.paidJobs : 0;
+  const median = (xs: number[]) => {
+    if (!xs.length) return null;
+    const s = [...xs].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  };
+  const turnaround = median(current.turnaroundDays);
+  const prevTurnaround = median(previous.turnaroundDays);
+
+  // Owed right now: finished or in-progress repairs with a price not yet paid.
+  let owed = 0;
+  let owedJobs = 0;
   for (const t of tickets) {
-    deviceCounts.set(t.deviceType, (deviceCounts.get(t.deviceType) ?? 0) + 1);
-    const brand = t.brand?.trim();
-    if (brand) {
-      const key = brand.toLowerCase();
-      const entry = brandCounts.get(key);
-      if (entry) entry.count += 1;
-      else brandCounts.set(key, { label: brand, count: 1 });
+    if (t.status === "CANCELLED" || !t.finalCost) continue;
+    const due = Number(t.finalCost) - paidOf(t);
+    if (due > 0.5) {
+      owed += due;
+      owedJobs += 1;
     }
   }
-  const devices = [...deviceCounts.entries()]
-    .map(([type, count]) => ({ label: deviceLabel[type] ?? type, count }))
-    .sort((a, b) => b.count - a.count);
-  const topBrands = [...brandCounts.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
 
-  const monthTooltip = (m: MonthBucket) =>
-    `${m.label}: ${formatLKR(m.revenue)} revenue · ${formatLKR(m.costs)} costs · ${formatLKR(m.profit)} profit · ${m.completed} completed`;
+  // ── Top lists (repairs booked in the period) ──
+  const tally = (pick: (t: (typeof tickets)[number]) => string | null | undefined) => {
+    const map = new Map<string, { label: string; count: number }>();
+    for (const t of inRange) {
+      const label = pick(t)?.trim();
+      if (!label) continue;
+      const key = label.toLowerCase();
+      const entry = map.get(key);
+      if (entry) entry.count += 1;
+      else map.set(key, { label, count: 1 });
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count);
+  };
+  const deviceLabel = Object.fromEntries(DEVICE_TYPES.map((d) => [d.value, d.label]));
+  const topIssues = tally((t) => t.issueTitle).slice(0, 6);
+  const topBrands = tally((t) => t.brand).slice(0, 6);
+  const devices = tally((t) => deviceLabel[t.deviceType] ?? t.deviceType);
+
+  const rangeLabel = RANGES[range].label.toLowerCase();
+  const chartBuckets: ChartBucket[] = buckets.map(({ totals: _t, ...b }) => b);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-          Reports
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Revenue trends and repair patterns over the last 12 months —{" "}
-          {formatLKR(trailingRevenue)} revenue, {formatLKR(trailingProfit)}{" "}
-          profit.
-        </p>
-      </div>
-
-      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-        <h2 className="font-display text-lg font-semibold">Revenue by month</h2>
-        <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          What customers paid for repairs, by month completed.
-        </p>
-        <MonthlyBarChart
-          months={months}
-          value={(m) => m.revenue}
-          barClassName="fill-primary"
-          tooltip={monthTooltip}
-          title="Monthly repair revenue for the last 12 months"
-        />
-      </section>
-
-      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-        <h2 className="font-display text-lg font-semibold">Profit by month</h2>
-        <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Revenue minus parts costs. Hover a bar for the full breakdown.
-        </p>
-        <MonthlyBarChart
-          months={months}
-          value={(m) => m.profit}
-          barClassName="fill-success"
-          tooltip={monthTooltip}
-          title="Monthly repair profit for the last 12 months"
-        />
-      </section>
-
-      {/* Screen-reader / no-SVG fallback for the monthly figures. Wrapped:
-          a table ignores the 1px width of .sr-only and pushed the page
-          sideways on phones. */}
-      <div className="sr-only">
-      <table>
-        <caption>Monthly revenue, costs and profit — last 12 months</caption>
-        <thead>
-          <tr>
-            <th>Month</th>
-            <th>Revenue</th>
-            <th>Costs</th>
-            <th>Profit</th>
-            <th>Repairs completed</th>
-          </tr>
-        </thead>
-        <tbody>
-          {months.map((m) => (
-            <tr key={m.key}>
-              <td>{m.label}</td>
-              <td>{formatLKR(m.revenue)}</td>
-              <td>{formatLKR(m.costs)}</td>
-              <td>{formatLKR(m.profit)}</td>
-              <td>{m.completed}</td>
-            </tr>
+    <div className="space-y-4">
+      {/* ── Title and period ─────────────────────────────── */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Reports
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            The last {rangeLabel}, compared with the {rangeLabel} before.
+          </p>
+        </div>
+        <nav aria-label="Period" className="flex w-full gap-1 rounded-2xl bg-card p-1 sm:w-auto">
+          {(Object.keys(RANGES) as RangeKey[]).map((key) => (
+            <Link
+              key={key}
+              href={`/admin/reports?range=${key}`}
+              scroll={false}
+              aria-current={key === range ? "page" : undefined}
+              className={cn(
+                "flex min-h-11 flex-1 items-center justify-center rounded-xl px-2 text-sm font-bold whitespace-nowrap transition-colors sm:flex-none sm:px-4",
+                key === range
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              {RANGES[key].label}
+            </Link>
           ))}
-        </tbody>
-      </table>
+        </nav>
       </div>
 
-      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-        <h2 className="font-display text-lg font-semibold">Common issues</h2>
-        <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          The problems customers bring in most, across all repairs.
-        </p>
-        <RankedBars items={topIssues} unit="repair" />
-      </section>
+      {/* ── Headline profit and tiles ────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <section className="flex flex-col justify-between gap-6 rounded-[2rem] bg-ink p-6 text-ink-foreground sm:p-8 lg:row-span-2">
+          <div>
+            <p className="text-sm font-bold opacity-80">Profit</p>
+            <p className="font-display mt-2 text-[clamp(2rem,9vw,3rem)] leading-none font-extrabold tracking-tight whitespace-nowrap tabular-nums lg:text-[clamp(1.75rem,2.5vw,3rem)]">
+              {formatLKR(Math.round(profit))}
+            </p>
+            <div className="mt-3">
+              <Change now={profit} before={prevProfit} onInk />
+            </div>
+          </div>
+          <dl className="grid grid-cols-2 gap-4 border-t border-ink-foreground/15 pt-5 text-sm">
+            <div>
+              <dt className="opacity-75">Money in</dt>
+              <dd className="font-display mt-0.5 text-xl font-extrabold tabular-nums">
+                {formatLKR(Math.round(current.revenue))}
+              </dd>
+            </div>
+            <div>
+              <dt className="opacity-75">Parts cost</dt>
+              <dd className="font-display mt-0.5 text-xl font-extrabold tabular-nums">
+                {formatLKR(Math.round(current.costs))}
+              </dd>
+            </div>
+          </dl>
+        </section>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <h2 className="font-display text-lg font-semibold">Device types</h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            What comes across the bench.
-          </p>
-          <RankedBars items={devices} unit="repair" />
-        </section>
-        <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <h2 className="font-display text-lg font-semibold">Top brands</h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            Most-repaired brands overall.
-          </p>
-          <RankedBars items={topBrands} unit="repair" />
-        </section>
+        <div className="grid grid-cols-2 gap-4 lg:col-span-2">
+          <Tile
+            label="Repairs finished"
+            value={String(current.finished)}
+            change={<Change now={current.finished} before={previous.finished} />}
+          />
+          <Tile
+            label="Average bill"
+            value={formatLKR(Math.round(avgBill))}
+            change={<Change now={avgBill} before={prevAvgBill} />}
+          />
+          <Tile
+            label="Typical repair time"
+            value={turnaround === null ? "—" : days(turnaround)}
+            change={
+              turnaround !== null && prevTurnaround !== null ? (
+                <Change now={turnaround} before={prevTurnaround} lowerIsBetter />
+              ) : (
+                <span className="text-sm text-muted-foreground">From booked to finished</span>
+              )
+            }
+          />
+          <Link
+            href="/admin/tickets?view=list"
+            className="flex flex-col justify-between gap-3 rounded-[1.75rem] bg-card p-5 transition-colors hover:bg-accent"
+          >
+            <span className="text-sm font-bold text-muted-foreground">Owed to you now</span>
+            <span className="font-display text-2xl leading-none font-extrabold tabular-nums sm:text-3xl">
+              {formatLKR(Math.round(owed))}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {owedJobs === 0 ? "Nothing unpaid" : `On ${owedJobs} repair${owedJobs === 1 ? "" : "s"}`}
+            </span>
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Chart ────────────────────────────────────────── */}
+      <ReportsChart buckets={chartBuckets} unit={RANGES[range].unit} />
+
+      {/* ── Top lists ────────────────────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <RankedCard title="Common problems" items={topIssues} />
+        <RankedCard title="Top brands" items={topBrands} />
+        <RankedCard title="Device types" items={devices} linkable={false} />
       </div>
     </div>
+  );
+}
+
+function days(n: number) {
+  if (n < 1) {
+    const h = Math.max(1, Math.round(n * 24));
+    return `${h} hour${h === 1 ? "" : "s"}`;
+  }
+  const d = Math.round(n * 10) / 10;
+  return `${d} day${d === 1 ? "" : "s"}`;
+}
+
+function Tile({ label, value, change }: { label: string; value: string; change: React.ReactNode }) {
+  return (
+    <section className="flex flex-col justify-between gap-3 rounded-[1.75rem] bg-card p-5">
+      <h2 className="text-sm font-bold text-muted-foreground">{label}</h2>
+      <p className="font-display text-2xl leading-none font-extrabold tabular-nums sm:text-3xl">
+        {value}
+      </p>
+      {change}
+    </section>
+  );
+}
+
+/** "▲ 12% vs before", with an arrow and words, never colour alone. */
+function Change({
+  now,
+  before,
+  lowerIsBetter,
+  onInk,
+}: {
+  now: number;
+  before: number;
+  lowerIsBetter?: boolean;
+  onInk?: boolean;
+}) {
+  if (before === 0 && now === 0) {
+    return <span className={cn("text-sm", onInk ? "opacity-75" : "text-muted-foreground")}>No change</span>;
+  }
+  if (before === 0) {
+    return <span className={cn("text-sm", onInk ? "opacity-75" : "text-muted-foreground")}>Nothing in the period before</span>;
+  }
+  const pct = Math.round(((now - before) / Math.abs(before)) * 100);
+  const up = pct > 0;
+  const good = pct === 0 ? null : lowerIsBetter ? !up : up;
+  const Icon = pct === 0 ? Minus : up ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span
+      className={cn(
+        "inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
+        onInk
+          ? "bg-ink-foreground/15 text-ink-foreground"
+          : good === null
+            ? "bg-secondary text-muted-foreground"
+            : good
+              ? "bg-success/12 text-success"
+              : "bg-destructive/10 text-destructive",
+      )}
+    >
+      <Icon className="size-3.5" aria-hidden="true" />
+      {pct === 0 ? "Same as before" : `${up ? "Up" : "Down"} ${Math.abs(pct)}% on the period before`}
+    </span>
+  );
+}
+
+function RankedCard({
+  title,
+  items,
+  linkable = true,
+}: {
+  title: string;
+  items: { label: string; count: number }[];
+  linkable?: boolean;
+}) {
+  const max = Math.max(1, ...items.map((i) => i.count));
+  const total = items.reduce((s, i) => s + i.count, 0);
+  return (
+    <section className="rounded-[1.75rem] bg-card p-5 sm:p-6">
+      <h2 className="font-display mb-3 text-lg font-extrabold">{title}</h2>
+      {items.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">No repairs booked in this period.</p>
+      ) : (
+        <ul className="-mx-2">
+          {items.map((item) => {
+            const body = (
+              <>
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="truncate text-[15px] font-bold">{item.label}</span>
+                  <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
+                    {item.count} · {Math.round((item.count / total) * 100)}%
+                  </span>
+                </span>
+                <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-secondary">
+                  <span
+                    className="block h-full rounded-full bg-primary"
+                    style={{ width: `${(item.count / max) * 100}%` }}
+                  />
+                </span>
+              </>
+            );
+            return (
+              <li key={item.label}>
+                {linkable ? (
+                  <Link
+                    href={`/admin/tickets?view=list&q=${encodeURIComponent(item.label)}`}
+                    title={`Show ${item.label} repairs`}
+                    className="block rounded-xl px-2 py-2.5 transition-colors hover:bg-accent"
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="px-2 py-2.5">{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
