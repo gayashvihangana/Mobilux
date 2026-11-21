@@ -32,28 +32,31 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-/** Opens the print dialog on the A4 bill, where "Save as PDF" makes the file. */
-export function PrintButton({
+/** Saves the bill as a PDF file, with no new page or print box. */
+export function PdfButton({
+  href,
   label,
   variant = "secondary",
   className,
 }: {
+  href: string;
   label: string;
   variant?: "secondary" | "white";
   className?: string;
 }) {
   return (
     <Button
-      type="button"
+      asChild
       size="lg"
       variant="secondary"
-      onClick={() => window.print()}
       className={cn(
         variant === "white" && "bg-white text-neutral-900 hover:bg-white/90",
         className,
       )}
     >
-      <Download /> {label}
+      <a href={href} download>
+        <Download /> {label}
+      </a>
     </Button>
   );
 }

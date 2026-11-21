@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Copy,
   Download,
+  Eye,
   Loader2,
   Minus,
   Plus,
@@ -450,12 +451,12 @@ export function BillBuilder({
       ? { label: isDraft ? "Save bill" : "Save changes", onClick: save }
       : saved.balance > 0
         ? { label: "Record payment", onClick: () => setPayOpen(true) }
-        : { label: "Download receipt", href: `/bill/${ticketId}?print=1` };
+        : { label: "Download receipt", href: `/bill/${ticketId}/pdf` };
 
   const mainButton = (className?: string) =>
     main.href ? (
       <Button asChild size="lg" className={className}>
-        <a href={main.href} target="_blank" rel="noreferrer">
+        <a href={main.href} download>
           <Download /> {main.label}
         </a>
       </Button>
@@ -496,9 +497,24 @@ export function BillBuilder({
         <div className="flex flex-wrap gap-2">
           {!isDraft ? (
             <>
+              {/* Saves the PDF file straight away: no new page, no print box.
+                  It is the saved bill, so unsaved changes ask for a save first. */}
               <Button asChild variant="secondary">
-                <a href={`/bill/${ticketId}?print=1`} target="_blank" rel="noreferrer">
+                <a
+                  href={`/bill/${ticketId}/pdf`}
+                  download
+                  onClick={(e) => {
+                    if (!dirty) return;
+                    e.preventDefault();
+                    toast.error("Save your changes first, so the PDF matches.");
+                  }}
+                >
                   <Download /> PDF
+                </a>
+              </Button>
+              <Button asChild variant="secondary">
+                <a href={`/bill/${ticketId}`} target="_blank" rel="noreferrer">
+                  <Eye /> Preview
                 </a>
               </Button>
               <Button variant="secondary" onClick={copyLink}>

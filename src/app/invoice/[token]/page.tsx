@@ -14,7 +14,7 @@ import { formatDate, formatLKR } from "@/lib/utils";
 import { BillDocument } from "@/components/bill-document";
 import { Button } from "@/components/ui/button";
 import { AutoPrint } from "@/components/bill-print-button";
-import { CopyButton, PrintButton } from "./invoice-buttons";
+import { CopyButton, PdfButton } from "./invoice-buttons";
 
 // The customer's bill link, as in docs/design-samples/bill.html (section 3).
 // Like a Stripe invoice link it needs no sign-in: the token in the address is
@@ -49,6 +49,7 @@ export default async function InvoicePage({
   const ticket = result.bill;
   const bill = computeBill(ticket, shopPayTo);
   const number = invoiceNumber(ticket.ticketNumber);
+  const pdfHref = `/invoice/${encodeURIComponent(token)}/pdf`;
   const hasPrice = bill.total > 0;
   const isOwner = !!session?.user && session.user.id === result.customerId;
   const firstName = bill.owner.trim().split(/\s+/)[0];
@@ -120,7 +121,7 @@ export default async function InvoicePage({
                 ? `Paid ${bill.payments.map((p) => `${formatLKR(p.amount)} by ${p.method.toLowerCase()} on ${formatDate(p.at)}`).join(", ")}.`
                 : ""}
             </p>
-            <PrintButton label="Download receipt" variant="white" />
+            <PdfButton href={pdfHref} label="Download receipt" variant="white" />
           </section>
         ) : (
           <section className="flex flex-col gap-3 rounded-[24px] bg-ink p-5 text-ink-foreground">
@@ -140,7 +141,7 @@ export default async function InvoicePage({
                   <a href="#pay">Pay by bank transfer</a>
                 </Button>
               ) : null}
-              <PrintButton label={showPay ? "PDF" : "Download PDF"} className={showPay ? "" : "flex-1"} />
+              <PdfButton href={pdfHref} label={showPay ? "PDF" : "Download PDF"} className={showPay ? "" : "flex-1"} />
             </div>
           </section>
         )}
