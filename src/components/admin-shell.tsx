@@ -59,7 +59,11 @@ export function AdminSidebar({
           />
         </form>
       </div>
-      <nav aria-label="Admin" className="mt-3 flex-1 overflow-y-auto px-3.5 pb-4">
+      <nav
+        aria-label="Admin"
+        // Scrolls when the window is short, without a scrollbar on the edge.
+        className="mt-3 flex-1 overflow-y-auto px-3.5 pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <ul className="space-y-0.5">
           {primary.map((link) => (
             <SidebarLink key={link.href} link={link} active={isActive(pathname, link.href)} />
