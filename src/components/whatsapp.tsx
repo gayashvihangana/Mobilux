@@ -21,9 +21,8 @@ export function WhatsAppIcon({ className }: { className?: string }) {
 export async function WhatsAppFloat() {
   const shop = await getShopInfo();
   // On the demo the shop is fictional but the number is real, so the default
-  // greeting would arrive as "Hi Ceylon Device Care!" — a message addressed
-  // to a business that does not exist, from someone actually asking about
-  // the software. Name the real subject instead.
+  // greeting arrives as a customer question about a repair — when whoever
+  // sends it is actually a buyer asking about the software. Say so instead.
   const message = DEMO_MODE
     ? "Hi! I saw the Mobilux demo and I'd like to know more."
     : `Hi ${shop.name}! I have a question.`;

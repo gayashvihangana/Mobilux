@@ -8,13 +8,19 @@ import { actionPermission, actionUser } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
-import { computeBill, resolveBillShow } from "@/lib/bill";
+import {
+  computeBill,
+  parseBillPayments,
+  PAYMENT_METHODS,
+  resolveBillShow,
+  type BillPaymentEntry,
+} from "@/lib/bill";
 import { fetchBillTicket } from "@/lib/bill-data";
 import { saveUploads } from "@/lib/uploads";
 import { sendEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/config";
 import {
-  doneLabel,
+  statusLabel,
   isRewind,
   milestoneDescription,
   pickupNote,
@@ -63,12 +69,16 @@ const TICKET_STATUSES = [
 
 const DEVICE_TYPES = ["PHONE", "TABLET", "LAPTOP", "SMARTWATCH", "OTHER"] as const;
 
+// Both helpers accept null: formData.get() returns null for a field the form
+// does not render at all, and several forms share one schema (the quick
+// new-repair form sends five fields of the long one). Rejecting null failed
+// those saves with errors for fields nobody could see.
 function optionalText(max: number) {
   return z
     .string()
     .trim()
     .max(max)
-    .optional()
+    .nullish()
     .or(z.literal(""))
     .transform((v) => v || undefined);
 }
@@ -76,8 +86,8 @@ function optionalText(max: number) {
 function optionalMoney() {
   return z
     .union([z.literal(""), z.coerce.number().min(0)])
-    .optional()
-    .transform((v) => (v === "" || v === undefined ? undefined : v));
+    .nullish()
+    .transform((v) => (v === "" || v == null ? undefined : v));
 }
 
 // ── Customer self-service submission ─────────────────────────────
@@ -160,11 +170,20 @@ export async function createTicket(
   redirect(`/repairs/${ticket.id}?created=1`);
 }
 
+// A phone number that cannot be dialled is worse than none: the tracker's
+// "last 4 digits" check and the Call / WhatsApp buttons both rely on it.
+function phoneError(phone: string | undefined): string | null {
+  if (!phone) return null;
+  const digitCount = phone.replace(/\D/g, "").length;
+  return digitCount < 9 || digitCount > 15 ? "Enter a full phone number." : null;
+}
+
 // ── Admin: manual repair log ─────────────────────────────────────
 
 const adminTicketSchema = z.object({
   customerId: optionalText(50),
   customerName: optionalText(120),
+  customerPhone: optionalText(30),
   deviceType: z.enum(DEVICE_TYPES),
   brand: optionalText(60),
   model: optionalText(80),
@@ -245,6 +264,7 @@ function parseAdminTicketForm(formData: FormData) {
   return adminTicketSchema.safeParse({
     customerId: formData.get("customerId"),
     customerName: formData.get("customerName"),
+    customerPhone: formData.get("customerPhone") ?? "",
     deviceType: formData.get("deviceType"),
     brand: formData.get("brand"),
     model: formData.get("model"),
@@ -338,6 +358,8 @@ export async function adminCreateTicket(
   if (!customerId && !data.customerName) {
     return { error: "Pick a customer account or enter a customer name." };
   }
+  const badPhone = phoneError(data.customerPhone);
+  if (badPhone) return { fieldErrors: { customerPhone: [badPhone] } };
 
   const completedAt = resolveCompletedAt(data.status, data.completedAt);
 
@@ -348,6 +370,7 @@ export async function adminCreateTicket(
         ticketNumber,
         customerId: customerId ?? null,
         customerName: data.customerName ?? null,
+        customerPhone: data.customerPhone ?? null,
         deviceType: data.deviceType,
         brand: data.brand ?? null,
         model: data.model ?? null,
@@ -412,10 +435,14 @@ export async function updateTicketDetails(
       id: true,
       completedAt: true,
       partsCost: true,
+      billPayments: true,
       issues: { select: { id: true, parts: true } },
     },
   });
   if (!existing) return { error: "Ticket not found." };
+  // Once payments are recorded on the bill, they own the paid amount; the
+  // edit form's "Customer paid" box is then only a read-out.
+  const keepsPaid = parseBillPayments(existing.billPayments).length > 0;
 
   // The form edits the parts bought to fix each bench error alongside the
   // repair's own parts, so both are saved — and costed — together.
@@ -450,7 +477,7 @@ export async function updateTicketDetails(
         solution: data.solution ?? null,
         estimatedCost: data.estimatedCost ?? null,
         finalCost: data.finalCost ?? null,
-        paidAmount: data.paidAmount ?? null,
+        ...(keepsPaid ? {} : { paidAmount: data.paidAmount ?? null }),
         duration: data.duration ?? null,
         ...partsColumns(parsePartsField(formData), {
           issuePartsCost: issueCost,
@@ -510,10 +537,31 @@ export async function updateBillNotes(
 
 // ── Admin: build & generate the itemised bill ────────────────────
 
-const billItemSchema = z.object({
-  label: z.string().trim().min(1).max(100),
-  amount: z.coerce.number().min(0).max(100_000_000),
-});
+// A line arrives as { label, qty, unitPrice }; older clients send only
+// { label, amount }. The saved line always carries all four.
+const billItemSchema = z
+  .object({
+    label: z.string().trim().min(1).max(100),
+    qty: z.coerce.number().int().min(1).max(999).optional(),
+    unitPrice: z.coerce.number().min(0).max(100_000_000).optional(),
+    amount: z.coerce.number().min(0).max(100_000_000).optional(),
+    warranty: z.string().trim().max(40).nullish(),
+    cover: z.string().trim().max(80).nullish(),
+  })
+  .transform((i) => {
+    const qty = i.qty ?? 1;
+    const unitPrice = i.unitPrice ?? (i.amount ?? 0) / qty;
+    const warranty = i.warranty || null;
+    return {
+      label: i.label,
+      qty,
+      unitPrice: Math.round(unitPrice * 100) / 100,
+      amount: Math.round(qty * unitPrice * 100) / 100,
+      // Each item carries its own warranty; "what it covers" only with one.
+      warranty,
+      cover: (warranty && i.cover) || null,
+    };
+  });
 
 const generateBillSchema = z.object({
   ticketId: z.string().min(1),
@@ -618,8 +666,24 @@ export async function generateBill(
   // admin explicitly re-issues with today's date.
   const existing = await prisma.repairTicket.findUnique({
     where: { id: data.ticketId },
-    select: { billGeneratedAt: true },
+    select: {
+      billGeneratedAt: true,
+      paidAmount: true,
+      paidAt: true,
+      billPayments: true,
+      payments: { where: { status: "PAID" }, select: { amount: true } },
+    },
   });
+  // A new total can settle a part-paid bill, or reopen a paid one.
+  const paidSoFar =
+    Number(existing?.paidAmount ?? 0) +
+    (existing?.payments ?? []).reduce((sum, p) => sum + Number(p.amount), 0);
+  const recorded = parseBillPayments(existing?.billPayments);
+  const paidAt =
+    paidSoFar > 0 && paidSoFar >= total - 0.005
+      ? (existing?.paidAt ??
+        (recorded.length > 0 ? new Date(recorded[recorded.length - 1].at) : new Date()))
+      : null;
   // A custom date the admin picked wins over everything. Otherwise: re-issue
   // (or a first-ever generation) stamps now; a plain update keeps the frozen
   // original invoice date.
@@ -642,6 +706,7 @@ export async function generateBill(
       billPayTo: hasPayTo ? payTo : undefined,
       billGeneratedAt,
       finalCost: total,
+      paidAt,
       // Only overwrite the ticket's issue when a value is supplied (it's a
       // required field); solution/warranty clear to null when blank.
       ...(data.issueTitle ? { issueTitle: data.issueTitle } : {}),
@@ -663,98 +728,141 @@ export async function generateBill(
   return { success: true };
 }
 
-// ── Admin: mark the bill paid / unpaid (the receipt step) ────────
+// ── Admin: record / remove payments on the bill ──────────────────
+//
+// A bill can be paid in parts (a deposit at drop-off, the rest at pickup).
+// Each payment is one entry in the ticket's `billPayments` list; paidAmount
+// is kept as their sum so the reports and the Board keep reading one number,
+// and paidAt is set only once nothing is left to pay.
 
-const markPaidSchema = z.object({
+const recordPaymentSchema = z.object({
   ticketId: z.string().min(1),
-  method: z.enum(["Cash", "Bank transfer", "Card", "Other"]),
+  amount: z.coerce.number().positive().max(100_000_000),
+  method: z.enum(PAYMENT_METHODS),
+  date: optionalText(40),
 });
 
-export async function markBillPaid(
-  _prev: TicketFormState,
-  formData: FormData,
-): Promise<TicketFormState> {
-  const actor = await actionPermission("bill:write");
-  if (!actor) return { error: "Not authorized." };
-
-  const parsed = markPaidSchema.safeParse({
-    ticketId: formData.get("ticketId"),
-    method: formData.get("method"),
-  });
-  if (!parsed.success) return { error: "Invalid request." };
-
-  const result = await fetchBillTicket(parsed.data.ticketId);
-  if (!result) return { error: "Ticket not found." };
-
-  const { total } = computeBill(result.bill);
-  if (!(total > 0)) {
-    return { error: "Generate the bill (with a total) before marking it paid." };
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.repairTicket.update({
-      where: { id: parsed.data.ticketId },
-      data: {
-        paidAmount: total,
-        paidAt: new Date(),
-        paidMethod: parsed.data.method,
-      },
-    });
-    await logAudit(
-      tx,
-      actor,
-      "bill.markPaid",
-      "RepairTicket",
-      parsed.data.ticketId,
-      {
-        ticketNumber: result.bill.ticketNumber,
-        amount: total,
-        method: parsed.data.method,
-      },
-    );
-  });
-
-  revalidatePath(`/admin/tickets/${parsed.data.ticketId}/bill`);
-  revalidatePath(`/admin/tickets/${parsed.data.ticketId}`);
-  revalidatePath(`/bill/${parsed.data.ticketId}`);
-  revalidatePath(`/repairs/${parsed.data.ticketId}`);
-  return { success: true };
+function paymentRollup(entries: BillPaymentEntry[], total: number, online: number) {
+  const sum =
+    Math.round(entries.reduce((s, e) => s + e.amount, 0) * 100) / 100;
+  const methods = [...new Set(entries.map((e) => e.method))];
+  const settled = entries.length > 0 && sum + online >= total - 0.005;
+  const last = entries[entries.length - 1];
+  return {
+    billPayments: entries.length > 0 ? entries : Prisma.DbNull,
+    paidAmount: entries.length > 0 ? sum : null,
+    paidMethod: methods.length > 0 ? methods.join(" + ") : null,
+    paidAt: settled && last ? new Date(last.at) : null,
+  };
 }
 
-export async function markBillUnpaid(
-  _prev: TicketFormState,
-  formData: FormData,
-): Promise<TicketFormState> {
+function revalidateBill(ticketId: string) {
+  revalidatePath(`/admin/tickets/${ticketId}/bill`);
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
+  revalidatePath(`/bill/${ticketId}`);
+  revalidatePath(`/repairs/${ticketId}`);
+}
+
+export async function recordBillPayment(input: {
+  ticketId: string;
+  amount: string | number;
+  method: string;
+  date?: string;
+}): Promise<TicketFormState> {
   const actor = await actionPermission("bill:write");
   if (!actor) return { error: "Not authorized." };
 
-  const ticketId = formData.get("ticketId");
-  if (typeof ticketId !== "string") return { error: "Invalid ticket." };
+  const parsed = recordPaymentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: "Enter an amount above zero and pick how they paid." };
+  }
+  const { ticketId, amount, method, date } = parsed.data;
+  const at = date ? parseColomboLocal(date) : new Date();
+  if (!at) return { error: "That date couldn't be read." };
 
-  const before = await prisma.repairTicket.findUnique({
-    where: { id: ticketId },
-    select: { ticketNumber: true, paidAmount: true, paidMethod: true },
+  const result = await fetchBillTicket(ticketId);
+  if (!result) return { error: "Repair not found." };
+  const bill = computeBill(result.bill);
+
+  // Start from the recorded list; an old hand-entered "Customer paid" becomes
+  // the first entry so it is not lost.
+  const entries: BillPaymentEntry[] = [...result.bill.billPayments];
+  if (entries.length === 0 && result.bill.paidAmount && Number(result.bill.paidAmount) > 0) {
+    entries.push({
+      id: crypto.randomUUID(),
+      amount: Number(result.bill.paidAmount),
+      method: result.bill.paidMethod ?? "Cash",
+      at: (result.bill.paidAt ?? new Date()).toISOString(),
+      by: null,
+    });
+  }
+  entries.push({
+    id: crypto.randomUUID(),
+    amount: Math.round(amount * 100) / 100,
+    method,
+    at: at.toISOString(),
+    by: actor.name,
   });
-  if (!before) return { error: "Ticket not found." };
+  entries.sort((a, b) => a.at.localeCompare(b.at));
 
-  // Clears only the manual paid record — a verified online payment (if any)
-  // still keeps the bill settled, by design.
+  const online = bill.payments
+    .filter((p) => p.online)
+    .reduce((s, p) => s + p.amount, 0);
+
   await prisma.$transaction(async (tx) => {
     await tx.repairTicket.update({
       where: { id: ticketId },
-      data: { paidAmount: null, paidAt: null, paidMethod: null },
+      data: paymentRollup(entries, bill.total, online),
     });
-    await logAudit(tx, actor, "bill.markUnpaid", "RepairTicket", ticketId, {
-      ticketNumber: before.ticketNumber,
-      previousAmount: before.paidAmount ? Number(before.paidAmount) : null,
-      previousMethod: before.paidMethod,
+    await logAudit(tx, actor, "bill.payment", "RepairTicket", ticketId, {
+      ticketNumber: result.bill.ticketNumber,
+      amount,
+      method,
     });
   });
 
-  revalidatePath(`/admin/tickets/${ticketId}/bill`);
-  revalidatePath(`/admin/tickets/${ticketId}`);
-  revalidatePath(`/bill/${ticketId}`);
-  revalidatePath(`/repairs/${ticketId}`);
+  revalidateBill(ticketId);
+  return { success: true };
+}
+
+export async function removeBillPayment(input: {
+  ticketId: string;
+  paymentId: string;
+}): Promise<TicketFormState> {
+  const actor = await actionPermission("bill:write");
+  if (!actor) return { error: "Not authorized." };
+
+  const result = await fetchBillTicket(input.ticketId);
+  if (!result) return { error: "Repair not found." };
+  const bill = computeBill(result.bill);
+
+  // "legacy" is the old single hand-entered paid amount.
+  const removed =
+    input.paymentId === "legacy"
+      ? bill.payments.find((p) => p.id === "legacy")
+      : result.bill.billPayments.find((p) => p.id === input.paymentId);
+  if (!removed) return { error: "That payment is already gone." };
+
+  const entries = result.bill.billPayments.filter((p) => p.id !== input.paymentId);
+  const online = bill.payments
+    .filter((p) => p.online)
+    .reduce((s, p) => s + p.amount, 0);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.repairTicket.update({
+      where: { id: input.ticketId },
+      data: paymentRollup(entries, bill.total, online),
+    });
+    await logAudit(tx, actor, "bill.paymentRemoved", "RepairTicket", input.ticketId, {
+      ticketNumber: result.bill.ticketNumber,
+      amount: removed.amount,
+      method: removed.method,
+    });
+  });
+
+  revalidateBill(input.ticketId);
   return { success: true };
 }
 
@@ -954,7 +1062,8 @@ export async function deleteStatusUpdate(
 const updateStatusSchema = z.object({
   ticketId: z.string().min(1),
   status: z.enum(TICKET_STATUSES),
-  note: z.string().trim().max(500).optional().or(z.literal("")),
+  // nullish: the one-tap buttons send no note field at all.
+  note: z.string().trim().max(500).nullish().or(z.literal("")).transform((v) => v || undefined),
 });
 
 // Items logged by the Mark-as-Received dialog ("what did the customer hand
@@ -1191,7 +1300,7 @@ export async function updateTicketStatus(
         { label: "Repair", value: ticket.ticketNumber },
         { label: "Device", value: hasDevice ? deviceName : "" },
         { label: "Issue", value: ticket.issueTitle },
-        { label: "Status", value: doneLabel(status as TicketStatus) },
+        { label: "Status", value: statusLabel(status as TicketStatus) },
       ],
       lines: [`Hi ${ticket.customer.name},`, message],
       cta: {
@@ -1206,6 +1315,137 @@ export async function updateTicketStatus(
   revalidatePath("/admin");
   revalidatePath(`/repairs/${ticketId}`);
   revalidatePath("/dashboard");
+  return { success: true };
+}
+
+// ── Admin: one-tap next step, and its undo ───────────────────────
+
+export type MoveResult =
+  | { ok: true; from: TicketStatus; to: TicketStatus }
+  | { ok: false; error: string };
+
+/**
+ * The Board and Today buttons: move a repair to `status` in one tap, going
+ * through the same path as the status form (timeline entry, customer
+ * notification and email). Returns the status it came from so the button can
+ * offer Undo. "Send price" also saves the quoted price.
+ */
+export async function moveTicket(input: {
+  ticketId: string;
+  status: TicketStatus;
+  estimatedCost?: number;
+}): Promise<MoveResult> {
+  if (!(await actionPermission("repair:write"))) {
+    return { ok: false, error: "Not authorized." };
+  }
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: input.ticketId },
+    select: { status: true },
+  });
+  if (!ticket) return { ok: false, error: "Repair not found." };
+  if (isRewind(ticket.status, input.status)) {
+    return { ok: false, error: "This repair has already moved on. Refresh the page." };
+  }
+
+  if (input.estimatedCost !== undefined) {
+    const price = Number(input.estimatedCost);
+    if (!Number.isFinite(price) || price < 0) {
+      return { ok: false, error: "Enter a price of 0 or more." };
+    }
+    await prisma.repairTicket.update({
+      where: { id: input.ticketId },
+      data: { estimatedCost: Math.round(price) },
+    });
+  }
+
+  const form = new FormData();
+  form.set("ticketId", input.ticketId);
+  form.set("status", input.status);
+  const result = await updateTicketStatus(null, form);
+  if (!result?.success) {
+    return { ok: false, error: result?.error ?? "Could not update the repair." };
+  }
+  return { ok: true, from: ticket.status, to: input.status };
+}
+
+/**
+ * Undo for a one-tap move: steps the repair back to `to`. Uses the rewind
+ * path, so the timeline entry just added is removed and the customer gets no
+ * new message (an email that already went out cannot be recalled).
+ */
+export async function undoTicketMove(input: {
+  ticketId: string;
+  to: TicketStatus;
+}): Promise<MoveResult> {
+  if (!(await actionPermission("repair:write"))) {
+    return { ok: false, error: "Not authorized." };
+  }
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: input.ticketId },
+    select: { status: true },
+  });
+  if (!ticket) return { ok: false, error: "Repair not found." };
+  if (!isRewind(ticket.status, input.to)) {
+    return { ok: false, error: "Nothing to undo — the repair has changed since." };
+  }
+  const form = new FormData();
+  form.set("ticketId", input.ticketId);
+  form.set("status", input.to);
+  const result = await updateTicketStatus(null, form);
+  if (!result?.success) {
+    return { ok: false, error: result?.error ?? "Could not undo." };
+  }
+  return { ok: true, from: ticket.status, to: input.to };
+}
+
+// ── Admin: the customer's name and phone on a repair ─────────────
+
+const contactSchema = z.object({
+  ticketId: z.string().min(1),
+  customerName: optionalText(120),
+  customerPhone: optionalText(30),
+});
+
+export async function updateTicketContact(
+  _prev: TicketFormState,
+  formData: FormData,
+): Promise<TicketFormState> {
+  if (!(await actionPermission("repair:write"))) {
+    return { error: "Not authorized." };
+  }
+  const parsed = contactSchema.safeParse({
+    ticketId: formData.get("ticketId"),
+    customerName: formData.get("customerName"),
+    customerPhone: formData.get("customerPhone"),
+  });
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const { ticketId, customerName, customerPhone } = parsed.data;
+
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { id: ticketId },
+    select: { customerId: true },
+  });
+  if (!ticket) return { error: "Repair not found." };
+  // A walk-in is known only by the name typed here, so it cannot be blank.
+  if (!ticket.customerId && !customerName) {
+    return { fieldErrors: { customerName: ["Enter the customer's name."] } };
+  }
+  const badPhone = phoneError(customerPhone);
+  if (badPhone) return { fieldErrors: { customerPhone: [badPhone] } };
+
+  await prisma.repairTicket.update({
+    where: { id: ticketId },
+    data: {
+      ...(ticket.customerId ? {} : { customerName: customerName ?? null }),
+      customerPhone: customerPhone ?? null,
+    },
+  });
+
+  revalidatePath(`/admin/tickets/${ticketId}`);
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
   return { success: true };
 }
 

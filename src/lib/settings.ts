@@ -1,7 +1,16 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { BANK_DETAILS, SHOP } from "@/lib/config";
+import { BANK_DETAILS, SHOP, WARRANTY_DAYS } from "@/lib/config";
+import {
+  DEFAULT_COMMON_PROBLEMS,
+  DEFAULT_MSG_LINK,
+  DEFAULT_MSG_READY,
+  parseWeekHours,
+  type DayHours,
+} from "@/lib/settings-shared";
+
+export * from "@/lib/settings-shared";
 import { DEFAULT_BILL_SHOW, resolveBillShow, type BillShow } from "@/lib/bill";
 
 export const PHONES_VISIBLE_KEY = "phones_storefront_visible";
@@ -44,6 +53,15 @@ export const SHOP_INFO_KEYS = {
   logoEmoji: "shop_logo_emoji",
   logoUrl: "shop_logo_url",
   accentHue: "shop_accent_hue",
+  // Settings page sections added in the UI rebuild (step 6). Read with the
+  // rest so they share one cached query.
+  weekHours: "shop_hours_week",
+  warrantyDays: "repair_warranty_days",
+  ticketPrefix: "repair_ticket_prefix",
+  commonProblems: "repair_common_problems",
+  billMessage: "bill_message",
+  msgReady: "msg_ready_for_pickup",
+  msgLink: "msg_tracking_link",
 } as const;
 
 export type ShopInfo = {
@@ -65,26 +83,24 @@ export type ShopInfo = {
    * colour that fails contrast in dark mode. See DEFAULT_ACCENT_HUE.
    */
   accentHue: number;
+  /** Opening hours per day, Monday first. `hours` is their one-line summary. */
+  weekHours: DayHours[];
+  /** Standard warranty on repairs, in days. */
+  warrantyDays: number;
+  /** New repairs are numbered PREFIX-001, PREFIX-002… */
+  ticketPrefix: string;
+  /** One-tap problems on the new-repair form. */
+  commonProblems: string[];
+  /** The thank-you line printed on bills. */
+  billMessage: string;
+  /** WhatsApp text for "ready for pickup" reminders. */
+  msgReady: string;
+  /** WhatsApp text for sending the tracking link. */
+  msgLink: string;
 };
 
 /** The blue the app ships with — matches `--primary` in globals.css. */
 export const DEFAULT_ACCENT_HUE = 262;
-
-/**
- * Named hues offered in Settings. Restricting the choice to a hue angle is
- * what keeps every theme token coherent: the whole palette rotates together
- * and nothing has to be re-checked for contrast.
- */
-export const ACCENT_PRESETS = [
-  { label: "Blue", hue: 262 },
-  { label: "Indigo", hue: 285 },
-  { label: "Violet", hue: 310 },
-  { label: "Rose", hue: 10 },
-  { label: "Amber", hue: 70 },
-  { label: "Green", hue: 150 },
-  { label: "Teal", hue: 190 },
-  { label: "Cyan", hue: 225 },
-] as const;
 
 export function normalizeHue(value: string | number | null | undefined): number {
   const n = typeof value === "number" ? value : Number(value);
@@ -124,6 +140,21 @@ const readShopInfo = unstable_cache(
       accentHue: normalizeHue(
         map.get(SHOP_INFO_KEYS.accentHue) || DEFAULT_ACCENT_HUE,
       ),
+      weekHours: parseWeekHours(map.get(SHOP_INFO_KEYS.weekHours)),
+      warrantyDays:
+        Number.parseInt(map.get(SHOP_INFO_KEYS.warrantyDays) ?? "", 10) ||
+        WARRANTY_DAYS,
+      ticketPrefix: map.get(SHOP_INFO_KEYS.ticketPrefix) || "REP",
+      commonProblems: (() => {
+        const list = (map.get(SHOP_INFO_KEYS.commonProblems) ?? "")
+          .split("\n")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        return list.length > 0 ? list : DEFAULT_COMMON_PROBLEMS;
+      })(),
+      billMessage: map.get(SHOP_INFO_KEYS.billMessage) || "",
+      msgReady: map.get(SHOP_INFO_KEYS.msgReady) || DEFAULT_MSG_READY,
+      msgLink: map.get(SHOP_INFO_KEYS.msgLink) || DEFAULT_MSG_LINK,
     };
   },
   ["shop-info"],

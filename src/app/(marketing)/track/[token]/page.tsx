@@ -3,6 +3,8 @@ import Link from "next/link";
 import { MessageCircle, SearchX } from "lucide-react";
 import { getShopInfo, shopWhatsappLink } from "@/lib/settings";
 import { findByToken } from "@/lib/track";
+import { invoicePath } from "@/lib/bill";
+import { prisma } from "@/lib/prisma";
 import { limitByIp } from "@/lib/rate-limit";
 import { TrackResult } from "@/components/track-result";
 import { Button } from "@/components/ui/button";
@@ -80,6 +82,24 @@ export default async function TrackByTokenPage({
         </h1>
       </div>
       <TrackResult ticket={ticket} />
+      <BillLink token={token} />
+    </div>
+  );
+}
+
+// Once the repair has a price, the tracker links to the customer's bill.
+async function BillLink({ token }: { token: string }) {
+  const priced = await prisma.repairTicket.findUnique({
+    where: { trackToken: token.trim() },
+    select: { finalCost: true, estimatedCost: true },
+  });
+  if (!priced || (priced.finalCost === null && priced.estimatedCost === null)) return null;
+  return (
+    <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-2xl bg-card p-5 sm:flex-row">
+      <p className="font-semibold">See your bill and how to pay.</p>
+      <Button asChild>
+        <Link href={invoicePath(token.trim())}>View your bill</Link>
+      </Button>
     </div>
   );
 }

@@ -118,6 +118,9 @@ model RepairTicket {
   customerId          String? // linked account (optional — walk-ins have none)
   customer            User?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
   customerName        String? // walk-in / legacy owner name when no account
+  // Walk-in phone number. Lets the shop call or WhatsApp a customer who has
+  // no account, and lets the public tracker check "last 4 digits" for them.
+  customerPhone       String?
   deviceType          DeviceType
   brand               String?
   model               String?
@@ -154,6 +157,9 @@ model RepairTicket {
   billGeneratedAt     DateTime? // when the bill was first generated — the invoice date/time
   paidAt              DateTime? // when the shop manually marked the bill paid (drives the receipt/PAID stamp)
   paidMethod          String? // e.g. "Cash", "Bank transfer" — printed on the paid receipt
+  // Payments the shop recorded by hand (cash, card, transfer), oldest first:
+  // [{ id, amount, method, at, by }]. paidAmount is kept as their sum.
+  billPayments        Json?
   warrantyPeriod      String? // e.g. "3 months" — only shown when the warranty field is enabled
   warrantyParts       String? // e.g. "Display, Battery" — what the warranty covers
   issueWarranty       String? // warranty offered on a free fix after an issue during the repair

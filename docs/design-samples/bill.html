@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bill redesign samples</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--ink:#0B1B33;--muted:#55637A;--soft:#3F4D63;--bg:#F5F7FB;--card:#FFFFFF;--field:#F0F3F9;--line:#E3E8F1;--blue:#2457F5;--blue-d:#1A3FB8;--blue-t:#E6EDFF;--green:#0B7A3E;--green-t:#DDF3E6;--amber:#7A4B00;--amber-t:#FFF1C7;--red:#C2261C}
+*{box-sizing:border-box}
+body{margin:0;background:#E9EDF4;color:var(--ink);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:15px;line-height:1.45}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.wrap{max-width:1400px;margin:0 auto;padding:32px 16px 80px;display:flex;flex-direction:column;gap:56px}
+.label{display:flex;flex-direction:column;gap:4px;margin-bottom:16px}
+.label b{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.label h2{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.label p{color:var(--muted);max-width:760px}
+.row{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.row>div{min-width:0;max-width:100%}
+.cap{font-size:13px;font-weight:700;color:var(--muted);margin:0 0 8px 4px}
+
+/* shared pieces */
+.card{background:var(--card);border-radius:24px;padding:20px}
+.card h3{font-size:17px;font-weight:800}
+.sub{color:var(--muted);font-size:14px}
+.btn{height:48px;padding:0 20px;border-radius:14px;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn.primary{background:var(--blue);color:#fff}
+.btn.ink{background:var(--ink);color:#fff}
+.btn.soft{background:var(--field)}
+.btn.white{background:#fff;color:var(--ink)}
+.btn.green{background:var(--green);color:#fff}
+.btn.sm{height:44px;padding:0 14px;font-size:14px}
+.pill{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:800}
+.pill.amber{background:var(--amber-t);color:var(--amber)}
+.pill.green{background:var(--green-t);color:var(--green)}
+.pill.blue{background:var(--blue-t);color:var(--blue-d)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.money{font-variant-numeric:tabular-nums;white-space:nowrap}
+.sum{display:flex;flex-direction:column;gap:10px}
+.sum div{display:flex;justify-content:space-between;gap:12px}
+.sum .hr{height:1px;background:var(--line);margin:2px 0}
+.sum .big{font-size:22px;font-weight:800}
+.sum .due{background:var(--amber-t);color:var(--amber);border-radius:16px;padding:14px 16px;font-weight:800;font-size:18px;align-items:center}
+.chip{height:44px;padding:0 14px;border-radius:999px;background:var(--field);font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.chip.on{background:var(--ink);color:#fff}
+svg.i{width:18px;height:18px;flex:none}
+
+/* status track */
+.track{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.track span{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--muted)}
+.track span i{width:22px;height:22px;border-radius:50%;background:var(--field);display:flex;align-items:center;justify-content:center;font-style:normal;font-size:12px}
+.track span.done{color:var(--ink)} .track span.done i{background:var(--ink);color:#fff}
+.track span.now{color:var(--blue-d)} .track span.now i{background:var(--blue);color:#fff}
+.track em{width:22px;height:2px;background:var(--line)}
+
+/* cart lines */
+.lines{display:flex;flex-direction:column}
+.line{display:grid;grid-template-columns:1fr auto auto auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.line:first-child{border-top:0}
+.line .name{font-weight:700}
+.line .name small{display:block;font-weight:500;color:var(--muted);font-size:13px}
+.qty{display:flex;align-items:center;background:var(--field);border-radius:12px;height:44px}
+.qty button{width:40px;height:44px;background:none;font-size:18px;font-weight:700}
+.qty b{min-width:20px;text-align:center}
+.price{width:110px;height:44px;border-radius:12px;background:var(--field);display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-weight:700}
+.x{width:44px;height:44px;border-radius:12px;background:none;color:var(--muted);display:flex;align-items:center;justify-content:center}
+.seg{display:flex;background:var(--field);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;height:40px;border-radius:10px;background:none;font-weight:700;font-size:14px}
+.seg button.on{background:#fff;box-shadow:0 1px 2px rgba(11,27,51,.12)}
+.field{height:48px;border-radius:14px;background:var(--field);display:flex;align-items:center;padding:0 14px;font-weight:600}
+.pay{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.pay:first-of-type{border-top:0}
+.pay .ic{width:40px;height:40px;border-radius:12px;background:var(--green-t);color:var(--green);display:flex;align-items:center;justify-content:center;flex:none}
+.more{display:flex;justify-content:space-between;align-items:center;font-weight:800}
+.more-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.more-list span{font-size:13px;background:var(--field);border-radius:999px;padding:6px 12px;color:var(--soft);font-weight:600}
+
+/* laptop admin */
+.laptop{width:100%;max-width:1320px;background:var(--bg);border-radius:28px;padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 1px 0 rgba(11,27,51,.06)}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;background:var(--card);border-radius:24px;padding:18px 20px}
+.top .who{display:flex;flex-direction:column;gap:6px;min-width:0}
+.top .who a{font-size:14px;color:var(--muted);text-decoration:none;font-weight:600}
+.top h1{font-size:26px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top .acts{display:flex;gap:8px;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;align-items:start}
+.colL{display:flex;flex-direction:column;gap:16px;min-width:0}
+.colR{display:flex;flex-direction:column;gap:16px;position:sticky;top:16px}
+.mini{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;font-size:12px;display:flex;flex-direction:column;gap:8px}
+
+/* phones */
+.phone{width:375px;max-width:100%;flex:none;background:var(--bg);border-radius:40px;border:10px solid var(--ink);overflow:hidden;position:relative;height:812px;display:flex;flex-direction:column}
+.phone .scroll{flex:1;overflow:hidden;padding:12px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.phone .card{padding:16px;border-radius:22px}
+.ptop{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tabs{display:flex;background:var(--field);border-radius:14px;padding:4px}
+.tabs button{flex:1;height:40px;border-radius:10px;background:none;font-weight:700;font-size:14px}
+.tabs button.on{background:#fff;box-shadow:0 1px 2px rgba(11,27,51,.12)}
+.sticky{background:var(--card);border-top:1px solid var(--line);padding:12px 16px 18px;display:flex;align-items:center;gap:12px}
+.sticky .t{flex:1;min-width:0}
+.sticky .t small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.sticky .t b{font-size:20px;font-weight:800}
+.pline{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.pline:first-child{border-top:0}
+.pline .n{font-weight:700}
+.pline .n small{display:block;color:var(--muted);font-weight:500;font-size:13px}
+.shade{position:absolute;inset:0;background:rgba(11,27,51,.45)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:28px 28px 0 0;padding:10px 16px 20px;display:flex;flex-direction:column;gap:14px}
+.grab{width:44px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 4px}
+.amount{height:64px;border-radius:16px;background:var(--field);display:flex;align-items:center;padding:0 16px;gap:8px;font-size:28px;font-weight:800}
+.amount small{font-size:15px;color:var(--muted);font-weight:700}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{height:52px;border-radius:14px;background:var(--field);font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px}
+.opt.on{background:var(--blue-t);color:var(--blue-d);box-shadow:inset 0 0 0 2px var(--blue)}
+
+/* customer bill */
+.shop{display:flex;align-items:center;gap:10px;padding:6px 2px}
+.logo{width:40px;height:40px;border-radius:12px;background:var(--ink);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.hero{border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.hero.due{background:var(--ink);color:#fff}
+.hero.paid{background:var(--green);color:#fff}
+.hero small{font-size:13px;font-weight:700;opacity:.8}
+.hero .amt{font-size:36px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.hero .meta{font-size:14px;opacity:.85}
+.bank{display:flex;flex-direction:column;gap:2px}
+.bank .r{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.bank .r:first-child{border-top:0}
+.bank .r small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.bank .r b{font-weight:700}
+.copy{height:40px;padding:0 12px;border-radius:12px;background:var(--blue-t);color:var(--blue-d);font-weight:800;font-size:13px;display:flex;align-items:center;gap:6px}
+.note{background:var(--blue-t);color:var(--blue-d);border-radius:14px;padding:12px 14px;font-size:14px;font-weight:600}
+
+/* A4 */
+.a4{width:794px;max-width:100%;background:#fff;padding:48px 56px;box-shadow:0 10px 30px rgba(11,27,51,.12);border-radius:4px;font-size:13px;color:#111;position:relative}
+.a4 h2{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.a4 table{width:100%;border-collapse:collapse;margin-top:8px}
+.a4 th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#666;padding:8px 0;border-bottom:1.5px solid #111}
+.a4 td{padding:10px 0;border-bottom:1px solid #e5e5e5;vertical-align:top}
+.a4 .r{text-align:right}
+.a4 .tot{margin-left:auto;width:300px;margin-top:16px;display:flex;flex-direction:column;gap:6px}
+.a4 .tot div{display:flex;justify-content:space-between}
+.a4 .tot .g{font-size:16px;font-weight:800;border-top:1.5px solid #111;padding-top:8px}
+.a4 .tot .bd{background:#111;color:#fff;padding:8px 10px;font-weight:800;font-size:15px;border-radius:4px}
+.a4 .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin:28px 0 20px}
+.a4 .meta small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#666;margin-bottom:4px}
+.a4 .foot{display:flex;gap:24px;margin-top:28px;padding-top:20px;border-top:1px solid #e5e5e5;align-items:flex-start}
+.qr{width:84px;height:84px;flex:none;background:
+ repeating-linear-gradient(90deg,#111 0 6px,#fff 6px 12px),#111;opacity:.85;border-radius:4px;
+ -webkit-mask:repeating-linear-gradient(0deg,#000 0 6px,transparent 6px 9px)}
+
+@media (max-width:1100px){.cols{grid-template-columns:1fr}.colR{position:static}}
+@media (max-width:640px){.line{grid-template-columns:1fr auto;}.line .price,.line .x{display:none}.a4{padding:24px}.a4 .meta{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="label">
+  <b>Bill redesign · samples</b>
+  <h2>Bills that work like a Shopify order and a Stripe invoice</h2>
+  <p>Example repair: REP-054, Samsung Galaxy A32, for Nimal Perera. It has three items, a LKR 500 discount and a LKR 3,000 cash deposit, so LKR 5,000 is still owed. Every name and price here is made up.</p>
+</header>
+
+<!-- ============ 1. ADMIN LAPTOP ============ -->
+<section>
+  <div class="label">
+    <b>1 · Admin, laptop</b>
+    <h2>Make the bill: edit on the left, the totals on the right</h2>
+    <p>The repair's parts and price fill in the items before you start. Every change updates the totals straight away. The status at the top shows where the bill is, and the big button is always the next thing to do.</p>
+  </div>
+  <div class="laptop">
+    <div class="top">
+      <div class="who">
+        <a href="#">← REP-054 · Samsung Galaxy A32</a>
+        <h1>Bill INV-054 <span class="pill amber"><span class="dot"></span>Part paid</span></h1>
+        <div class="track">
+          <span class="done"><i>✓</i>Draft</span><em></em>
+          <span class="done"><i>✓</i>Sent 16 Nov</span><em></em>
+          <span class="now"><i>3</i>Part paid</span><em></em>
+          <span><i>4</i>Paid</span>
+        </div>
+      </div>
+      <div class="acts">
+        <button class="btn soft"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>PDF</button>
+        <button class="btn soft"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg>Copy link</button>
+        <button class="btn soft">Send again on WhatsApp</button>
+        <button class="btn primary">Record payment</button>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="colL">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <h3>Items</h3><span class="sub">Qty × price</span>
+          </div>
+          <div class="lines">
+            <div class="line"><div class="name">Charging port replacement<small>Part from the repair</small></div><div class="qty"><button>−</button><b>1</b><button>+</button></div><div class="price money">4,500</div><button class="x" aria-label="Remove">✕</button></div>
+            <div class="line"><div class="name">Water damage cleaning<small>Labour</small></div><div class="qty"><button>−</button><b>1</b><button>+</button></div><div class="price money">2,500</div><button class="x" aria-label="Remove">✕</button></div>
+            <div class="line"><div class="name">Tempered glass protector<small>750 each</small></div><div class="qty"><button>−</button><b>2</b><button>+</button></div><div class="price money">1,500</div><button class="x" aria-label="Remove">✕</button></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px">
+            <button class="chip">+ Labour</button><button class="chip">+ Screen</button><button class="chip">+ Battery</button><button class="chip">+ Back cover</button><button class="chip">+ Glass protector</button><button class="chip on">+ Other item</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:12px">Discount</h3>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <div class="seg" style="flex:1 1 260px"><button>None</button><button>Percent</button><button class="on">LKR amount</button></div>
+            <div class="field money" style="width:160px;justify-content:flex-end">500</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <h3>Payments</h3><button class="btn soft sm">+ Record payment</button>
+          </div>
+          <div class="pay"><div class="ic">✓</div><div style="flex:1"><b>Deposit · Cash</b><div class="sub">9 Nov, 10:12 AM · by Kasun</div></div><b class="money">LKR 3,000</b><button class="x" aria-label="Remove payment">✕</button></div>
+          <p class="sub" style="margin-top:8px">If the customer uploads a bank slip from the bill link, it appears here to approve.</p>
+        </div>
+
+        <div class="card">
+          <div class="more"><span>More options</span><span class="sub">Show ▾</span></div>
+          <div class="more-list"><span>Warranty: 90 days</span><span>Technician: Kasun</span><span>Pay to: BOC · 0071 2345</span><span>Bill date: 16 Nov</span><span>Notes on bill</span><span>What prints on the bill</span></div>
+        </div>
+      </div>
+
+      <div class="colR">
+        <div class="card">
+          <h3 style="margin-bottom:14px">Summary</h3>
+          <div class="sum">
+            <div><span class="sub">Subtotal · 4 items</span><span class="money">LKR 8,500</span></div>
+            <div style="color:var(--green)"><span>Discount</span><span class="money">− LKR 500</span></div>
+            <div class="hr"></div>
+            <div class="big"><span>Total</span><span class="money">LKR 8,000</span></div>
+            <div><span class="sub">Paid</span><span class="money">− LKR 3,000</span></div>
+            <div class="due"><span>Balance due</span><span class="money">LKR 5,000</span></div>
+          </div>
+          <p class="sub" style="margin-top:12px">Profit if paid in full: <b style="color:var(--ink)">LKR 4,700</b> (parts cost LKR 3,300). The customer never sees this.</p>
+        </div>
+        <div class="mini">
+          <div style="display:flex;justify-content:space-between"><b style="font-size:13px">What the customer sees</b><a href="#" style="color:var(--blue);font-weight:700;text-decoration:none">Open ↗</a></div>
+          <div style="background:var(--ink);color:#fff;border-radius:12px;padding:12px"><div style="opacity:.8;font-weight:700">Balance due</div><div style="font-size:22px;font-weight:800">LKR 5,000</div></div>
+          <div style="display:flex;justify-content:space-between"><span>Charging port replacement</span><span>4,500</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Water damage cleaning</span><span>2,500</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Glass protector × 2</span><span>1,500</span></div>
+          <div style="display:flex;justify-content:space-between;font-weight:800;border-top:1px solid var(--line);padding-top:6px"><span>Total</span><span>8,000</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. ADMIN PHONE ============ -->
+<section>
+  <div class="label">
+    <b>2 · Admin, phone</b>
+    <h2>Same bill on a phone, with a Record payment sheet</h2>
+    <p>Edit and Preview are tabs. The balance and the next action stay fixed at the bottom. Record payment fills in the full balance already, so a normal pickup takes two taps: Cash, then Save.</p>
+  </div>
+  <div class="row">
+    <div>
+      <p class="cap">Edit tab</p>
+      <div class="phone">
+        <div class="scroll">
+          <div class="ptop"><span class="sub" style="font-weight:700">← REP-054</span><span class="pill amber"><span class="dot"></span>Part paid</span></div>
+          <h1 style="font-size:24px;font-weight:800">Bill INV-054</h1>
+          <div class="tabs"><button class="on">Edit</button><button>Preview</button></div>
+          <div class="card">
+            <h3 style="margin-bottom:4px">Items</h3>
+            <div class="pline"><div class="n">Charging port replacement<small>1 × 4,500</small></div><b class="money">4,500</b></div>
+            <div class="pline"><div class="n">Water damage cleaning<small>1 × 2,500</small></div><b class="money">2,500</b></div>
+            <div class="pline"><div class="n">Glass protector<small>2 × 750</small></div><b class="money">1,500</b></div>
+            <div style="display:flex;gap:8px;overflow:hidden;margin-top:8px"><button class="chip">+ Labour</button><button class="chip">+ Screen</button><button class="chip">+ Other</button></div>
+          </div>
+          <div class="card sum">
+            <div><span class="sub">Subtotal</span><span class="money">8,500</span></div>
+            <div style="color:var(--green)"><span>Discount</span><span class="money">− 500</span></div>
+            <div style="font-weight:800"><span>Total</span><span class="money">LKR 8,000</span></div>
+            <div><span class="sub">Paid · cash 9 Nov</span><span class="money">− 3,000</span></div>
+          </div>
+          <div class="card"><div class="more"><span>More options</span><span class="sub">▾</span></div></div>
+        </div>
+        <div class="sticky">
+          <div class="t"><small>Balance due</small><b class="money">LKR 5,000</b></div>
+          <button class="btn primary">Record payment</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="cap">Record payment</p>
+      <div class="phone">
+        <div class="scroll" style="filter:blur(1px)">
+          <div class="ptop"><span class="sub" style="font-weight:700">← REP-054</span><span class="pill amber">Part paid</span></div>
+          <h1 style="font-size:24px;font-weight:800">Bill INV-054</h1>
+          <div class="card" style="height:220px"></div>
+        </div>
+        <div class="shade"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="font-size:20px;font-weight:800">Record payment</h3><button class="x" aria-label="Close">✕</button></div>
+          <div>
+            <p class="cap" style="margin-left:0">Amount</p>
+            <div class="amount"><small>LKR</small>5,000</div>
+            <div style="display:flex;gap:8px;margin-top:8px"><button class="chip on">Full balance</button><button class="chip">Other amount</button></div>
+          </div>
+          <div>
+            <p class="cap" style="margin-left:0">How they paid</p>
+            <div class="grid2"><button class="opt on">Cash</button><button class="opt">Card</button><button class="opt">Bank transfer</button><button class="opt">Other</button></div>
+          </div>
+          <div class="field" style="justify-content:space-between"><span class="sub" style="font-weight:600">Date</span><span>Today, 21 Nov</span></div>
+          <button class="btn green" style="height:56px;font-size:16px">Save · bill becomes Paid</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. CUSTOMER PHONE ============ -->
+<section>
+  <div class="label">
+    <b>3 · Customer, phone</b>
+    <h2>The bill link: no sign-in, and opens from WhatsApp</h2>
+    <p>The first thing they see is what they owe. Bank details have copy buttons, and the bill number is the transfer reference. Once it's paid in full, the same link turns into a green receipt that shows the warranty date.</p>
+  </div>
+  <div class="row">
+    <div>
+      <p class="cap">Part paid</p>
+      <div class="phone">
+        <div class="scroll">
+          <div class="shop"><div class="logo">M</div><div><b>Mobilux</b><div class="sub" style="font-size:13px">Invoice INV-054 · 16 Nov 2026</div></div></div>
+          <div class="hero due">
+            <small>Balance due</small>
+            <div class="amt money">LKR 5,000</div>
+            <div class="meta">Total 8,000 · you've paid 3,000. Pay when you collect, or by bank transfer.</div>
+            <div style="display:flex;gap:8px"><button class="btn white" style="flex:1">Pay by bank transfer</button><button class="btn" style="background:#22385C;color:#fff;width:48px;padding:0" aria-label="Download PDF">↓</button></div>
+          </div>
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><h3>Samsung Galaxy A32</h3><span class="pill green">Ready</span></div>
+            <div class="pline"><div class="n">Charging port replacement</div><span class="money">4,500</span></div>
+            <div class="pline"><div class="n">Water damage cleaning</div><span class="money">2,500</span></div>
+            <div class="pline"><div class="n">Glass protector<small>2 × 750</small></div><span class="money">1,500</span></div>
+            <div class="sum" style="margin-top:8px">
+              <div style="color:var(--green)"><span>Discount</span><span class="money">− 500</span></div>
+              <div style="font-weight:800"><span>Total</span><span class="money">LKR 8,000</span></div>
+              <div><span class="sub">Paid 9 Nov · cash</span><span class="money">− 3,000</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="cap">Part paid, scrolled to "Pay by bank transfer"</p>
+      <div class="phone">
+        <div class="scroll">
+          <div class="card">
+            <h3 style="margin-bottom:8px">Pay by bank transfer</h3>
+            <div class="bank">
+              <div class="r"><div><small>Bank</small><b>Bank of Ceylon · Kandy</b></div></div>
+              <div class="r"><div><small>Account name</small><b>Mobilux Phone Repairs</b></div><button class="copy">Copy</button></div>
+              <div class="r"><div><small>Account number</small><b class="money">0071 2345 6789</b></div><button class="copy">Copy</button></div>
+              <div class="r"><div><small>Amount</small><b class="money">5,000.00</b></div><button class="copy">Copy</button></div>
+              <div class="r"><div><small>Reference</small><b>INV-054</b></div><button class="copy">Copy</button></div>
+            </div>
+            <div class="note" style="margin-top:10px">Put <b>INV-054</b> as the reference so we can match your payment.</div>
+            <button class="btn primary" style="width:100%;margin-top:12px">Upload payment slip</button>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;gap:8px">
+            <h3>Questions about this bill?</h3>
+            <button class="btn soft" style="width:100%">WhatsApp us</button>
+            <button class="btn soft" style="width:100%">Download PDF</button>
+          </div>
+          <p class="sub" style="text-align:center;font-size:13px">Mobilux · 12 Peradeniya Rd, Kandy · 077 000 0000</p>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="cap">Paid in full: becomes a receipt</p>
+      <div class="phone">
+        <div class="scroll">
+          <div class="shop"><div class="logo">M</div><div><b>Mobilux</b><div class="sub" style="font-size:13px">Receipt INV-054 · 21 Nov 2026</div></div></div>
+          <div class="hero paid">
+            <small>✓ Paid in full</small>
+            <div class="amt money">LKR 8,000</div>
+            <div class="meta">Thank you, Nimal. Paid with cash 3,000 on 9 Nov and cash 5,000 on 21 Nov.</div>
+            <button class="btn white">Download receipt</button>
+          </div>
+          <div class="card" style="display:flex;gap:12px;align-items:center">
+            <div class="ic" style="width:44px;height:44px;border-radius:14px;background:var(--blue-t);color:var(--blue-d);display:flex;align-items:center;justify-content:center;font-weight:800">✓</div>
+            <div><b>90-day warranty</b><div class="sub">Covers the charging port until 19 Feb 2027. Keep this link.</div></div>
+          </div>
+          <div class="card">
+            <h3 style="margin-bottom:4px">Samsung Galaxy A32</h3>
+            <div class="pline"><div class="n">Charging port replacement</div><span class="money">4,500</span></div>
+            <div class="pline"><div class="n">Water damage cleaning</div><span class="money">2,500</span></div>
+            <div class="pline"><div class="n">Glass protector<small>2 × 750</small></div><span class="money">1,500</span></div>
+            <div class="sum" style="margin-top:8px">
+              <div style="color:var(--green)"><span>Discount</span><span class="money">− 500</span></div>
+              <div style="font-weight:800"><span>Total paid</span><span class="money">LKR 8,000</span></div>
+            </div>
+          </div>
+          <button class="btn soft">Leave us a review ★</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. PRINTED ============ -->
+<section>
+  <div class="label">
+    <b>4 · Printed or PDF (A4)</b>
+    <h2>A clean invoice in the same layout as the screen</h2>
+    <p>Columns for item, quantity, price and total. Payments are listed, with the balance due in a black box. Bank details and the QR code sit at the bottom. When it's paid, the heading changes to "Receipt" and a PAID stamp appears.</p>
+  </div>
+  <div class="a4">
+    <div style="display:flex;justify-content:space-between;gap:24px;align-items:flex-start">
+      <div style="display:flex;gap:12px;align-items:center"><div class="logo" style="background:#111">M</div><div><b style="font-size:16px">Mobilux</b><div style="color:#666">12 Peradeniya Rd, Kandy · 077 000 0000</div></div></div>
+      <div style="text-align:right"><h2>Invoice</h2><div style="color:#666">INV-054</div></div>
+    </div>
+    <div class="meta">
+      <div><small>Bill to</small><b>Nimal Perera</b><br>077 123 4567</div>
+      <div><small>Device</small><b>Samsung Galaxy A32</b><br>Repair REP-054</div>
+      <div><small>Dates</small>Issued 16 Nov 2026<br>Warranty 90 days</div>
+    </div>
+    <table>
+      <thead><tr><th>Item</th><th class="r" style="width:60px">Qty</th><th class="r" style="width:110px">Price</th><th class="r" style="width:110px">Total</th></tr></thead>
+      <tbody>
+        <tr><td>Charging port replacement</td><td class="r">1</td><td class="r">4,500.00</td><td class="r">4,500.00</td></tr>
+        <tr><td>Water damage cleaning</td><td class="r">1</td><td class="r">2,500.00</td><td class="r">2,500.00</td></tr>
+        <tr><td>Tempered glass protector</td><td class="r">2</td><td class="r">750.00</td><td class="r">1,500.00</td></tr>
+      </tbody>
+    </table>
+    <div class="tot">
+      <div><span>Subtotal</span><span>8,500.00</span></div>
+      <div><span>Discount</span><span>− 500.00</span></div>
+      <div class="g"><span>Total (LKR)</span><span>8,000.00</span></div>
+      <div style="color:#444"><span>Paid 9 Nov · Cash</span><span>− 3,000.00</span></div>
+      <div class="bd"><span>Balance due</span><span>LKR 5,000.00</span></div>
+    </div>
+    <div class="foot">
+      <div style="flex:1"><b>How to pay</b><div style="color:#444;margin-top:4px">Bank of Ceylon, Kandy · Mobilux Phone Repairs · 0071 2345 6789<br>Reference: <b>INV-054</b>. Or pay at the shop when you collect.</div><div style="color:#666;margin-top:12px">Thank you for choosing Mobilux.</div></div>
+      <div style="text-align:center"><div class="qr" role="img" aria-label="QR code to open this bill"></div><div style="font-size:11px;color:#666;margin-top:4px">Scan to view or pay</div></div>
+    </div>
+  </div>
+</section>
+
+</div>
+</body>
+</html>

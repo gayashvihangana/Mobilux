@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, Newsreader } from "next/font/google";
+import { Plus_Jakarta_Sans, Newsreader } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { DemoBanner } from "@/components/demo-banner";
@@ -7,13 +7,8 @@ import { DEMO_MODE, SITE_URL } from "@/lib/config";
 import { getShopInfo } from "@/lib/settings";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
 });
 
@@ -90,7 +85,7 @@ export default async function RootLayout({
       style={{ "--brand-hue": shop.accentHue } as React.CSSProperties}
     >
       <body
-        className={`${inter.variable} ${spaceGrotesk.variable} ${newsreader.variable} min-h-dvh font-sans antialiased`}
+        className={`${jakarta.variable} ${newsreader.variable} min-h-dvh font-sans antialiased`}
       >
         <ThemeProvider>
           {DEMO_MODE ? <DemoBanner /> : null}

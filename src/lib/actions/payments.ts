@@ -105,6 +105,11 @@ export async function submitReceipt(
       );
       amount = applyDiscount(Number(ticket.finalCost), discountPercent);
     }
+    // A deposit or part payment the shop already took comes off.
+    amount = Math.round((amount - Number(ticket.paidAmount ?? 0)) * 100) / 100;
+    if (!(amount > 0)) {
+      return { error: "This bill is already paid." };
+    }
     label = ticket.ticketNumber;
   } else {
     const order = await prisma.order.findUnique({

@@ -4,14 +4,54 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+// Under 768px a table turns into a stack of rows, one value per line with its
+// column title beside it (CSS in globals.css, keyed on data-stack). The titles
+// are copied from the header onto each cell here, so pages need no changes.
+// Pass stack={false} for a table that must stay a grid.
+function Table({
+  className,
+  stack = true,
+  ...props
+}: React.ComponentProps<"table"> & { stack?: boolean }) {
+  const ref = React.useRef<HTMLTableElement>(null)
+
+  React.useLayoutEffect(() => {
+    const table = ref.current
+    if (!table || !stack) return
+    const label = () => {
+      const heads = Array.from(table.tHead?.rows[0]?.cells ?? [])
+      const titles: string[] = []
+      for (const th of heads) {
+        const text = th.textContent?.trim() ?? ""
+        for (let i = 0; i < th.colSpan; i++) titles.push(text)
+      }
+      for (const body of Array.from(table.tBodies)) {
+        for (const row of Array.from(body.rows)) {
+          let col = 0
+          const fits = row.cells.length > 1
+          for (const cell of Array.from(row.cells)) {
+            cell.dataset.label = fits ? (titles[col] ?? "") : ""
+            col += cell.colSpan
+          }
+        }
+      }
+    }
+    label()
+    // Rows can change after a filter or a save; keep the labels in step.
+    const observer = new MutationObserver(label)
+    observer.observe(table, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [stack])
+
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
       <table
+        ref={ref}
         data-slot="table"
+        data-stack={stack ? "" : undefined}
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />

@@ -116,8 +116,7 @@ export async function TrackResult({ ticket }: { ticket: PublicTicket }) {
           />
         </div>
         <p className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
-          Sign in to see the full notes from our technicians, photos, and your
-          bill.
+          Sign in to see the full notes from our technicians and photos.
         </p>
       </div>
 

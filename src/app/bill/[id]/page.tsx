@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getShopInfo, getShopPayTo } from "@/lib/settings";
 import { prisma } from "@/lib/prisma";
 import { invoiceNumber } from "@/lib/bill";
@@ -30,6 +31,8 @@ export async function generateMetadata({
       model: true,
       customerName: true,
       paidAt: true,
+      paidAmount: true,
+      finalCost: true,
       customer: { select: { name: true } },
       payments: { where: { status: "PAID" }, take: 1, select: { id: true } },
     },
@@ -38,7 +41,12 @@ export async function generateMetadata({
 
   const owner = ticket.customer?.name ?? ticket.customerName ?? "Customer";
   const device = [ticket.brand, ticket.model].filter(Boolean).join(" ");
-  const settled = !!ticket.paidAt || ticket.payments.length > 0;
+  const settled =
+    !!ticket.paidAt ||
+    ticket.payments.length > 0 ||
+    (ticket.finalCost !== null &&
+      ticket.paidAmount !== null &&
+      Number(ticket.paidAmount) >= Number(ticket.finalCost));
   const kind = settled ? "Receipt" : "Invoice";
   const label = [owner, device]
     .filter(Boolean)
@@ -63,7 +71,7 @@ export default async function BillPage({
   const result = await fetchBillTicket(id);
   if (!result) notFound();
 
-  const isAdmin = user.role === "ADMIN";
+  const isAdmin = can(user, "bill:write");
   const isOwner = result.customerId === user.id;
   if (!isAdmin && !isOwner) notFound();
 

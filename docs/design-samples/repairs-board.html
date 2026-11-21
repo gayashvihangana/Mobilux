@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin layout 1, repair board</title>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#2457F5}a:hover{color:#1A3FB8}
+</style>
+</helmet>
+<div style="min-height: 900px; box-sizing: border-box; background: #F5F7FB; color: #0B1B33; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 20px">
+  <header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: #FFFFFF; border-radius: 24px; padding: 10px 10px 10px 18px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 36px; height: 36px; border-radius: 12px; background: #0B1B33; color: #FFFFFF; font-weight: 800; font-size: 17px; display: flex; align-items: center; justify-content: center">M</div>
+      <span style="font-size: 18px; font-weight: 800">Mobilux</span>
+    </div>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; background: #F0F3F9; border-radius: 999px; padding: 4px">
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Today</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 700; color: #FFFFFF; background: #0B1B33; text-decoration: none">Board</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Customers</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Money</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Shop</a>
+    </nav>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+      <label for="q" style="position: absolute; left: -9999px">Search</label>
+      <input id="q" type="search" placeholder="Search name, phone, REP" style="width: 230px; max-width: 100%; height: 48px; box-sizing: border-box; border: 0; border-radius: 16px; background: #F0F3F9; padding: 0 16px; font: 500 15px 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B33">
+      <a href="#" style="height: 48px; padding: 0 20px; border-radius: 16px; background: #2457F5; color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none; display: flex; align-items: center">New repair</a>
+    </div>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px">
+    <h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.02em">Repair board</h1>
+    <span style="font-size: 15px; color: #55637A">6 open repairs · 1 waiting more than 3 days</span>
+  </div>
+
+  <main style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; align-items: start">
+    <section style="background: #EBEFF6; border-radius: 24px; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px"><h2 style="margin: 0; font-size: 15px; font-weight: 800">Received</h2><span style="font-size: 13px; font-weight: 700; background: #FFFFFF; border-radius: 999px; padding: 3px 10px">1</span></div>
+      <div style="background: #FFFFFF; border-radius: 18px; padding: 8px; display: flex; flex-direction: column; gap: 8px">
+        <div role="img" aria-label="Photo of the device" style="height: 84px; border-radius: 12px; background: #E6EDFF; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="34" height="60" viewBox="0 0 40 72"><rect x="2" y="2" width="36" height="68" rx="8" fill="#0B1B33"></rect><rect x="6" y="6" width="28" height="60" rx="5" fill="#7FA2FF"></rect></svg></div>
+        <div style="padding: 0 6px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">Huawei Y9 2019</span><span style="font-size: 13px; color: #55637A">Mic not working</span><span style="font-size: 13px; color: #55637A">Tharushi S. · today</span></div>
+        <button style="height: 44px; border: 0; border-radius: 12px; background: #F0F3F9; color: #0B1B33; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Start diagnosing</button>
+      </div>
+    </section>
+
+    <section style="background: #EBEFF6; border-radius: 24px; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px"><h2 style="margin: 0; font-size: 15px; font-weight: 800">Diagnosing</h2><span style="font-size: 13px; font-weight: 700; background: #FFFFFF; border-radius: 999px; padding: 3px 10px">1</span></div>
+      <div style="background: #FFFFFF; border-radius: 18px; padding: 8px; display: flex; flex-direction: column; gap: 8px">
+        <div role="img" aria-label="Photo of the device" style="height: 84px; border-radius: 12px; background: #E6EDFF; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="34" height="60" viewBox="0 0 40 72"><rect x="2" y="2" width="36" height="68" rx="8" fill="#0B1B33"></rect><rect x="6" y="6" width="28" height="60" rx="5" fill="#2457F5"></rect></svg></div>
+        <div style="padding: 0 6px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">Redmi Note 10</span><span style="font-size: 13px; color: #55637A">Cracked display</span><span style="font-size: 13px; color: #55637A">Kavindu R. · today</span></div>
+        <button style="height: 44px; border: 0; border-radius: 12px; background: #F0F3F9; color: #0B1B33; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Send price</button>
+      </div>
+    </section>
+
+    <section style="background: #FFF4D6; border-radius: 24px; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px"><h2 style="margin: 0; font-size: 15px; font-weight: 800; color: #5C3A00">Waiting for parts</h2><span style="font-size: 13px; font-weight: 700; background: #FFFFFF; border-radius: 999px; padding: 3px 10px">1</span></div>
+      <div style="background: #FFFFFF; border-radius: 18px; padding: 8px; display: flex; flex-direction: column; gap: 8px">
+        <div role="img" aria-label="Photo of the device" style="height: 84px; border-radius: 12px; background: #FFE9A8; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="34" height="60" viewBox="0 0 40 72"><rect x="2" y="2" width="36" height="68" rx="8" fill="#0B1B33"></rect><rect x="6" y="6" width="28" height="60" rx="5" fill="#F4B300"></rect></svg></div>
+        <div style="padding: 0 6px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">iPhone 11</span><span style="font-size: 13px; color: #55637A">Charging IC fault</span><span style="font-size: 13px; font-weight: 700; color: #7A4B00">Sanduni F. · day 4</span></div>
+        <button style="height: 44px; border: 0; border-radius: 12px; background: #F0F3F9; color: #0B1B33; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Part arrived</button>
+      </div>
+    </section>
+
+    <section style="background: #E1E9FF; border-radius: 24px; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px"><h2 style="margin: 0; font-size: 15px; font-weight: 800; color: #1A3FB8">Repairing</h2><span style="font-size: 13px; font-weight: 700; background: #FFFFFF; border-radius: 999px; padding: 3px 10px">1</span></div>
+      <div style="background: #FFFFFF; border-radius: 18px; padding: 8px; display: flex; flex-direction: column; gap: 8px">
+        <div role="img" aria-label="Photo of the device" style="height: 84px; border-radius: 12px; background: #2457F5; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="34" height="60" viewBox="0 0 40 72"><rect x="2" y="2" width="36" height="68" rx="8" fill="#0B1B33"></rect><rect x="6" y="6" width="28" height="60" rx="5" fill="#FFFFFF"></rect></svg></div>
+        <div style="padding: 0 6px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">Samsung Galaxy A32</span><span style="font-size: 13px; color: #55637A">No power, water damage</span><span style="font-size: 13px; color: #55637A">Nimal P. · day 2</span></div>
+        <button style="height: 44px; border: 0; border-radius: 12px; background: #2457F5; color: #FFFFFF; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Mark ready</button>
+      </div>
+    </section>
+
+    <section style="background: #DDF3E6; border-radius: 24px; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 6px"><h2 style="margin: 0; font-size: 15px; font-weight: 800; color: #0B5A30">Ready for pickup</h2><span style="font-size: 13px; font-weight: 700; background: #FFFFFF; border-radius: 999px; padding: 3px 10px">2</span></div>
+      <div style="background: #FFFFFF; border-radius: 18px; padding: 8px; display: flex; flex-direction: column; gap: 8px">
+        <div style="padding: 6px 6px 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">iPhone 12 Mini</span><span style="font-size: 13px; color: #55637A">Battery · Chamari D.</span><span style="font-size: 13px; font-weight: 700">LKR 7,500 to collect</span></div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+          <button style="height: 44px; border: 0; border-radius: 12px; background: #F0F3F9; color: #0B1B33; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Remind</button>
+          <button style="height: 44px; border: 0; border-radius: 12px; background: #0B1B33; color: #FFFFFF; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Picked up</button>
+        </div>
+      </div>
+      <div style="background: #FFFFFF; border-radius: 18px; padding: 8px; display: flex; flex-direction: column; gap: 8px">
+        <div style="padding: 6px 6px 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 800">Nokia 105</span><span style="font-size: 13px; color: #55637A">Keypad · Sunil W.</span><span style="font-size: 13px; font-weight: 700">LKR 1,200 to collect</span></div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+          <button style="height: 44px; border: 0; border-radius: 12px; background: #F0F3F9; color: #0B1B33; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Remind</button>
+          <button style="height: 44px; border: 0; border-radius: 12px; background: #0B1B33; color: #FFFFFF; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Picked up</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

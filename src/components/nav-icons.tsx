@@ -3,6 +3,7 @@ import {
   CreditCard,
   Gift,
   History,
+  House,
   LayoutDashboard,
   NotebookPen,
   Package,
@@ -19,6 +20,7 @@ import {
 // function to a client one — so links carry an icon *name* and the client nav
 // looks it up here.
 export const NAV_ICONS = {
+  today: House,
   overview: LayoutDashboard,
   repairs: Wrench,
   customers: Users,

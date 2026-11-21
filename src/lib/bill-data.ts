@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import {
+  parseBillPayments,
   resolveBillShow,
   type BillLineItem,
   type BillPayTo,
@@ -14,6 +15,8 @@ export async function fetchBillTicket(
   bill: BillTicket;
   customerId: string | null;
   trackToken: string;
+  /** Parts and costs the shop paid: for the admin's profit line only. */
+  partsCost: number;
 } | null> {
   const ticket = await prisma.repairTicket.findUnique({
     where: { id },
@@ -22,8 +25,7 @@ export async function fetchBillTicket(
       issues: { orderBy: { reportedAt: "asc" } },
       payments: {
         where: { status: "PAID" },
-        orderBy: { createdAt: "desc" },
-        take: 1,
+        orderBy: { createdAt: "asc" },
         select: { amount: true, createdAt: true },
       },
     },
@@ -35,6 +37,7 @@ export async function fetchBillTicket(
     // Drives the bill's QR code — the unguessable tracking link, not the
     // sequential ticket number.
     trackToken: ticket.trackToken,
+    partsCost: ticket.partsCost ? Number(ticket.partsCost) : 0,
     bill: {
       id: ticket.id,
       ticketNumber: ticket.ticketNumber,
@@ -52,6 +55,7 @@ export async function fetchBillTicket(
       partsUsed: ticket.partsUsed,
       billNotes: ticket.billNotes,
       customerName: ticket.customerName,
+      customerPhone: ticket.customerPhone,
       technician: ticket.technician,
       billItems: (ticket.billItems as BillLineItem[] | null) ?? null,
       billDiscountPercent: ticket.billDiscountPercent?.toString() ?? null,
@@ -60,6 +64,7 @@ export async function fetchBillTicket(
       billGeneratedAt: ticket.billGeneratedAt,
       paidAt: ticket.paidAt,
       paidMethod: ticket.paidMethod,
+      billPayments: parseBillPayments(ticket.billPayments),
       warrantyPeriod: ticket.warrantyPeriod,
       warrantyParts: ticket.warrantyParts,
       issues: ticket.issues.map((issue) => ({
@@ -74,12 +79,22 @@ export async function fetchBillTicket(
       // resolves null to the built-in defaults on its own.
       billShow: ticket.billShow ? resolveBillShow(ticket.billShow) : null,
       customer: ticket.customer,
-      paidPayment: ticket.payments[0]
-        ? {
-            amount: ticket.payments[0].amount.toString(),
-            createdAt: ticket.payments[0].createdAt,
-          }
-        : null,
+      onlinePayments: ticket.payments.map((p) => ({
+        amount: p.amount.toString(),
+        createdAt: p.createdAt,
+      })),
     },
   };
+}
+
+// The customer's bill link (/invoice/[token]) finds the repair by its
+// unguessable tracking token, never by id or ticket number.
+export async function fetchBillByToken(token: string) {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+  const ticket = await prisma.repairTicket.findUnique({
+    where: { trackToken: trimmed },
+    select: { id: true },
+  });
+  return ticket ? fetchBillTicket(ticket.id) : null;
 }

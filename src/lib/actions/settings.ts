@@ -11,9 +11,10 @@ import {
   SHOP_INFO_KEYS,
   SHOP_INFO_TAG,
   getShopBankAccounts,
-  getShopInfo,
   normalizeHue,
+  parseWeekHours,
   setSetting,
+  weekHoursSummary,
   type BankAccount,
 } from "@/lib/settings";
 
@@ -178,13 +179,17 @@ const emojiSchema = z
   .trim()
   .refine((v) => v === "" || [...v].length <= 4, "Use a single emoji");
 
-const shopInfoSchema = z.object({
+// Each field the Settings page can send, with its check. A section sends only
+// its own fields, and only fields that arrive are written — so saving the
+// Repairs section can never blank the shop's name.
+const optionalText = (max: number) => z.string().trim().max(max);
+
+const FIELD_SCHEMAS = {
   name: z.string().trim().min(1, "Shop name is required").max(120),
-  tagline: z.string().trim().max(120).optional().or(z.literal("")),
-  phone: z.string().trim().max(60).optional().or(z.literal("")),
-  email: z.string().trim().max(120).optional().or(z.literal("")),
-  address: z.string().trim().max(200).optional().or(z.literal("")),
-  hours: z.string().trim().max(200).optional().or(z.literal("")),
+  tagline: optionalText(120),
+  phone: optionalText(60),
+  email: optionalText(120),
+  address: optionalText(200),
   // Stored digits-only so wa.me links can't be built from "+94 71 234 5678".
   whatsapp: z
     .string()
@@ -195,73 +200,81 @@ const shopInfoSchema = z.object({
       "Enter the number with its country code, digits only",
     ),
   logoEmoji: emojiSchema,
-  accentHue: z.coerce
+  accentHue: z.coerce.number().refine(Number.isFinite, "Pick a brand colour"),
+  weekHours: z.string().max(2000),
+  warrantyDays: z.coerce
     .number()
-    .refine(Number.isFinite, "Pick a brand colour"),
-});
+    .int("Whole days only")
+    .min(0, "0 or more")
+    .max(3650, "That is more than ten years"),
+  ticketPrefix: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{2,6}$/, "2 to 6 letters, e.g. REP"),
+  commonProblems: optionalText(2000),
+  billMessage: optionalText(300),
+  msgReady: optionalText(1000),
+  msgLink: optionalText(1000),
+} as const;
 
-export async function updateShopInfo(
+type Field = keyof typeof FIELD_SCHEMAS;
+
+export async function saveSettings(
   _prev: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
   if (!(await allowed())) return { error: "Not authorized." };
 
-  const parsed = shopInfoSchema.safeParse({
-    name: formData.get("name") ?? "",
-    tagline: formData.get("tagline") ?? "",
-    phone: formData.get("phone") ?? "",
-    email: formData.get("email") ?? "",
-    address: formData.get("address") ?? "",
-    hours: formData.get("hours") ?? "",
-    whatsapp: formData.get("whatsapp") ?? "",
-    logoEmoji: formData.get("logoEmoji") ?? "",
-    accentHue: formData.get("accentHue") ?? "",
-  });
-  if (!parsed.success) {
-    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  const values: Partial<Record<Field, string>> = {};
+  const fieldErrors: Record<string, string[]> = {};
+  for (const field of Object.keys(FIELD_SCHEMAS) as Field[]) {
+    if (!formData.has(field)) continue;
+    const parsed = FIELD_SCHEMAS[field].safeParse(formData.get(field) ?? "");
+    if (!parsed.success) {
+      fieldErrors[field] = parsed.error.issues.map((i) => i.message);
+      continue;
+    }
+    values[field] = String(parsed.data ?? "");
   }
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
-  const {
-    name,
-    tagline,
-    phone,
-    email,
-    address,
-    hours,
-    whatsapp,
-    logoEmoji,
-    accentHue,
-  } = parsed.data;
+  const writes: Promise<unknown>[] = [];
+  const write = (key: string, value: string) => writes.push(setSetting(key, value));
+
+  for (const field of Object.keys(values) as Field[]) {
+    const value = values[field] as string;
+    if (field === "accentHue") {
+      write(SHOP_INFO_KEYS.accentHue, String(normalizeHue(value)));
+    } else if (field === "weekHours") {
+      // Saved per day, and as the one-line summary every bill, message and
+      // page already reads.
+      const week = parseWeekHours(value);
+      write(SHOP_INFO_KEYS.weekHours, JSON.stringify(week));
+      write(SHOP_INFO_KEYS.hours, weekHoursSummary(week));
+    } else if (field === "commonProblems") {
+      const list = value
+        .split("\n")
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .slice(0, 12);
+      write(SHOP_INFO_KEYS.commonProblems, list.join("\n"));
+    } else {
+      write(SHOP_INFO_KEYS[field], value);
+    }
+  }
 
   // Logo image: a new upload replaces the old one, "removeLogo" clears it, and
-  // neither present means leave whatever is saved alone. Resolved before any
-  // write so a failed upload doesn't half-save the form.
-  const current = await getShopInfo();
-  let logoUrl = current.logoUrl;
-
-  if (formData.get("removeLogo") === "1") {
-    logoUrl = "";
-  }
+  // neither present leaves whatever is saved alone.
+  if (formData.get("removeLogo") === "1") write(SHOP_INFO_KEYS.logoUrl, "");
   const file = formData.get("logo");
   if (file instanceof File && file.size > 0) {
     const { urls, error } = await saveUploads([file], "branding", 1);
     if (error) return { error };
-    if (urls?.[0]) logoUrl = urls[0];
+    if (urls?.[0]) write(SHOP_INFO_KEYS.logoUrl, urls[0]);
   }
 
-  await Promise.all([
-    setSetting(SHOP_INFO_KEYS.name, name),
-    setSetting(SHOP_INFO_KEYS.tagline, tagline || ""),
-    setSetting(SHOP_INFO_KEYS.phone, phone || ""),
-    setSetting(SHOP_INFO_KEYS.email, email || ""),
-    setSetting(SHOP_INFO_KEYS.address, address || ""),
-    setSetting(SHOP_INFO_KEYS.hours, hours || ""),
-    setSetting(SHOP_INFO_KEYS.whatsapp, whatsapp),
-    setSetting(SHOP_INFO_KEYS.logoEmoji, logoEmoji || ""),
-    setSetting(SHOP_INFO_KEYS.logoUrl, logoUrl),
-    setSetting(SHOP_INFO_KEYS.accentHue, String(normalizeHue(accentHue))),
-  ]);
-
+  await Promise.all(writes);
   revalidateSettings();
   revalidateShopIdentity();
   return { success: true };

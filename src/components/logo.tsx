@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The shop's mark and name. This renders inside client components (the mobile
@@ -25,7 +24,7 @@ export function Logo({
   return (
     <Link
       href={href}
-      className={cn("group flex items-center gap-2.5", className)}
+      className={cn("group flex min-w-0 items-center gap-2.5", className)}
     >
       <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-xl border border-primary/30 bg-primary/15 transition-colors group-hover:bg-primary/25">
         {brand.logoUrl ? (
@@ -40,10 +39,18 @@ export function Logo({
         ) : brand.logoEmoji ? (
           <span className="text-lg leading-none">{brand.logoEmoji}</span>
         ) : (
-          <Smartphone className="size-4.5 text-primary" />
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/brand/mobilux-mark.png"
+            alt=""
+            className="size-full object-cover"
+          />
         )}
       </span>
-      <span className="font-display text-xl font-bold tracking-tight">
+      {/* Truncates rather than overflowing: the name is whatever the shop
+          typed into Settings, and a long one used to run straight out of the
+          header bar and over the buttons on a phone. */}
+      <span className="font-display truncate text-lg font-bold tracking-tight sm:text-xl">
         {brand.name}
       </span>
     </Link>

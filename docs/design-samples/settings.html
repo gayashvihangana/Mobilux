@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Admin settings page</title>
+
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#2457F5}a:hover{color:#1A3FB8}
+</style>
+</helmet>
+<div style="min-height: 980px; box-sizing: border-box; background: #F5F7FB; color: #0B1B33; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 20px">
+  <header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; background: #FFFFFF; border-radius: 24px; padding: 10px 10px 10px 14px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <img src="../../public/brand/mobilux-mark.png" alt="Mobilux logo" style="width: 44px; height: 44px; border-radius: 12px; object-fit: cover">
+      <span style="font-size: 18px; font-weight: 800">Mobilux</span>
+    </div>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; gap: 4px; background: #F0F3F9; border-radius: 999px; padding: 4px">
+      <a href="today-bento.html" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Today</a>
+      <a href="repairs-board.html" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Repairs</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Customers</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Money</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 600; color: #55637A; text-decoration: none">Shop</a>
+      <a href="#" style="height: 44px; padding: 0 18px; border-radius: 999px; display: flex; align-items: center; font-size: 15px; font-weight: 700; color: #FFFFFF; background: #0B1B33; text-decoration: none">Settings</a>
+    </nav>
+    <a href="#" style="height: 48px; padding: 0 20px; border-radius: 16px; background: #2457F5; color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none; display: flex; align-items: center">New repair</a>
+  </header>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+    <nav aria-label="Settings sections" style="flex: 1 1 230px; max-width: 100%; box-sizing: border-box; background: #FFFFFF; border-radius: 28px; padding: 14px; display: flex; flex-direction: column; gap: 2px">
+      <h1 style="margin: 0; padding: 8px 12px 10px; font-size: 24px; font-weight: 800">Settings</h1>
+      <a href="#" aria-current="page" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; background: #E6EDFF; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 800">Shop profile</span><span style="font-size: 13px; color: #3F4D63">Name, logo, contact, hours</span></a>
+      <a href="#" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 700">Repairs</span><span style="font-size: 13px; color: #55637A">Steps, warranty, ticket numbers</span></a>
+      <a href="#" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 700">Bills and payments</span><span style="font-size: 13px; color: #55637A">Bank accounts, bill text</span></a>
+      <a href="#" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 700">Customer messages</span><span style="font-size: 13px; color: #55637A">WhatsApp texts you send</span></a>
+      <a href="#" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 700">Appearance</span><span style="font-size: 13px; color: #55637A">Light or dark, accent colour</span></a>
+      <a href="#" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 700">Staff and roles</span><span style="font-size: 13px; color: #55637A">Who can do what</span></a>
+      <a href="#" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 700">Account and security</span><span style="font-size: 13px; color: #55637A">Your profile and password</span></a>
+      <a href="#" style="min-height: 52px; padding: 6px 14px; border-radius: 16px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: #0B1B33"><span style="font-size: 15px; font-weight: 700">Data</span><span style="font-size: 13px; color: #55637A">Export repairs and customers</span></a>
+    </nav>
+
+    <main style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section style="background: #FFFFFF; border-radius: 28px; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+        <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 20px; font-weight: 800">Shop profile</h2><span style="font-size: 14px; color: #55637A">Shown on the website, on bills and on tracking pages.</span></div>
+        <div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: center">
+          <img src="../../public/brand/mobilux-mark.png" alt="Current shop logo" style="width: 96px; height: 96px; border-radius: 22px; object-fit: cover">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; gap: 8px">
+              <button style="height: 44px; padding: 0 18px; border: 0; border-radius: 14px; background: #0B1B33; color: #FFFFFF; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Change logo</button>
+              <button style="height: 44px; padding: 0 18px; border: 0; border-radius: 14px; background: #F0F3F9; color: #0B1B33; font: 700 14px 'Plus Jakarta Sans', system-ui, sans-serif">Remove</button>
+            </div>
+            <span style="font-size: 13px; color: #55637A">PNG or JPG, square, at least 512 px</span>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px">
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="s1" style="font-size: 14px; font-weight: 700">Shop name</label><input id="s1" type="text" value="Mobilux" style="height: 48px; box-sizing: border-box; border: 1px solid #D3DBE8; border-radius: 14px; padding: 0 14px; font: 500 15px 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B33"></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="s2" style="font-size: 14px; font-weight: 700">Tagline</label><input id="s2" type="text" value="Phone repairing" style="height: 48px; box-sizing: border-box; border: 1px solid #D3DBE8; border-radius: 14px; padding: 0 14px; font: 500 15px 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B33"></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="s3" style="font-size: 14px; font-weight: 700">Phone</label><input id="s3" type="tel" value="071 949 5825" style="height: 48px; box-sizing: border-box; border: 1px solid #D3DBE8; border-radius: 14px; padding: 0 14px; font: 500 15px 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B33"></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="s4" style="font-size: 14px; font-weight: 700">WhatsApp</label><input id="s4" type="tel" value="071 949 5825" style="height: 48px; box-sizing: border-box; border: 1px solid #D3DBE8; border-radius: 14px; padding: 0 14px; font: 500 15px 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B33"></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="s5" style="font-size: 14px; font-weight: 700">Email</label><input id="s5" type="email" value="mobiluxlk@gmail.com" style="height: 48px; box-sizing: border-box; border: 1px solid #D3DBE8; border-radius: 14px; padding: 0 14px; font: 500 15px 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B33"></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><label for="s6" style="font-size: 14px; font-weight: 700">Town shown to customers</label><input id="s6" type="text" value="Pannipitiya, Sri Lanka" style="height: 48px; box-sizing: border-box; border: 2px solid #2457F5; border-radius: 14px; padding: 0 14px; font: 500 15px 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B33"></div>
+        </div>
+      </section>
+
+      <section style="background: #FFFFFF; border-radius: 28px; padding: 24px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 2px"><h2 style="margin: 0; font-size: 20px; font-weight: 800">Opening hours</h2><span style="font-size: 14px; color: #55637A">The website shows "Open now" or "Closed" from these.</span></div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px">
+          <span style="font-size: 15px; font-weight: 700; width: 150px">Monday to Friday</span>
+          <span style="font-size: 15px; color: #0B1B33">9:00 am to 7:00 pm</span>
+          <button role="switch" aria-checked="true" aria-label="Open Monday to Friday" style="width: 56px; height: 44px; border: 0; background: transparent; padding: 6px 0; display: flex; align-items: center"><span style="width: 56px; height: 32px; border-radius: 16px; background: #2457F5; display: flex; align-items: center; justify-content: flex-end; padding: 0 4px; box-sizing: border-box"><span style="width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF"></span></span></button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; border-top: 1px solid #E6ECF3">
+          <span style="font-size: 15px; font-weight: 700; width: 150px">Saturday</span>
+          <span style="font-size: 15px; color: #0B1B33">9:00 am to 7:00 pm</span>
+          <button role="switch" aria-checked="true" aria-label="Open Saturday" style="width: 56px; height: 44px; border: 0; background: transparent; padding: 6px 0; display: flex; align-items: center"><span style="width: 56px; height: 32px; border-radius: 16px; background: #2457F5; display: flex; align-items: center; justify-content: flex-end; padding: 0 4px; box-sizing: border-box"><span style="width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF"></span></span></button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; border-top: 1px solid #E6ECF3">
+          <span style="font-size: 15px; font-weight: 700; width: 150px">Sunday</span>
+          <span style="font-size: 15px; color: #55637A">Closed</span>
+          <button role="switch" aria-checked="false" aria-label="Open Sunday" style="width: 56px; height: 44px; border: 0; background: transparent; padding: 6px 0; display: flex; align-items: center"><span style="width: 56px; height: 32px; border-radius: 16px; background: #C3CEDD; display: flex; align-items: center; justify-content: flex-start; padding: 0 4px; box-sizing: border-box"><span style="width: 24px; height: 24px; border-radius: 50%; background: #FFFFFF"></span></span></button>
+        </div>
+      </section>
+
+      <div style="background: #0B1B33; color: #FFFFFF; border-radius: 22px; padding: 12px 12px 12px 22px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+        <span style="font-size: 15px; font-weight: 600">1 unsaved change: Town shown to customers</span>
+        <div style="display: flex; gap: 8px">
+          <button style="height: 48px; padding: 0 20px; border: 0; border-radius: 14px; background: #1D3357; color: #FFFFFF; font: 700 15px 'Plus Jakarta Sans', system-ui, sans-serif">Discard</button>
+          <button style="height: 48px; padding: 0 24px; border: 0; border-radius: 14px; background: #2457F5; color: #FFFFFF; font: 800 15px 'Plus Jakarta Sans', system-ui, sans-serif">Save changes</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":980}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

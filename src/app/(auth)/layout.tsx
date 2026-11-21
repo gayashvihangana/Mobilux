@@ -26,7 +26,7 @@ export default async function AuthLayout({
             logoEmoji: shop.logoEmoji,
           }}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"

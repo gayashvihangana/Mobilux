@@ -69,18 +69,26 @@ export async function findByNumberAndPhone(
 
   const ticket = await prisma.repairTicket.findFirst({
     where: { ticketNumber: { equals: number, mode: "insensitive" } },
-    select: { ...PUBLIC_SELECT, customer: { select: { phone: true } } },
+    select: {
+      ...PUBLIC_SELECT,
+      customerPhone: true,
+      customer: { select: { phone: true } },
+    },
   });
   if (!ticket) return null;
 
-  // Walk-in tickets carry no phone number, so there is nothing to check
-  // against and they stay reachable only by their tracking link.
-  const onFile = ticket.customer?.phone;
+  // The number taken at the counter comes first, then the linked account's.
+  // A ticket with neither stays reachable only by its tracking link.
+  const onFile = ticket.customerPhone || ticket.customer?.phone;
   if (!onFile) return null;
 
   const tail = digits(onFile).slice(-4);
   if (tail.length !== 4 || tail !== last4) return null;
 
-  const { customer: _customer, ...publicFields } = ticket;
+  const {
+    customer: _customer,
+    customerPhone: _customerPhone,
+    ...publicFields
+  } = ticket;
   return publicFields;
 }

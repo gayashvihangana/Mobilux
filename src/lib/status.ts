@@ -14,150 +14,145 @@ export const STATUS_PIPELINE: TicketStatus[] = [
   "PICKED_UP",
 ];
 
+// ─── What a status means ─────────────────────────────────────────────
+// A ticket's `status` is what is happening to the device RIGHT NOW: a
+// DIAGNOSING repair is being diagnosed, an AWAITING_PARTS one is waiting for
+// a part. Each status has exactly one name (`label`), and every screen —
+// admin, tracker, bill, emails — uses it, so a repair never reads two ways.
+//
+// Colour carries meaning only: blue while the shop is working on it, amber
+// while it waits on something, green once it is ready or done, red for
+// cancelled.
 export const STATUS_META: Record<
   TicketStatus,
-  { label: string; description: string; className: string; dotClassName: string }
+  {
+    label: string;
+    description: string;
+    className: string;
+    dotClassName: string;
+  }
 > = {
   SUBMITTED: {
-    label: "Submitted",
-    description:
-      "Submitted online — our team will review and confirm shortly.",
+    label: "Waiting to confirm",
+    description: "Sent online — the shop will confirm it shortly.",
     className: "bg-warning/15 text-warning border-warning/30",
     dotClassName: "bg-warning",
   },
   CONFIRMED: {
-    label: "Confirmed",
-    description:
-      "Request accepted — please bring your device to the shop.",
-    className: "bg-primary/15 text-primary border-primary/30",
-    dotClassName: "bg-primary",
+    label: "Waiting for device",
+    description: "Request accepted — please bring your device to the shop.",
+    className: "bg-warning/15 text-warning border-warning/30",
+    dotClassName: "bg-warning",
   },
   RECEIVED: {
     label: "Received",
-    description: "Your device has been received and logged.",
-    className: "bg-info/15 text-info border-info/30",
-    dotClassName: "bg-info",
+    description: "Your device is at the shop, waiting to be checked.",
+    className: "bg-primary/15 text-primary border-primary/30",
+    dotClassName: "bg-primary",
   },
   DIAGNOSING: {
     label: "Diagnosing",
-    description: "Our technician is diagnosing the issue.",
+    description: "Finding out exactly what is wrong.",
     className: "bg-primary/15 text-primary border-primary/30",
     dotClassName: "bg-primary",
   },
   AWAITING_PARTS: {
-    label: "Awaiting Parts",
-    description: "Waiting for replacement parts to arrive.",
+    label: "Waiting for parts",
+    description: "Waiting for a replacement part to arrive.",
     className: "bg-warning/15 text-warning border-warning/30",
     dotClassName: "bg-warning",
   },
   IN_PROGRESS: {
-    label: "In Progress",
-    description: "Repair work is underway.",
+    label: "Repairing",
+    description: "The repair is being done.",
     className: "bg-primary/15 text-primary border-primary/30",
     dotClassName: "bg-primary",
   },
   COMPLETED: {
-    label: "Completed",
-    description: "The repair is complete — ready to collect.",
+    label: "Ready for pickup",
+    description: "Repaired and tested — ready to collect.",
     className: "bg-success/15 text-success border-success/30",
     dotClassName: "bg-success",
   },
   // Legacy status — old tickets may still carry it. Treated as COMPLETED.
   READY_FOR_PICKUP: {
-    label: "Ready for Pickup",
-    description: "Your device is ready to collect.",
+    label: "Ready for pickup",
+    description: "Repaired and tested — ready to collect.",
     className: "bg-success/15 text-success border-success/30",
     dotClassName: "bg-success",
   },
   PICKED_UP: {
-    label: "Picked Up",
+    label: "Picked up",
     description: "Device collected. Thank you!",
     className: "bg-success/15 text-success border-success/30",
     dotClassName: "bg-success",
   },
   CANCELLED: {
     label: "Cancelled",
-    description: "This ticket was cancelled.",
+    description: "This repair was cancelled.",
     className: "bg-destructive/15 text-destructive border-destructive/30",
     dotClassName: "bg-destructive",
   },
 };
 
-// ─── Milestone model ─────────────────────────────────────────────────
-// A ticket's `status` = the last COMPLETED milestone. `STATUS_META.label`
-// above is the ONGOING/activity name of each step (used for the stepper's
-// active blue node and nowhere else that implies completion). The three
-// helpers below give the other two forms:
-//
-//   doneLabel        — the completed name of a milestone. This is what the
-//                      customer sees once a step is done: the badge, the
-//                      finished stepper nodes, and the timeline entries.
-//                      Clicking "Mark as Diagnosed" records DIAGNOSING,
-//                      which reads "Diagnosed" everywhere it's shown.
-//   pendingLabel     — what the shop is doing / waiting for while the
-//                      ticket sits at a status (the note-less top row of
-//                      the timeline). null once terminal.
-//   milestoneDescription — default body text for a timeline entry that has
-//                      no custom note.
+/** The one name for a status, used on every screen. */
+export function statusLabel(status: TicketStatus): string {
+  return STATUS_META[status].label;
+}
 
-const DONE_LABELS: Partial<Record<TicketStatus, string>> = {
-  DIAGNOSING: "Diagnosed",
-  AWAITING_PARTS: "Parts Arrived",
-  IN_PROGRESS: "Repair Started",
+// The six steps a walk-in repair goes through, as shown on the repair page
+// and the tracker. Online requests start earlier (SUBMITTED, CONFIRMED), but
+// those are paperwork before the device is in the shop.
+export const REPAIR_STEPS: TicketStatus[] = [
+  "RECEIVED",
+  "DIAGNOSING",
+  "AWAITING_PARTS",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "PICKED_UP",
+];
+
+/** Where a status sits in REPAIR_STEPS; -1 before arrival or when cancelled. */
+export function repairStepIndex(status: TicketStatus): number {
+  return REPAIR_STEPS.indexOf(status === "READY_FOR_PICKUP" ? "COMPLETED" : status);
+}
+
+// The button that moves a repair on from each status. "Send price" is a
+// small form (price, and whether a part is needed); the rest are one tap.
+export const NEXT_STEP_ACTION: Partial<Record<TicketStatus, string>> = {
+  SUBMITTED: "Accept request",
+  CONFIRMED: "Mark received",
+  RECEIVED: "Start diagnosing",
+  DIAGNOSING: "Send price",
+  AWAITING_PARTS: "Part arrived",
+  IN_PROGRESS: "Mark ready",
+  COMPLETED: "Picked up",
+  READY_FOR_PICKUP: "Picked up",
 };
 
-// Current-activity labels — "what's happening right now" at a given status.
-// SHORT is used where space is tight (the stepper's blue node, the status
-// pill): just enough to name the activity ("Diagnosing", not "Diagnosing the
-// device"). DETAILED is the fuller line the customer reads in the timeline.
-const ACTIVITY_SHORT: Partial<Record<TicketStatus, string>> = {
-  SUBMITTED: "Confirming",
-  CONFIRMED: "Waiting to receive",
-  RECEIVED: "Diagnosing",
-  DIAGNOSING: "Waiting for parts",
-  AWAITING_PARTS: "Waiting to start",
-  IN_PROGRESS: "Repairing",
-  COMPLETED: "Ready for pickup",
-  READY_FOR_PICKUP: "Ready for pickup",
-  // PICKED_UP / CANCELLED are terminal — nothing pending.
-};
-
-const ACTIVITY_DETAILED: Partial<Record<TicketStatus, string>> = {
-  SUBMITTED: "Waiting for the shop to confirm your request",
-  CONFIRMED: "Waiting to receive your device",
-  RECEIVED: "Diagnosing your device",
-  DIAGNOSING: "Waiting for parts to arrive",
-  AWAITING_PARTS: "Getting ready to start the repair",
-  IN_PROGRESS: "Repairing your device",
-  COMPLETED: "Ready for you to collect",
-  READY_FOR_PICKUP: "Ready for you to collect",
-};
-
+// Default timeline text for a step that has no note of its own: what
+// happened when the repair reached that status.
 const MILESTONE_DESCRIPTIONS: Record<TicketStatus, string> = {
-  SUBMITTED: "Repair request submitted.",
+  SUBMITTED: "Repair request sent online.",
   CONFIRMED: "Request accepted by the shop.",
   RECEIVED: "Device received at the shop.",
-  DIAGNOSING: "Diagnosis complete.",
-  AWAITING_PARTS: "Replacement parts received.",
+  DIAGNOSING: "Started checking the device.",
+  AWAITING_PARTS: "Waiting for a replacement part.",
   IN_PROGRESS: "Repair work started.",
-  COMPLETED: "Your repair is completed and tested.",
-  READY_FOR_PICKUP: "Ready to collect.",
+  COMPLETED: "Repaired and tested.",
+  READY_FOR_PICKUP: "Repaired and tested.",
   PICKED_UP: "Device collected. Thank you!",
   CANCELLED: "This repair was cancelled.",
 };
 
-export function doneLabel(status: TicketStatus): string {
-  return DONE_LABELS[status] ?? STATUS_META[status].label;
-}
-
 // A natural phrase for a headline like "Your iPhone 13 is <phrase>" — used in
 // the notification title and email heading so they read like a sentence.
 const STATUS_HEADLINE: Record<TicketStatus, string> = {
-  SUBMITTED: "received — pending confirmation",
+  SUBMITTED: "received — waiting to confirm",
   CONFIRMED: "confirmed",
   RECEIVED: "received at the shop",
-  DIAGNOSING: "diagnosed",
-  AWAITING_PARTS: "awaiting parts",
+  DIAGNOSING: "being diagnosed",
+  AWAITING_PARTS: "waiting for a part",
   IN_PROGRESS: "being repaired",
   COMPLETED: "ready for pickup",
   READY_FOR_PICKUP: "ready for pickup",
@@ -167,17 +162,6 @@ const STATUS_HEADLINE: Record<TicketStatus, string> = {
 
 export function statusHeadline(status: TicketStatus): string {
   return STATUS_HEADLINE[status];
-}
-
-// Fuller current-activity line (timeline). Null once terminal.
-export function pendingLabel(status: TicketStatus): string | null {
-  return ACTIVITY_DETAILED[status] ?? null;
-}
-
-// Compact current-activity name — the stepper's blue node and the status
-// pill. Falls back to the done label for terminal statuses.
-export function currentActivityLabel(status: TicketStatus): string {
-  return ACTIVITY_SHORT[status] ?? doneLabel(status);
 }
 
 // Context that lets the pickup-related notes name the device and tell the

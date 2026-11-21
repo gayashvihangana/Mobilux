@@ -1,5 +1,5 @@
 import type { TicketStatus } from "@prisma/client";
-import { Check, TriangleAlert, X } from "lucide-react";
+import { Check, TriangleAlert } from "lucide-react";
 import type { IssueSummary } from "@/lib/repair-issue";
 
 // Only what the timeline actually renders — deliberately not Prisma's full
@@ -14,19 +14,20 @@ export type TimelineUpdate = {
   photo?: string | null;
 };
 import {
-  currentActivityLabel,
-  doneLabel,
   milestoneDescription,
-  pendingLabel,
   pickupNote,
+  REPAIR_STEPS,
+  repairStepIndex,
   STATUS_META,
+  statusLabel,
   type MilestoneContext,
 } from "@/lib/status";
+
+const TERMINAL: TicketStatus[] = ["PICKED_UP", "CANCELLED"];
 import { cn, formatDateTime } from "@/lib/utils";
 
-// Every milestone, in order — used by the vertical timeline to list the
-// steps still to come. Submitted/Confirmed belong here: the timeline tells
-// the whole story, including the online request and its acceptance.
+// Every status a repair passes through, in order — the vertical timeline
+// lists the ones still to come above the dated history.
 const TIMELINE_PIPELINE: TicketStatus[] = [
   "SUBMITTED",
   "CONFIRMED",
@@ -35,27 +36,7 @@ const TIMELINE_PIPELINE: TicketStatus[] = [
   "AWAITING_PARTS",
   "IN_PROGRESS",
   "COMPLETED",
-  "READY_FOR_PICKUP",
-];
-
-// The horizontal bar shows only the hands-on repair, starting where the
-// device physically arrives — Submitted/Confirmed are pre-arrival paperwork
-// and would just eat width. While a ticket still sits at either of them the
-// first circle is the blue "happening now" node ("Waiting to receive"), so
-// nothing is lost.
-//
-// The final READY_FOR_PICKUP node is purely visual — it's no longer a
-// milestone the admin marks (COMPLETED goes straight to PICKED_UP). It's the
-// blue "Ready for pickup" circle while the device waits at the shop after the
-// Completed node ticks green, then ticks green itself as "Picked up" once
-// collected. One collection circle, not two.
-const STEPPER_PIPELINE: TicketStatus[] = [
-  "RECEIVED",
-  "DIAGNOSING",
-  "AWAITING_PARTS",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "READY_FOR_PICKUP",
+  "PICKED_UP",
 ];
 
 // The dated rows the issues contribute to the vertical timeline, ready to be
@@ -157,138 +138,98 @@ function IssueRow({
   );
 }
 
-// Horizontal pipeline stepper (customer-facing "where is my device").
-//
-// The blue circle is always the step happening RIGHT NOW — labelled with the
-// current activity ("Waiting to start the repair", "Repair in progress"). The
-// step is not ticked green until that work is actually finished, at which
-// point its label switches to the completed name. Everything ahead is a
-// greyed-out upcoming step.
+// The six steps of a repair as a row of bars, with the step it is on now
+// highlighted (the approved "steps" design). `status` is what is happening
+// now, so the current bar IS the status; everything before it is done.
+// Phones have no room for six names, so they get the current step in words.
 export function StatusStepper({
   status,
   cancelledFrom,
   issuePending = false,
 }: {
   status: TicketStatus;
-  /** For cancelled tickets: the last real milestone reached before the
-   * cancellation (derived from the timeline), so the stepper can still show
-   * how far the repair got. The steps that never happened are crossed out. */
+  /** For cancelled tickets: the last real step reached before the
+   * cancellation (from the timeline), so the bars still show how far the
+   * repair got. */
   cancelledFrom?: TicketStatus | null;
-  /** An issue is awaiting the customer's decision — the current node turns
-   * amber with an alert to show the pipeline is paused right there. */
+  /** An issue is waiting on the customer's decision — the current bar turns
+   * amber to show the repair is paused there. */
   issuePending?: boolean;
 }) {
   const cancelled = status === "CANCELLED";
-  const lastIndex = STEPPER_PIPELINE.length - 1;
+  const pickedUp = status === "PICKED_UP";
+  const current = cancelled
+    ? -1
+    : pickedUp
+      ? REPAIR_STEPS.length
+      : repairStepIndex(status);
+  const reached = cancelled
+    ? cancelledFrom
+      ? repairStepIndex(cancelledFrom)
+      : -1
+    : current;
 
-  // doneUpTo = index of the last green (finished) node; activeIndex = the
-  // blue "happening now" node. `status` is the last completed milestone, so
-  // the active node is normally the one after it. Collection is special: the
-  // final node stays blue ("awaiting pickup") until the device is collected.
-  let doneUpTo: number;
-  let activeIndex: number;
-  if (cancelled) {
-    doneUpTo = cancelledFrom ? STEPPER_PIPELINE.indexOf(cancelledFrom) : -1;
-    activeIndex = -1;
-  } else if (status === "PICKED_UP") {
-    doneUpTo = lastIndex;
-    activeIndex = -1;
-  } else if (status === "READY_FOR_PICKUP") {
-    doneUpTo = lastIndex - 1;
-    activeIndex = lastIndex;
-  } else {
-    const ci = STEPPER_PIPELINE.indexOf(status);
-    doneUpTo = ci;
-    activeIndex = ci < lastIndex ? ci + 1 : -1;
-  }
-
-  // Color of the connector segment joining index and index+1.
-  const segmentClass = (index: number) => {
-    if (index + 1 <= doneUpTo) return "bg-success";
-    if (index + 1 === activeIndex) return issuePending ? "bg-warning" : "bg-primary";
-    return cancelled ? "bg-destructive/25" : "bg-border";
-  };
+  const summary = cancelled
+    ? "Cancelled"
+    : issuePending
+      ? "Paused — waiting for the customer to decide"
+      : statusLabel(status);
 
   return (
-    <div className={cancelled ? "space-y-3" : undefined}>
+    <div className="space-y-3">
       {cancelled ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          This repair was cancelled — the crossed-out steps never happened.
-          Contact us if this looks wrong.
+          This repair was cancelled. The crossed-out steps never happened.
         </div>
       ) : null}
-      <ol className="flex items-start">
-        {STEPPER_PIPELINE.map((step, index) => {
-          const done = index <= doneUpTo;
-          const current = index === activeIndex;
-          // Finished steps read as the completed milestone; the last node
-          // reads "Picked up" once collected. The blue node reads the live
-          // activity. Upcoming steps keep their neutral ongoing name.
-          const label = done
-            ? index === lastIndex && status === "PICKED_UP"
-              ? doneLabel("PICKED_UP")
-              : doneLabel(step)
-            : current
-              ? issuePending
-                ? "Issue — decision needed"
-                : currentActivityLabel(status)
-              : STATUS_META[step].label;
+      <p className="text-sm font-bold md:hidden">
+        {summary}
+        {current >= 0 && current < REPAIR_STEPS.length ? (
+          <span className="font-medium text-muted-foreground">
+            {" "}
+            · step {current + 1} of {REPAIR_STEPS.length}
+          </span>
+        ) : null}
+      </p>
+      <ol className="grid grid-cols-6 gap-1.5 md:gap-2">
+        {REPAIR_STEPS.map((step, index) => {
+          const isCurrent = index === current;
+          const done = cancelled ? index <= reached : index < current;
           return (
-            <li key={step} className="flex flex-1 flex-col items-center">
-              <div className="flex w-full items-center">
-                <div
-                  className={cn(
-                    "h-0.5 flex-1",
-                    index === 0 ? "bg-transparent" : segmentClass(index - 1),
-                  )}
-                />
-                <span
-                  className={cn(
-                    "grid size-7 shrink-0 place-items-center rounded-full border-2 text-[10px] font-bold",
-                    done && "border-success bg-success text-white",
-                    current &&
-                      (issuePending
-                        ? "border-warning bg-warning/15 text-warning shadow-[0_0_12px] shadow-warning/40"
-                        : "border-primary bg-primary/15 text-primary shadow-[0_0_12px] shadow-primary/40"),
-                    !done &&
-                      !current &&
-                      (cancelled
-                        ? "border-destructive/40 bg-destructive/5 text-destructive/70"
-                        : "border-border bg-card text-muted-foreground"),
-                  )}
-                >
-                  {done ? (
-                    <Check className="size-3.5" />
-                  ) : current && issuePending ? (
-                    <TriangleAlert className="size-3.5" />
-                  ) : cancelled ? (
-                    <X className="size-3.5" />
-                  ) : (
-                    index + 1
-                  )}
-                </span>
-                <div
-                  className={cn(
-                    "h-0.5 flex-1",
-                    index === lastIndex ? "bg-transparent" : segmentClass(index),
-                  )}
-                />
-              </div>
+            <li key={step} aria-current={isCurrent ? "step" : undefined}>
+              <span
+                aria-hidden
+                className={cn(
+                  "block h-1.5 rounded-full",
+                  isCurrent
+                    ? issuePending
+                      ? "bg-warning"
+                      : "bg-primary"
+                    : done
+                      ? "bg-foreground"
+                      : cancelled
+                        ? "bg-destructive/20"
+                        : "bg-border",
+                )}
+              />
               <span
                 className={cn(
-                  "mt-2 hidden px-1 text-center text-[11px] leading-tight md:block",
-                  current
+                  "mt-2 hidden text-xs leading-tight md:block",
+                  isCurrent
                     ? issuePending
-                      ? "font-semibold text-warning"
-                      : "font-semibold text-primary"
+                      ? "font-bold text-warning"
+                      : "font-bold text-primary"
                     : done
-                      ? "font-medium text-success"
-                      : cancelled
-                        ? "text-muted-foreground/70 line-through"
-                        : "text-muted-foreground",
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                  cancelled && !done && "line-through",
                 )}
               >
-                {label}
+                {statusLabel(step)}
+              </span>
+              <span className="sr-only md:hidden">{statusLabel(step)}</span>
+              <span className="sr-only">
+                {isCurrent ? " (now)" : done ? " (done)" : ""}
               </span>
             </li>
           );
@@ -298,51 +239,11 @@ export function StatusStepper({
   );
 }
 
-// The "happening now" row — the current activity, shown in blue with a
-// pulsing dot. Reads the fuller current-activity line (e.g. "Diagnosing your
-// device"). Turns into a real dated entry once the shop completes that step.
-// Once the repair is done, the row flips to "Ready for you to collect" and
-// tells the customer where and when to pick the device up (via `ctx`).
-export function PendingRow({
-  status,
-  ctx,
-  issuePending = false,
-}: {
-  status: TicketStatus;
-  ctx?: MilestoneContext;
-  /** The pipeline is paused on a reported issue — the row turns amber. */
-  issuePending?: boolean;
-}) {
-  const label = pendingLabel(status);
-  if (!label) return null;
-  const awaitingPickup = status === "COMPLETED" || status === "READY_FOR_PICKUP";
-  if (issuePending) {
-    return (
-      <li className="relative flex gap-4 pb-6">
-        <span
-          className="absolute top-5 left-[7px] h-full w-0.5 bg-border"
-          aria-hidden
-        />
-        <span className="relative mt-1 grid size-4 shrink-0 place-items-center">
-          <span className="absolute inline-flex size-4 animate-ping rounded-full bg-warning/40" />
-          <span className="relative size-3 rounded-full border-2 border-warning bg-background" />
-        </span>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="text-sm font-semibold text-warning">
-              Paused — issue reported
-            </p>
-            <span className="rounded-full border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-              Decision needed
-            </span>
-          </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Work is on hold until the reported issue is decided.
-          </p>
-        </div>
-      </li>
-    );
-  }
+// Shown at the top of the timeline while a reported issue waits for the
+// customer's decision: the repair is on hold until then. Nothing is shown
+// otherwise — the newest dated entry already says what is happening now.
+export function PendingRow({ issuePending = false }: { issuePending?: boolean }) {
+  if (!issuePending) return null;
   return (
     <li className="relative flex gap-4 pb-6">
       <span
@@ -350,24 +251,36 @@ export function PendingRow({
         aria-hidden
       />
       <span className="relative mt-1 grid size-4 shrink-0 place-items-center">
-        <span className="absolute inline-flex size-4 animate-ping rounded-full bg-primary/40" />
-        <span className="relative size-3 rounded-full border-2 border-primary bg-background" />
+        <span className="relative size-3 rounded-full border-2 border-warning bg-background" />
       </span>
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <p className="text-sm font-semibold text-primary">{label}</p>
-          <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-            {awaitingPickup ? "Ready" : "In progress"}
+          <p className="text-sm font-semibold text-warning">
+            Paused — issue reported
+          </p>
+          <span className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+            Decision needed
           </span>
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          {awaitingPickup
-            ? pickupNote(ctx)
-            : "We'll update this as soon as it's done."}
+          Work is on hold until the reported issue is decided.
         </p>
       </div>
     </li>
   );
+}
+
+/** Timeline text for an entry with no note. The newest entry of a repair
+ * that is ready to collect gets the full "come and collect" message. */
+export function entryDescription(
+  status: TicketStatus,
+  isNow: boolean,
+  ctx?: MilestoneContext,
+) {
+  if (isNow && (status === "COMPLETED" || status === "READY_FOR_PICKUP")) {
+    return pickupNote(ctx);
+  }
+  return milestoneDescription(status, ctx);
 }
 
 // A step that hasn't happened yet — shown faint with a hollow dot and a
@@ -385,7 +298,7 @@ function UpcomingRow({ status }: { status: TicketStatus }) {
           <p className="text-sm font-medium text-muted-foreground">
             {STATUS_META[status].label}
           </p>
-          <span className="rounded-full border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <span className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs font-medium text-muted-foreground">
             Waiting
           </span>
         </div>
@@ -423,11 +336,13 @@ export function StatusHistory({
   // Steps after the one happening now — shown furthest-away first (top).
   let upcoming: TicketStatus[] = [];
   if (status) {
-    const ci = TIMELINE_PIPELINE.indexOf(status);
+    const ci = TIMELINE_PIPELINE.indexOf(
+      status === "READY_FOR_PICKUP" ? "COMPLETED" : status,
+    );
     if (ci !== -1) {
-      // status = last completed milestone → the active step is ci+1, so the
-      // still-to-come steps start at ci+2. Reverse so the finish line is up top.
-      upcoming = TIMELINE_PIPELINE.slice(ci + 2).reverse();
+      // `status` is the step happening now, so the ones still to come start
+      // right after it. Reversed so the finish line is at the top.
+      upcoming = TIMELINE_PIPELINE.slice(ci + 1).reverse();
     }
   }
 
@@ -460,9 +375,7 @@ export function StatusHistory({
       {upcoming.map((step) => (
         <UpcomingRow key={`upcoming-${step}`} status={step} />
       ))}
-      {status ? (
-        <PendingRow status={status} ctx={ctx} issuePending={issuePending} />
-      ) : null}
+      <PendingRow issuePending={issuePending} />
       {rows.map((row, index) => {
         const withLine = index < rows.length - 1;
         if (row.kind === "issue") {
@@ -479,6 +392,7 @@ export function StatusHistory({
         const update = row.update;
         const meta = STATUS_META[update.status];
         const latest = index === 0;
+        const isNow = update.id === updates[0]?.id && update.status === status;
         return (
           <li key={row.key} className="relative flex gap-4 pb-6 last:pb-0">
             {withLine ? (
@@ -497,16 +411,21 @@ export function StatusHistory({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <p className={cn("text-sm font-semibold", latest && "text-foreground")}>
-                  {doneLabel(update.status)}
+                  {statusLabel(update.status)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDateTime(update.createdAt)}
                 </p>
+                {isNow && !TERMINAL.includes(update.status) ? (
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    Now
+                  </span>
+                ) : null}
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">
                 {publicView
-                  ? milestoneDescription(update.status, ctx)
-                  : (update.note ?? milestoneDescription(update.status, ctx))}
+                  ? entryDescription(update.status, isNow, ctx)
+                  : (update.note ?? entryDescription(update.status, isNow, ctx))}
               </p>
               {update.photo && !publicView ? (
                 <a

@@ -7,10 +7,9 @@ import { getShopInfo } from "@/lib/settings";
 // session is redirected off "/" — so the footer swaps to their own links.
 const guestLinks = [
   { href: "/#services", label: "Services" },
-  { href: "/#how-it-works", label: "How it works" },
+  { href: "/track", label: "Track repair" },
   { href: "/shop", label: "Shop" },
-  { href: "/register", label: "Start a repair" },
-  { href: "/track", label: "Track my device" },
+  { href: "/#find-us", label: "Find us" },
 ];
 
 const customerLinks = [
@@ -22,10 +21,10 @@ const customerLinks = [
 ];
 
 const adminLinks = [
-  { href: "/admin", label: "Overview" },
+  { href: "/admin", label: "Today" },
   { href: "/admin/tickets", label: "Repairs" },
   { href: "/shop", label: "Shop" },
-  { href: "/admin/tickets/new", label: "New repair log" },
+  { href: "/admin/tickets/new", label: "New repair" },
   { href: "/track", label: "Track a device" },
 ];
 
@@ -44,7 +43,7 @@ export async function SiteFooter() {
 
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-10 sm:flex-row sm:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 pt-10 pb-28 sm:flex-row sm:justify-between sm:pb-10">
         <div className="flex flex-col items-center gap-2 sm:items-start">
           <Logo
             brand={{
@@ -58,12 +57,12 @@ export async function SiteFooter() {
             <p className="text-sm text-muted-foreground">{strapline}</p>
           ) : null}
         </div>
-        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+        <nav className="flex flex-wrap items-center justify-center gap-x-2 text-sm text-muted-foreground">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="transition-colors hover:text-foreground"
+              className="inline-flex min-h-11 items-center px-2 transition-colors hover:text-foreground"
             >
               {link.label}
             </Link>
