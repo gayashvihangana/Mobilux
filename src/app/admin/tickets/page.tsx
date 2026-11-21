@@ -306,7 +306,7 @@ export default async function RepairsPage({
       </div>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <form action="/admin/tickets" className="relative md:w-96" role="search">
+        <form id="search" action="/admin/tickets" className="relative scroll-mt-24 md:w-96" role="search">
           {view !== "board" ? <input type="hidden" name="view" value={view} /> : null}
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input

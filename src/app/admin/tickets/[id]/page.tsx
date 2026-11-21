@@ -571,7 +571,7 @@ export default async function AdminTicketDetailPage({
 
       {/* Phone: the main action stays in reach at the bottom of the screen. */}
       {!terminal ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden">
+        <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 border-t border-border bg-card px-4 py-3 md:hidden">
           <MainAction
             ticketId={ticket.id}
             status={ticket.status}

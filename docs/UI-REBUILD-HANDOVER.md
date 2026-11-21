@@ -78,10 +78,16 @@ Step 4, homepage (done):
 - Header: solid white bar, links Services, Track repair, Shop, Find us, and "WhatsApp us" in place of "Sign up". The footer has room underneath so the WhatsApp button no longer covers its links.
 - Reviews show only with at least 3 approved, as a plain grid (no moving rails).
 
+Step 5, admin menu and the other admin pages (done):
+- Admin menu as in the approved `docs/design-samples/admin-nav.html`: `src/components/admin-shell.tsx` (navy sidebar from 1024px, bottom bar with Today, Repairs, +, Payments, More below that) wired up in `src/app/admin/layout.tsx`. The sidebar shows counts for open repairs and payments to check. The old `admin-nav.tsx` is gone.
+- Tables: `src/components/ui/table.tsx` copies each column title onto its cells, and `globals.css` stacks every row under 768px, so all ten admin tables fit a phone with no page changes. Pass `stack={false}` to keep a table as a grid.
+- Buttons: size `sm` and `icon-sm` are now 44px.
+- Every admin page measured at 375px and 1366px: no sideways scroll (Reports was 441px wide because of its hidden screen-reader table).
+- Not done: the pages' own content is unchanged, so "Shop numbers" still has its glow blobs and many small cards, and the stat cards on Customers stack one per row on a phone. Worth a pass later.
+
 ## Steps left
 
-1. **Step 5, the rest of the admin pages** restyled. The admin header is still the old top bar with a More menu.
-2. **Step 6, Settings** as described above.
+1. **Step 6, Settings** as described above.
 
 Other known problems: the seven shop products are the sample products from `prisma/seed.ts`; Settings still says "Colombo, Sri Lanka" (the owner can change it himself).
 

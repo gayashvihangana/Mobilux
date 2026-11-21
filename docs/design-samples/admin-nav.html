@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin menu sample</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F7FB; --card: #FFFFFF; --text: #0B1B33; --muted: #55637A;
+    --primary: #2457F5; --ink: #083262; --soft: #F0F3F9; --line: #DCE3EE;
+    --amber-soft: #FFF4D6; --amber-text: #9A5B00;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #E9EDF5; font-family: "Plus Jakarta Sans", system-ui, sans-serif; color: var(--text); padding: 32px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .intro { color: var(--muted); margin: 0 0 28px; max-width: 760px; line-height: 1.5; }
+  .label { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: none; margin: 0 0 10px; }
+  .row { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+  svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+  /* ── Laptop ── */
+  .laptop { width: 1200px; height: 720px; background: var(--bg); border-radius: 20px; overflow: hidden; display: flex; box-shadow: 0 1px 0 var(--line); }
+  .side { width: 248px; background: var(--ink); color: #fff; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; font-weight: 800; font-size: 17px; }
+  .mark { width: 36px; height: 36px; border-radius: 12px; background: #fff; color: var(--ink); display: grid; place-items: center; font-weight: 800; }
+  .newbtn { height: 48px; border-radius: 14px; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; margin-bottom: 14px; }
+  .search { height: 44px; border-radius: 14px; background: rgba(255,255,255,.1); color: rgba(255,255,255,.7); display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 14px; margin-bottom: 10px; }
+  .nav { height: 44px; border-radius: 12px; display: flex; align-items: center; gap: 12px; padding: 0 12px; font-weight: 600; font-size: 15px; color: rgba(255,255,255,.8); }
+  .nav.on { background: #fff; color: var(--ink); }
+  .nav .count { margin-left: auto; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.15); border-radius: 999px; padding: 2px 8px; }
+  .nav.on .count { background: var(--soft); }
+  .group { font-size: 12px; font-weight: 700; color: rgba(255,255,255,.5); padding: 16px 12px 6px; }
+  .side .bottom { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 8px 0; border-top: 1px solid rgba(255,255,255,.12); font-size: 14px; }
+  .avatar { width: 36px; height: 36px; border-radius: 999px; background: rgba(255,255,255,.15); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+  .main { flex: 1; padding: 28px 32px; }
+  .main h2 { margin: 0 0 4px; font-size: 30px; font-weight: 800; }
+  .main .sub { color: var(--muted); margin: 0 0 20px; }
+  .tiles { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .tile { border-radius: 28px; background: var(--card); height: 180px; }
+  .tile.ink { background: var(--ink); height: 280px; }
+  .tile.blue { background: var(--primary); }
+  .stack { display: grid; gap: 16px; }
+
+  /* ── Phone ── */
+  .phone { width: 375px; height: 760px; background: var(--bg); border-radius: 32px; overflow: hidden; position: relative; box-shadow: 0 1px 0 var(--line); }
+  .top { height: 60px; background: var(--card); display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; }
+  .top .name { font-weight: 800; font-size: 16px; flex: 1; }
+  .iconbtn { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--text); }
+  .ph-main { padding: 16px; }
+  .ph-main h2 { margin: 0; font-size: 24px; font-weight: 800; }
+  .ph-main .sub { color: var(--muted); font-size: 14px; margin: 2px 0 14px; }
+  .ph-tile { border-radius: 26px; background: var(--ink); height: 230px; margin-bottom: 12px; }
+  .ph-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ph-row div { border-radius: 24px; height: 100px; background: var(--card); }
+  .ph-row div.amber { background: var(--amber-soft); }
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 76px; background: var(--card); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; padding: 0 6px 6px; }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; color: var(--muted); height: 60px; justify-content: center; }
+  .tab.on { color: var(--primary); }
+  .tab .plus { width: 52px; height: 52px; border-radius: 18px; background: var(--primary); color: #fff; display: grid; place-items: center; margin-top: -18px; }
+  .dim { position: absolute; inset: 0; background: rgba(11,27,51,.45); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--card); border-radius: 28px 28px 0 0; padding: 10px 16px 20px; }
+  .grab { width: 40px; height: 5px; border-radius: 9px; background: var(--line); margin: 0 auto 12px; }
+  .sheet h3 { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-weight: 700; padding: 8px 4px 4px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .cell { background: var(--soft); border-radius: 16px; height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 700; text-align: center; }
+  .cell svg { color: var(--primary); }
+  .note { margin-top: 28px; max-width: 900px; color: var(--muted); line-height: 1.6; font-size: 14px; }
+  .note b { color: var(--text); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0 5 5l-9.4 9.4a2.1 2.1 0 0 1-3-3z"/><path d="M14.7 6.3 17 4l3 3-2.3 2.3"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></symbol>
+  <symbol id="wallet" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 13H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+  <symbol id="box" viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></symbol>
+  <symbol id="chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z"/><path d="M9 12h6M9 16h6"/></symbol>
+  <symbol id="star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+  <symbol id="gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13M12 8a3 3 0 1 1 3-3c0 2-3 3-3 3s-3-1-3-3a3 3 0 1 1 3 3"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="staff" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+</svg>
+
+<h1>Admin menu: sample for approval</h1>
+<p class="intro">Laptop: a navy sidebar on the left with every section in view, so nothing hides under "More". Phone: a bar at the bottom with the four things you use most and a big + for a new repair. Everything else is under "More". Search is in the sidebar on laptop and behind the magnifier at the top on a phone.</p>
+
+<p class="label">Laptop (1024px and wider)</p>
+<div class="laptop">
+  <aside class="side">
+    <div class="brand"><span class="mark">M</span> Mobilux</div>
+    <div class="newbtn"><svg class="i"><use href="#plus"/></svg> New repair</div>
+    <div class="search"><svg class="i"><use href="#search"/></svg> Search repairs</div>
+    <div class="nav on"><svg class="i"><use href="#home"/></svg> Today</div>
+    <div class="nav"><svg class="i"><use href="#wrench"/></svg> Repairs <span class="count">13</span></div>
+    <div class="nav"><svg class="i"><use href="#users"/></svg> Customers</div>
+    <div class="nav"><svg class="i"><use href="#wallet"/></svg> Payments <span class="count">2</span></div>
+    <div class="group">Shop</div>
+    <div class="nav"><svg class="i"><use href="#bag"/></svg> Orders</div>
+    <div class="nav"><svg class="i"><use href="#box"/></svg> Products</div>
+    <div class="group">Numbers</div>
+    <div class="nav"><svg class="i"><use href="#chart"/></svg> Reports</div>
+    <div class="nav"><svg class="i"><use href="#alert"/></svg> Bench errors</div>
+    <div class="nav"><svg class="i"><use href="#cog"/></svg> Settings</div>
+    <div class="bottom"><span class="avatar">GV</span> Gayash <span style="margin-left:auto;opacity:.7"><svg class="i"><use href="#bell"/></svg></span></div>
+  </aside>
+  <div class="main">
+    <h2>Good afternoon, Gayash</h2>
+    <p class="sub">Friday 20 November</p>
+    <div class="tiles">
+      <div class="tile ink"></div>
+      <div class="stack"><div class="tile blue" style="height:132px"></div><div class="tile" style="height:132px"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="row" style="margin-top:36px">
+  <div>
+    <p class="label">Phone: bottom bar</p>
+    <div class="phone">
+      <div class="top"><span class="mark" style="background:var(--ink);color:#fff">M</span><span class="name">Mobilux</span><span class="iconbtn"><svg class="i"><use href="#search"/></svg></span><span class="iconbtn"><svg class="i"><use href="#bell"/></svg></span></div>
+      <div class="ph-main">
+        <h2>Good afternoon</h2>
+        <p class="sub">Friday 20 November</p>
+        <div class="ph-tile"></div>
+        <div class="ph-row"><div style="background:var(--primary)"></div><div class="amber"></div></div>
+      </div>
+      <nav class="bar">
+        <div class="tab on"><svg class="i"><use href="#home"/></svg>Today</div>
+        <div class="tab"><svg class="i"><use href="#wrench"/></svg>Repairs</div>
+        <div class="tab"><span class="plus"><svg class="i"><use href="#plus"/></svg></span>New</div>
+        <div class="tab"><svg class="i"><use href="#wallet"/></svg>Payments</div>
+        <div class="tab"><svg class="i"><use href="#grid"/></svg>More</div>
+      </nav>
+    </div>
+  </div>
+  <div>
+    <p class="label">Phone: "More" opened</p>
+    <div class="phone">
+      <div class="top"><span class="mark" style="background:var(--ink);color:#fff">M</span><span class="name">Mobilux</span><span class="iconbtn"><svg class="i"><use href="#search"/></svg></span><span class="iconbtn"><svg class="i"><use href="#bell"/></svg></span></div>
+      <div class="ph-main"><h2>Good afternoon</h2><p class="sub">Friday 20 November</p><div class="ph-tile"></div></div>
+      <div class="dim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <h3>Customers and shop</h3>
+        <div class="grid3">
+          <div class="cell"><svg class="i"><use href="#users"/></svg>Customers</div>
+          <div class="cell"><svg class="i"><use href="#bag"/></svg>Orders</div>
+          <div class="cell"><svg class="i"><use href="#box"/></svg>Products</div>
+          <div class="cell"><svg class="i"><use href="#gift"/></svg>Loyalty</div>
+          <div class="cell"><svg class="i"><use href="#star"/></svg>Reviews</div>
+        </div>
+        <h3>Numbers</h3>
+        <div class="grid3">
+          <div class="cell"><svg class="i"><use href="#chart"/></svg>Reports</div>
+          <div class="cell"><svg class="i"><use href="#alert"/></svg>Bench errors</div>
+          <div class="cell"><svg class="i"><use href="#note"/></svg>Notes</div>
+        </div>
+        <h3>Setup</h3>
+        <div class="grid3">
+          <div class="cell"><svg class="i"><use href="#staff"/></svg>Staff</div>
+          <div class="cell"><svg class="i"><use href="#clock"/></svg>Activity</div>
+          <div class="cell"><svg class="i"><use href="#cog"/></svg>Settings</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="note"><b>Notes.</b> The sidebar here is shortened for the picture. The real one lists every section your account can open: Today, Repairs, Customers, Payments; Shop (Orders, Products, Loyalty, Reviews); Numbers (Shop numbers, Reports, Bench errors, Notes, Activity); Setup (Staff, Settings). Staff accounts only see what they are allowed to use, as now. Light and dark theme switch and sign out sit behind your name at the bottom of the sidebar, and behind the bell and avatar on a phone. The counts are open repairs and payments waiting to be checked.</p>
+</body>
+</html>

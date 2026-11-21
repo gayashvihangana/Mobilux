@@ -336,6 +336,60 @@
   }
 }
 
+/* ── Tables on phones ─────────────────────────────────────────────
+   Under 768px each row becomes a block with one value per line and its
+   column title on the left (titles copied onto cells by <Table>). No table
+   is wider than the screen any more (audit S1). */
+@media (max-width: 767px) {
+  table[data-stack] {
+    min-width: 0 !important;
+  }
+  table[data-stack] thead {
+    display: none;
+  }
+  table[data-stack] tbody,
+  table[data-stack] tr,
+  table[data-stack] td {
+    display: block;
+    width: 100% !important;
+    max-width: none !important;
+  }
+  table[data-stack] tr {
+    padding: 10px 16px;
+  }
+  table[data-stack] td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 32px;
+    padding: 4px 0 !important;
+    text-align: right !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+  table[data-stack] td > * {
+    min-width: 0;
+  }
+  table[data-stack] td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    max-width: 45%;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+  table[data-stack] td[data-label=""]::before,
+  table[data-stack] td:not([data-label])::before {
+    content: none;
+  }
+  table[data-stack] td[data-label=""] {
+    justify-content: center;
+    text-align: center !important;
+  }
+}
+
 @media print {
   @page {
     margin: 10mm;

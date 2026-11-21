@@ -367,8 +367,11 @@ export default async function AdminReportsPage() {
         />
       </section>
 
-      {/* Screen-reader / no-SVG fallback for the monthly figures */}
-      <table className="sr-only">
+      {/* Screen-reader / no-SVG fallback for the monthly figures. Wrapped:
+          a table ignores the 1px width of .sr-only and pushed the page
+          sideways on phones. */}
+      <div className="sr-only">
+      <table>
         <caption>Monthly revenue, costs and profit — last 12 months</caption>
         <thead>
           <tr>
@@ -391,6 +394,7 @@ export default async function AdminReportsPage() {
           ))}
         </tbody>
       </table>
+      </div>
 
       <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
         <h2 className="font-display text-lg font-semibold">Common issues</h2>
