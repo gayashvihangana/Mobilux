@@ -73,6 +73,7 @@ import {
 } from "@/lib/status";
 import { RECEIVED_ITEM_PRESETS } from "@/lib/received-items";
 import { FormAutosave } from "@/components/forms/form-autosave";
+import { DeviceFields } from "@/components/forms/device-fields";
 
 function useSuccessToast(state: TicketFormState, message: string) {
   const last = useRef<TicketFormState>(null);
@@ -729,14 +730,25 @@ export function TicketDetailsForm({ values }: { values: TicketDetailsValues }) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="brand">Brand</Label>
-          <Input id="brand" name="brand" defaultValue={values.brand ?? ""} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="model">Model</Label>
-          <Input id="model" name="model" defaultValue={values.model ?? ""} />
-        </div>
+        <DeviceFields
+          defaultBrand={values.brand ?? ""}
+          defaultModel={values.model ?? ""}
+          brand={{ id: "brand" }}
+          model={{ id: "model" }}
+        >
+          {(fields) => (
+            <>
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="brand">Brand</Label>
+                {fields.brand}
+              </div>
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="model">Model</Label>
+                {fields.model}
+              </div>
+            </>
+          )}
+        </DeviceFields>
       </div>
 
       <div className="space-y-2">

@@ -101,9 +101,14 @@ Step 7, bills and payments (done):
 - Customer bill link `/invoice/[trackToken]` (no sign-in, not indexed): balance due or a green "Paid" receipt, items, bank details with Copy buttons and the bill number as reference, "Send your slip on WhatsApp" (or "Upload payment slip" for the signed-in owner), and print to PDF. The tracker links to it once the repair has a price. Slip uploads now ask for the balance, not the full price.
 - Printed bill (`src/components/bill-document.tsx`) redesigned like the sample: Item / Qty / Price / Total, every payment, a black "Balance due" box, PAID stamp. It sizes by its own width, so the narrow preview stacks neatly.
 
+Step 8, Brand and Model boxes (done):
+- `src/components/forms/device-fields.tsx`: Brand and Model suggest as you type (Apple, Asus, Acer for "A"; every iPhone 13 for "13"), with arrow keys, Enter and Escape. Anything else can be typed ("Add ..."), and "Other brand/model" clears the box to type in. With no brand, picking a model fills in its brand; a new brand clears the model.
+- Used on the quick new-repair form, the full repair log, the edit form and the customer's own booking form.
+- The list is `src/lib/devices.ts` (popular phones, tablets and laptops sold in Sri Lanka). Brands and models the shop has saved on repairs are added to it (`deviceSuggestions` in `src/lib/actions/devices.ts`), so a model typed once is offered next time. No database change.
+
 ## Steps left
 
-All seven steps are done. Ideas for later: restyle the insides of the back-office pages (Shop numbers, Customers stat cards), real photos on the homepage, and "returning customer" under the phone field.
+All eight steps are done. Ideas for later: restyle the insides of the back-office pages (Shop numbers, Customers stat cards), real photos on the homepage, and "returning customer" under the phone field.
 
 Other known problems: the seven shop products are the sample products from `prisma/seed.ts`; Settings still says "Colombo, Sri Lanka" (the owner can change it himself).
 

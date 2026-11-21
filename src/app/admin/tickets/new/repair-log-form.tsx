@@ -19,6 +19,7 @@ import { FormAutosave } from "@/components/forms/form-autosave";
 import { PartsEditor } from "@/components/forms/parts-editor";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { DEVICE_TYPES, statusLabel, STATUS_PIPELINE } from "@/lib/status";
+import { DeviceFields } from "@/components/forms/device-fields";
 
 export type CustomerOption = { id: string; name: string; email: string };
 
@@ -110,18 +111,27 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="brand">
-            Brand <span className="text-muted-foreground">(optional)</span>
-          </Label>
-          <Input id="brand" name="brand" placeholder="e.g. Samsung" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="model">
-            Model <span className="text-muted-foreground">(optional)</span>
-          </Label>
-          <Input id="model" name="model" placeholder="e.g. Galaxy A12" />
-        </div>
+        <DeviceFields
+          brand={{ id: "brand", placeholder: "e.g. Samsung" }}
+          model={{ id: "model", placeholder: "e.g. Galaxy A12" }}
+        >
+          {(fields) => (
+            <>
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="brand">
+                  Brand <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                {fields.brand}
+              </div>
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="model">
+                  Model <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                {fields.model}
+              </div>
+            </>
+          )}
+        </DeviceFields>
       </div>
 
       {/* Issue & solution */}

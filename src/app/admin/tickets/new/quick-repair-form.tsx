@@ -9,6 +9,7 @@ import { FieldError } from "@/components/forms/field-error";
 import { FormAutosave } from "@/components/forms/form-autosave";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { cn } from "@/lib/utils";
+import { DeviceFields } from "@/components/forms/device-fields";
 
 // Fields that render their own error message below.
 const SHOWN_FIELDS = new Set([
@@ -96,30 +97,27 @@ export function QuickRepairForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor={id("brand")} className={cn(compact && "sr-only")}>
-            Brand
-          </Label>
-          <Input
-            id={id("brand")}
-            name="brand"
-            autoComplete="off"
-            placeholder={compact ? "Brand" : "e.g. Samsung"}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={id("model")} className={cn(compact && "sr-only")}>
-            Model
-          </Label>
-          <Input
-            id={id("model")}
-            name="model"
-            autoComplete="off"
-            placeholder={compact ? "Model" : "e.g. Galaxy A32"}
-          />
-        </div>
-      </div>
+      <DeviceFields
+        brand={{ id: id("brand"), placeholder: compact ? "Brand" : "Type or pick, e.g. Samsung" }}
+        model={{ id: id("model"), placeholder: compact ? "Model" : "e.g. Galaxy A32" }}
+      >
+        {(fields) => (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor={id("brand")} className={cn(compact && "sr-only")}>
+                Brand
+              </Label>
+              {fields.brand}
+            </div>
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor={id("model")} className={cn(compact && "sr-only")}>
+                Model
+              </Label>
+              {fields.model}
+            </div>
+          </div>
+        )}
+      </DeviceFields>
 
       <div className="space-y-2">
         <Label htmlFor={id("issueTitle")} className={cn(compact && "sr-only")}>

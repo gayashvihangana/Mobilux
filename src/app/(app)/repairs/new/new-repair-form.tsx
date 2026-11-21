@@ -18,6 +18,7 @@ import { FileInput } from "@/components/forms/file-input";
 import { FormAutosave } from "@/components/forms/form-autosave";
 import { createTicket } from "@/lib/actions/tickets";
 import { DEVICE_TYPES } from "@/lib/status";
+import { DeviceFields } from "@/components/forms/device-fields";
 
 export function NewRepairForm() {
   const [state, formAction, pending] = useActionState(createTicket, null);
@@ -49,28 +50,37 @@ export function NewRepairForm() {
           </Select>
           <FieldError errors={state?.fieldErrors?.deviceType} />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="brand">Brand</Label>
-          <Input
-            id="brand"
-            name="brand"
-            placeholder="e.g. Apple, Samsung"
-            required
-            className="h-11"
-          />
-          <FieldError errors={state?.fieldErrors?.brand} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="model">Model</Label>
-          <Input
-            id="model"
-            name="model"
-            placeholder="e.g. iPhone 14 Pro"
-            required
-            className="h-11"
-          />
-          <FieldError errors={state?.fieldErrors?.model} />
-        </div>
+        <DeviceFields
+          brand={{
+            id: "brand",
+            placeholder: "Type or pick, e.g. Apple",
+            required: true,
+            className: "h-11",
+            invalid: !!state?.fieldErrors?.brand,
+          }}
+          model={{
+            id: "model",
+            placeholder: "e.g. iPhone 14 Pro",
+            required: true,
+            className: "h-11",
+            invalid: !!state?.fieldErrors?.model,
+          }}
+        >
+          {(fields) => (
+            <>
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="brand">Brand</Label>
+                {fields.brand}
+                <FieldError errors={state?.fieldErrors?.brand} />
+              </div>
+              <div className="min-w-0 space-y-2">
+                <Label htmlFor="model">Model</Label>
+                {fields.model}
+                <FieldError errors={state?.fieldErrors?.model} />
+              </div>
+            </>
+          )}
+        </DeviceFields>
       </div>
 
       <div className="space-y-2">
