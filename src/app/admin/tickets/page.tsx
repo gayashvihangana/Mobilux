@@ -320,7 +320,7 @@ export default async function RepairsPage({
           ))}
         </nav>
         <div className="flex gap-2">
-          <form action="/admin/tickets" className="relative min-w-0 flex-1 lg:w-80 lg:flex-none" role="search">
+          <form id="search" action="/admin/tickets" className="relative min-w-0 flex-1 scroll-mt-24 lg:w-80 lg:flex-none" role="search">
             {p.scope !== "active" ? <input type="hidden" name="scope" value={p.scope} /> : null}
             {p.view !== "list" ? <input type="hidden" name="view" value={p.view} /> : null}
             <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
