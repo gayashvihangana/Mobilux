@@ -71,11 +71,17 @@ Step 3, Board and repair page (done):
 - `src/app/admin/tickets/[id]/page.tsx` is the new repair page; the "⋯" menu is in `repair-actions.tsx`. The customer's name and phone are edited there (`updateTicketContact`); Call and WhatsApp links come from `src/lib/phone.ts` (07X numbers become 947X for WhatsApp).
 - New colour tokens `warning-soft`, `warning-tint` and `amber` for the sample's soft amber; `--warning` stays the darker orange for text.
 
+Step 4, homepage (done):
+- `src/app/(marketing)/page.tsx`: hero (white card plus blue card with a tracking card), three service cards, and "Find us" with Call, WhatsApp and Directions. Town, phone, WhatsApp, address and hours all come from Settings; the town is the last part of the address. "30-day warranty" is fixed text until warranty days is a setting (step 6).
+- Photos: none added yet. Every image slot is in `src/lib/site-images.ts`; while a slot is empty the page shows a drawing like the sample. The owner can drop photos into `public/photos/` and set the paths.
+- Removed from the homepage: the parallax cover, glow blobs, slide-in animations, "How it works", the sample products and the "Get started free" sign-up push. Page went from 6,648px to about 3,360px tall on a phone, and from 399px to 375px wide.
+- Header: solid white bar, links Services, Track repair, Shop, Find us, and "WhatsApp us" in place of "Sign up". The footer has room underneath so the WhatsApp button no longer covers its links.
+- Reviews show only with at least 3 approved, as a plain grid (no moving rails).
+
 ## Steps left
 
-1. **Step 4, homepage** as described above. Also fix the sideways scroll on phones (the slide-in animations and glow blobs make the page 399px wide on a 375px screen) and the WhatsApp button overlapping the footer.
-2. **Step 5, the rest of the admin pages** restyled. The admin header is still the old top bar with a More menu.
-3. **Step 6, Settings** as described above.
+1. **Step 5, the rest of the admin pages** restyled. The admin header is still the old top bar with a More menu.
+2. **Step 6, Settings** as described above.
 
 Other known problems: the seven shop products are the sample products from `prisma/seed.ts`; Settings still says "Colombo, Sri Lanka" (the owner can change it himself).
 
