@@ -1940,3 +1940,32 @@ export async function respondRepairIssue(
   revalidatePath("/track");
   return { success: true };
 }
+
+/**
+ * Hides repairs from the active list (a device never collected, a job the
+ * customer walked away from) or brings them back. Archived repairs keep their
+ * step, bill and history, and are listed under Repairs > Archived.
+ */
+export async function setTicketsArchived(input: {
+  ticketIds: string[];
+  archived: boolean;
+}): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const actor = await actionPermission("repair:write");
+  if (!actor) return { ok: false, error: "Not authorized." };
+  const ids = [...new Set(input.ticketIds)].filter((id) => typeof id === "string").slice(0, 200);
+  if (ids.length === 0) return { ok: false, error: "Pick at least one repair." };
+
+  const count = await prisma.$transaction(async (tx) => {
+    const res = await tx.repairTicket.updateMany({
+      where: { id: { in: ids }, archivedAt: input.archived ? null : { not: null } },
+      data: { archivedAt: input.archived ? new Date() : null },
+    });
+    for (const id of ids) {
+      await logAudit(tx, actor, input.archived ? "ticket.archive" : "ticket.unarchive", "RepairTicket", id, {});
+    }
+    return res.count;
+  });
+  revalidatePath("/admin/tickets");
+  revalidatePath("/admin");
+  return { ok: true, count };
+}

@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active repairs samples</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--ink:#083262;--text:#0B1B33;--muted:#55637A;--soft:#3F4D63;--bg:#F5F7FB;--card:#FFFFFF;--field:#F0F3F9;--line:#E3E8F1;--blue:#0B57F0;--blue-t:#E6EDFF;--green:#0B7A3E;--green-t:#DDF0E5;--amber:#7A4B00;--amber-t:#FFF1C7;--red:#C2261C;--red-t:#FDE7E5;--grey-t:#EBEFF6}
+*{box-sizing:border-box}
+body{margin:0;background:#DCE2EC;color:var(--text);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:15px;line-height:1.4}
+h1,h2,h3,h4,p{margin:0}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.wrap{max-width:1420px;margin:0 auto;padding:32px 16px 80px;display:flex;flex-direction:column;gap:64px}
+.label{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;max-width:900px}
+.label b{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.label h2{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.label p,.label ul{color:var(--muted)}
+.label ul{margin:4px 0 0;padding-left:20px}
+.tag{display:inline-block;background:var(--green);color:#fff;font-size:12px;font-weight:800;border-radius:99px;padding:3px 10px;margin-left:8px;vertical-align:middle;letter-spacing:0}
+.row{display:flex;gap:28px;align-items:flex-start}
+.scroll{overflow-x:auto;max-width:100%}
+.shadow{border-radius:20px;box-shadow:0 20px 50px -20px rgba(8,50,98,.35);overflow:hidden;flex:none}
+.cap{font-size:13px;font-weight:700;color:var(--muted);margin:0 0 8px 4px}
+
+/* laptop frame */
+.laptop{width:1366px;height:768px;display:flex;background:var(--bg);overflow:hidden}
+.side{width:256px;flex:none;background:var(--ink);color:#fff;padding:22px 14px;display:flex;flex-direction:column;gap:6px}
+.side .brand{font-weight:800;font-size:19px;padding:6px 10px 14px}
+.side .new{height:46px;border-radius:14px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;margin-bottom:8px}
+.side a{height:42px;border-radius:12px;padding:0 12px;display:flex;align-items:center;font-weight:700;color:#fff;opacity:.9}
+.side a.on{background:#fff;color:var(--ink);opacity:1}
+.main{flex:1;min-width:0;padding:28px 32px 0;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.top h1{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.top p{color:var(--muted);font-size:14px;margin-top:2px}
+.btn{height:44px;padding:0 18px;border-radius:14px;font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;background:var(--blue);color:#fff}
+.btn.soft{background:var(--field);color:var(--text)} .btn.ink{background:var(--ink);color:#fff} .btn.sm{height:38px;padding:0 12px;font-size:13px;border-radius:11px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.search{height:44px;flex:1;min-width:220px;max-width:380px;border-radius:14px;background:#fff;display:flex;align-items:center;padding:0 14px;color:var(--muted);font-size:14px;gap:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:38px;padding:0 12px;border-radius:99px;background:#fff;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;white-space:nowrap}
+.chip em{font-style:normal;font-size:12px;background:var(--field);border-radius:99px;padding:1px 7px}
+.chip.on{background:var(--ink);color:#fff} .chip.on em{background:rgba(255,255,255,.2)}
+.seg{display:flex;gap:2px;background:#fff;border-radius:12px;padding:3px}
+.seg span{height:34px;padding:0 12px;border-radius:9px;display:flex;align-items:center;font-weight:700;font-size:13px;color:var(--muted)}
+.seg span.on{background:var(--field);color:var(--text)}
+.pill{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:99px;font-size:12px;font-weight:800;white-space:nowrap}
+.pill i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.p-grey{background:var(--grey-t);color:var(--soft)} .p-amber{background:var(--amber-t);color:var(--amber)} .p-blue{background:var(--blue-t);color:#1A3FB8} .p-green{background:var(--green-t);color:var(--green)} .p-red{background:var(--red-t);color:var(--red)}
+.late{color:var(--red);font-weight:700}
+.money{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700}
+.ico{width:36px;height:36px;border-radius:10px;flex:none;display:grid;place-items:center;background:var(--blue-t)}
+.ico i{width:12px;height:20px;border-radius:3px;border:2px solid var(--ink);background:var(--blue)}
+.muted{color:var(--muted)}
+
+/* Option 1: table */
+.table{background:#fff;border-radius:22px;overflow:hidden}
+.tr{display:grid;grid-template-columns:24px 1.45fr 1.9fr 1fr 1.1fr .7fr .9fr 140px;gap:12px;align-items:center;padding:8px 18px;min-height:62px;border-top:1px solid var(--line);font-size:14px}
+.tr.head{min-height:44px;border-top:0;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;background:#FAFBFD}
+.tr.head span.sort{color:var(--text)}
+.tr .box{width:18px;height:18px;border-radius:5px;border:2px solid #C5CEDC}
+.tr .dev{display:flex;gap:10px;align-items:center;min-width:0}
+.tr .dev b{display:block;font-weight:800;line-height:1.25}
+.tr .dev small{color:var(--muted);font-size:12px;font-weight:600}
+.tr .cut{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tr .who b{display:block;font-weight:700} .tr .who small{color:var(--muted);font-size:12px}
+.group{padding:10px 18px;font-size:13px;font-weight:800;background:var(--field);border-top:1px solid var(--line);display:flex;gap:8px;align-items:center}
+
+/* Option 2: action queue */
+.q{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.lane{border-radius:24px;padding:14px;background:#fff}
+.lane h3{font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px}
+.lane h3 em{font-style:normal;font-size:12px;background:var(--field);border-radius:99px;padding:2px 8px}
+.lane > p{font-size:13px;color:var(--muted);margin:2px 0 12px}
+.lane.now{background:var(--ink);color:#fff} .lane.now > p{color:rgba(255,255,255,.75)} .lane.now h3 em{background:rgba(255,255,255,.2)}
+.job{border-radius:16px;background:var(--bg);padding:12px;display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.lane.now .job{background:#fff;color:var(--text)}
+.job .h{display:flex;gap:10px;align-items:flex-start}
+.job .h b{display:block;font-weight:800}
+.job .h small{display:block;color:var(--muted);font-size:13px}
+.job .why{font-size:13px;font-weight:700}
+.job .acts{display:flex;gap:6px}
+
+/* Option 3: split list + preview */
+.split{display:grid;grid-template-columns:440px 1fr;gap:14px;flex:1;min-height:0}
+.list{background:#fff;border-radius:22px;overflow:hidden;display:flex;flex-direction:column}
+.list .tabs{display:flex;gap:4px;padding:10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.li{display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:flex-start}
+.li.sel{background:var(--blue-t);box-shadow:inset 3px 0 0 var(--blue)}
+.li .t{flex:1;min-width:0}
+.li .t b{font-weight:800;display:block}
+.li .t p{font-size:13px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li .t small{font-size:12px;color:var(--muted)}
+.li .r{text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.detail{background:#fff;border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+.hero{background:var(--ink);color:#fff;border-radius:20px;padding:20px;display:flex;justify-content:space-between;gap:16px;align-items:flex-end}
+.hero h3{font-size:24px;font-weight:800}
+.hero p{opacity:.8;font-size:14px}
+.steps{display:flex;gap:6px;align-items:center;font-size:13px;font-weight:700;color:var(--muted)}
+.steps span{display:flex;gap:6px;align-items:center}
+.steps i{width:22px;height:22px;border-radius:50%;background:var(--field);display:grid;place-items:center;font-style:normal;font-size:11px}
+.steps .d{color:var(--text)} .steps .d i{background:var(--ink);color:#fff}
+.steps .n{color:#1A3FB8} .steps .n i{background:var(--blue);color:#fff}
+.steps em{width:18px;height:2px;background:var(--line)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.box2{background:var(--bg);border-radius:16px;padding:14px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.box2 h4{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800;margin-bottom:2px}
+
+/* phone frame */
+.phone{width:375px;height:760px;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.ph-top{height:56px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-weight:800;border-bottom:1px solid var(--line);flex:none}
+.ph-body{padding:16px;display:flex;flex-direction:column;gap:12px;overflow:hidden;flex:1}
+.ph-body h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.hscroll{display:flex;gap:6px;overflow:hidden}
+.pcard{background:#fff;border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.pcard .h{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.pcard .h b{font-weight:800;display:block}
+.pcard .h small{color:var(--muted);font-size:13px;display:block}
+.prow{background:#fff;display:flex;gap:10px;padding:12px;align-items:center;border-bottom:1px solid var(--line)}
+.prow:first-child{border-radius:18px 18px 0 0} .prow:last-child{border-radius:0 0 18px 18px;border-bottom:0}
+.prow .t{flex:1;min-width:0} .prow b{display:block;font-weight:800;font-size:15px} .prow small{display:block;color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph-nav{height:64px;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;font-size:11px;font-weight:700;color:var(--muted);flex:none}
+.ph-nav span.on{color:var(--blue)}
+.ph-nav .plus{width:48px;height:48px;border-radius:16px;background:var(--blue);color:#fff;display:grid;place-items:center;font-size:24px;margin-top:-22px}
+.sheet{position:absolute;inset:auto 0 0 0;height:300px;background:#fff;border-radius:24px 24px 0 0;box-shadow:0 -12px 30px -12px rgba(0,0,0,.25);padding:16px;display:flex;flex-direction:column;gap:10px}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);align-self:center}
+.note{font-size:13px;color:var(--muted);margin-top:10px;max-width:900px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="label" style="margin:0">
+    <b>Repairs page</b>
+    <h2>Three ways to open on every active repair</h2>
+    <p>"Active" means everything not yet collected or cancelled: online requests, received, diagnosing, waiting for parts, repairing and ready for pickup. All three samples share the same search, the same New repair button and a Board / List switch, so the current board can stay as a second view for anyone who likes it. Each is shown on a 1366px laptop and on a phone.</p>
+  </div>
+
+  <!-- ═════════════════════════════ 1. TABLE ═════════════════════════════ -->
+  <section>
+    <div class="label">
+      <b>Sample 1 <span class="tag">Recommended</span></b>
+      <h2>One list, like an online shop's orders page</h2>
+      <ul>
+        <li>Every active repair in one table: device, problem, customer, step, days waiting, money and the next button. Nothing is squashed or cut off on a laptop.</li>
+        <li>Step chips with counts on top ("All active 20, Ready 6…"). Tap one to narrow the list; "All active" is the default.</li>
+        <li>Sorted by days waiting, oldest first, so late repairs sit at the top. Click any heading to sort by it.</li>
+        <li>Tick boxes for jobs on many at once (e.g. send a reminder to everyone ready for pickup).</li>
+        <li>This is what Shopify, Stripe and most repair-shop systems use. It's the easiest to scan with 20 or 200 repairs.</li>
+      </ul>
+    </div>
+    <div class="row scroll">
+      <div class="shadow"><div class="laptop">
+        <aside class="side"><div class="brand">Ceylon Device Care</div><div class="new">+ New repair</div><a>Today</a><a class="on">Repairs</a><a>Customers</a><a>Payments</a><a>Orders</a><a>Products</a><a>Reports</a></aside>
+        <div class="main">
+          <div class="top">
+            <div><h1>Repairs</h1><p>20 active · 6 ready for pickup · 16 waiting more than 3 days</p></div>
+            <div style="display:flex;gap:10px;align-items:center"><div class="seg"><span class="on">List</span><span>Board</span></div><span class="btn">+ New repair</span></div>
+          </div>
+          <div class="toolbar">
+            <div class="search">⌕ Search repair number, name, phone or device</div>
+            <div class="chips">
+              <span class="chip on">All active <em>20</em></span><span class="chip">Online requests <em>2</em></span><span class="chip">Received <em>3</em></span><span class="chip">Diagnosing <em>3</em></span><span class="chip">Waiting for parts <em>3</em></span><span class="chip">Repairing <em>3</em></span><span class="chip">Ready <em>6</em></span>
+            </div>
+          </div>
+          <div class="table">
+            <div class="tr head"><span class="box"></span><span>Device</span><span>Problem</span><span>Customer</span><span>Step</span><span class="sort">Waiting ↓</span><span>Money</span><span></span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>Dell Inspiron 15</b><small>DEMO-0005</small></div></div><span class="cut">Keyboard keys not responding (E, R, T)</span><div class="who"><b>Sanduni R.</b><small>077 123 4567</small></div><span><span class="pill p-amber"><i></i>Waiting for parts</span></span><span class="late">107 days</span><span class="money">LKR 18,500</span><span class="btn soft sm">Part arrived</span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>Apple iPhone 11</b><small>DEMO-0003</small></div></div><span class="cut">Battery replacement</span><div class="who"><b>Roshan W.</b><small>071 555 0102</small></div><span><span class="pill p-blue"><i></i>Repairing</span></span><span class="late">106 days</span><span class="money">LKR 12,000</span><span class="btn sm">Mark ready</span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>Samsung Galaxy A54</b><small>DEMO-0008</small></div></div><span class="cut">No sound from earpiece during calls</span><div class="who"><b>Chamara D.</b><small>076 222 9090</small></div><span><span class="pill p-grey"><i></i>Diagnosing</span></span><span class="late">104 days</span><span class="muted">No price yet</span><span class="btn soft sm">Send price</span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>Xiaomi Redmi Note 13</b><small>DEMO-0011</small></div></div><span class="cut">Camera app crashes as soon as it opens</span><div class="who"><b>Amila P.</b><small>070 444 1212</small></div><span><span class="pill p-grey"><i></i>Received</span></span><span class="late">103 days</span><span class="muted">No price yet</span><span class="btn soft sm">Start diagnosing</span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>OnePlus Nord 3</b><small>DEMO-0014</small></div></div><span class="cut">Speaker crackling at high volume</span><div class="who"><b>Nadeesha K.</b><small>077 888 3434</small></div><span><span class="pill p-green"><i></i>Ready for pickup</span></span><span class="late">12 days</span><span class="money">LKR 9,500 due</span><span class="btn ink sm">Picked up</span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>Apple iPhone 12</b><small>DEMO-0015</small></div></div><span class="cut">Charging port loose</span><div class="who"><b>Chamara D.</b><small>077 100 0006</small></div><span><span class="pill p-green"><i></i>Ready for pickup</span></span><span>5 days</span><span class="money" style="color:var(--green)">Paid</span><span class="btn ink sm">Picked up</span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>Samsung Galaxy S24</b><small>DEMO-0002</small></div></div><span class="cut">Screen flickers after an update</span><div class="who"><b>Sanduni R.</b><small>Online request</small></div><span><span class="pill p-amber"><i></i>Waiting for device</span></span><span>2 days</span><span class="money">LKR 32,000</span><span class="btn soft sm">Device arrived</span></div>
+            <div class="tr"><span class="box"></span><div class="dev"><span class="ico"><i></i></span><div style="min-width:0"><b>Huawei Nova 11</b><small>DEMO-0013</small></div></div><span class="cut">Phone restarts on its own</span><div class="who"><b>Nimali S.</b><small>072 333 8080</small></div><span><span class="pill p-grey"><i></i>Received</span></span><span>2 days</span><span class="muted">No price yet</span><span class="btn soft sm">Start diagnosing</span></div>
+          </div>
+        </div>
+      </div></div>
+      <div>
+        <p class="cap">Phone</p>
+        <div class="shadow"><div class="phone">
+          <div class="ph-top"><span>Ceylon Device Care</span><span class="muted">⌕</span></div>
+          <div class="ph-body">
+            <h1>Repairs</h1>
+            <div class="search" style="max-width:none">⌕ Search repairs</div>
+            <div class="hscroll"><span class="chip on">All active <em>20</em></span><span class="chip">Ready <em>6</em></span><span class="chip">Repairing <em>3</em></span><span class="chip">Parts <em>3</em></span></div>
+            <div>
+              <div class="prow"><span class="ico"><i></i></span><div class="t"><b>Dell Inspiron 15</b><small>Keyboard keys not responding · Sanduni R.</small></div><div style="text-align:right"><span class="pill p-amber">Parts</span><div class="late" style="font-size:12px;margin-top:4px">107 days</div></div></div>
+              <div class="prow"><span class="ico"><i></i></span><div class="t"><b>Apple iPhone 11</b><small>Battery replacement · Roshan W.</small></div><div style="text-align:right"><span class="pill p-blue">Repairing</span><div class="late" style="font-size:12px;margin-top:4px">106 days</div></div></div>
+              <div class="prow"><span class="ico"><i></i></span><div class="t"><b>Samsung Galaxy A54</b><small>No sound from earpiece · Chamara D.</small></div><div style="text-align:right"><span class="pill p-grey">Diagnosing</span><div class="late" style="font-size:12px;margin-top:4px">104 days</div></div></div>
+              <div class="prow"><span class="ico"><i></i></span><div class="t"><b>OnePlus Nord 3</b><small>LKR 9,500 due · Nadeesha K.</small></div><div style="text-align:right"><span class="pill p-green">Ready</span><div style="font-size:12px;margin-top:4px" class="muted">12 days</div></div></div>
+              <div class="prow"><span class="ico"><i></i></span><div class="t"><b>Apple iPhone 12</b><small>Paid · Chamara D.</small></div><div style="text-align:right"><span class="pill p-green">Ready</span><div style="font-size:12px;margin-top:4px" class="muted">5 days</div></div></div>
+              <div class="prow"><span class="ico"><i></i></span><div class="t"><b>Huawei Nova 11</b><small>Phone restarts on its own · Nimali S.</small></div><div style="text-align:right"><span class="pill p-grey">Received</span><div style="font-size:12px;margin-top:4px" class="muted">2 days</div></div></div>
+            </div>
+          </div>
+          <div class="ph-nav"><span>Today</span><span class="on">Repairs</span><span class="plus">+</span><span>Payments</span><span>More</span></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════════ 2. ACTION QUEUE ═════════════════════════════ -->
+  <section>
+    <div class="label">
+      <b>Sample 2</b>
+      <h2>Grouped by what needs doing</h2>
+      <ul>
+        <li>Instead of the six steps, active repairs sit in three groups: <b>Do now</b> (late, ready to collect, part arrived), <b>On the bench</b> and <b>Waiting on someone</b> (customer or supplier).</li>
+        <li>Each card says why it's there ("Late by 104 days", "Customer hasn't replied in 3 days") and has the button for the next step.</li>
+        <li>Great for a busy counter: you never have to think about where to look. But exact steps are less visible, and very busy days make "Do now" long.</li>
+      </ul>
+    </div>
+    <div class="row scroll">
+      <div class="shadow"><div class="laptop">
+        <aside class="side"><div class="brand">Ceylon Device Care</div><div class="new">+ New repair</div><a>Today</a><a class="on">Repairs</a><a>Customers</a><a>Payments</a><a>Orders</a><a>Products</a><a>Reports</a></aside>
+        <div class="main">
+          <div class="top">
+            <div><h1>Repairs</h1><p>20 active repairs</p></div>
+            <div style="display:flex;gap:10px;align-items:center"><div class="search" style="width:320px">⌕ Search repairs</div><div class="seg"><span class="on">Groups</span><span>List</span><span>Board</span></div><span class="btn">+ New repair</span></div>
+          </div>
+          <div class="q">
+            <div class="lane now">
+              <h3>Do now <em>7</em></h3><p>Late, or waiting on you</p>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>OnePlus Nord 3</b><small>Nadeesha K. · DEMO-0014</small></div></div><span class="why" style="color:var(--green)">Ready · LKR 9,500 to collect</span><div class="acts"><span class="btn ink sm" style="flex:1;justify-content:center">Picked up</span><span class="btn soft sm">Remind</span></div></div>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Dell Inspiron 15</b><small>Sanduni R. · DEMO-0005</small></div></div><span class="why" style="color:var(--amber)">Part arrived yesterday</span><div class="acts"><span class="btn sm" style="flex:1;justify-content:center">Start repair</span></div></div>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Samsung Galaxy A54</b><small>Chamara D. · DEMO-0008</small></div></div><span class="why late">Late by 104 days · no price sent</span><div class="acts"><span class="btn soft sm" style="flex:1;justify-content:center">Send price</span></div></div>
+            </div>
+            <div class="lane">
+              <h3>On the bench <em>6</em></h3><p>Being checked or repaired</p>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Apple iPhone 11</b><small>Battery replacement · Roshan W.</small></div></div><span class="why muted">Repairing · 2 days</span><div class="acts"><span class="btn sm" style="flex:1;justify-content:center">Mark ready</span></div></div>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Xiaomi Redmi Note 13</b><small>Camera app crashes · Amila P.</small></div></div><span class="why muted">Received · today</span><div class="acts"><span class="btn soft sm" style="flex:1;justify-content:center">Start diagnosing</span></div></div>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Huawei Nova 11</b><small>Phone restarts · Nimali S.</small></div></div><span class="why muted">Diagnosing · 1 day</span><div class="acts"><span class="btn soft sm" style="flex:1;justify-content:center">Send price</span></div></div>
+            </div>
+            <div class="lane">
+              <h3>Waiting on someone <em>7</em></h3><p>Customer or supplier</p>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Samsung Galaxy S23 Ultra</b><small>Ishara M. · DEMO-0004</small></div></div><span class="why muted">Price sent · no reply in 3 days</span><div class="acts"><span class="btn soft sm" style="flex:1;justify-content:center">Nudge on WhatsApp</span></div></div>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Samsung Galaxy Watch 5</b><small>Tharindu J. · DEMO-0006</small></div></div><span class="why muted">Part ordered 5 days ago</span><div class="acts"><span class="btn soft sm" style="flex:1;justify-content:center">Part arrived</span></div></div>
+              <div class="job"><div class="h"><span class="ico"><i></i></span><div><b>Samsung Galaxy S24</b><small>Online request · Sanduni R.</small></div></div><span class="why muted">Waiting for the device</span><div class="acts"><span class="btn soft sm" style="flex:1;justify-content:center">Device arrived</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div>
+        <p class="cap">Phone</p>
+        <div class="shadow"><div class="phone">
+          <div class="ph-top"><span>Ceylon Device Care</span><span class="muted">⌕</span></div>
+          <div class="ph-body">
+            <h1>Repairs</h1>
+            <div class="hscroll"><span class="chip on">Do now <em>7</em></span><span class="chip">On the bench <em>6</em></span><span class="chip">Waiting <em>7</em></span></div>
+            <div class="pcard"><div class="h"><div><b>OnePlus Nord 3</b><small>Nadeesha K.</small></div><span class="pill p-green">Ready</span></div><span style="font-size:13px;font-weight:700;color:var(--green)">LKR 9,500 to collect</span><div style="display:flex;gap:6px"><span class="btn ink sm" style="flex:1;justify-content:center">Picked up</span><span class="btn soft sm">Remind</span></div></div>
+            <div class="pcard"><div class="h"><div><b>Dell Inspiron 15</b><small>Sanduni R.</small></div><span class="pill p-amber">Part in</span></div><span style="font-size:13px;font-weight:700;color:var(--amber)">Part arrived yesterday</span><span class="btn sm" style="justify-content:center">Start repair</span></div>
+            <div class="pcard"><div class="h"><div><b>Samsung Galaxy A54</b><small>Chamara D.</small></div><span class="pill p-red">Late</span></div><span class="late" style="font-size:13px">Late by 104 days · no price sent</span><span class="btn soft sm" style="justify-content:center">Send price</span></div>
+          </div>
+          <div class="ph-nav"><span>Today</span><span class="on">Repairs</span><span class="plus">+</span><span>Payments</span><span>More</span></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════════════════════ 3. SPLIT ═════════════════════════════ -->
+  <section>
+    <div class="label">
+      <b>Sample 3</b>
+      <h2>List on the left, the repair on the right</h2>
+      <ul>
+        <li>All active repairs in a slim list; click one and its details open beside it (steps, customer, money, buttons) without leaving the page. Like an email inbox.</li>
+        <li>Fastest for working through repairs one after another with the keyboard (↑ ↓ to move).</li>
+        <li>Note: an earlier sample had a list like this and the left part wasn't chosen then. On a phone it becomes a list, and a repair opens as a sheet from the bottom.</li>
+      </ul>
+    </div>
+    <div class="row scroll">
+      <div class="shadow"><div class="laptop">
+        <aside class="side"><div class="brand">Ceylon Device Care</div><div class="new">+ New repair</div><a>Today</a><a class="on">Repairs</a><a>Customers</a><a>Payments</a><a>Orders</a><a>Products</a><a>Reports</a></aside>
+        <div class="main" style="padding-bottom:20px">
+          <div class="top">
+            <div><h1>Repairs</h1><p>20 active repairs</p></div>
+            <div style="display:flex;gap:10px;align-items:center"><div class="seg"><span class="on">List</span><span>Board</span></div><span class="btn">+ New repair</span></div>
+          </div>
+          <div class="split">
+            <div class="list">
+              <div class="tabs"><div class="search" style="max-width:none;width:100%;background:var(--field);height:40px">⌕ Search repairs</div><span class="chip on">All 20</span><span class="chip">Ready 6</span><span class="chip">Bench 6</span><span class="chip">Waiting 8</span></div>
+              <div class="li"><span class="ico"><i></i></span><div class="t"><b>Dell Inspiron 15</b><p>Keyboard keys not responding (E, R, T)</p><small>Sanduni R. · DEMO-0005</small></div><div class="r"><span class="pill p-amber">Parts</span><span class="late" style="font-size:12px">107 days</span></div></div>
+              <div class="li sel"><span class="ico"><i></i></span><div class="t"><b>Apple iPhone 11</b><p>Battery replacement</p><small>Roshan W. · DEMO-0003</small></div><div class="r"><span class="pill p-blue">Repairing</span><span class="late" style="font-size:12px">106 days</span></div></div>
+              <div class="li"><span class="ico"><i></i></span><div class="t"><b>Samsung Galaxy A54</b><p>No sound from earpiece during calls</p><small>Chamara D. · DEMO-0008</small></div><div class="r"><span class="pill p-grey">Diagnosing</span><span class="late" style="font-size:12px">104 days</span></div></div>
+              <div class="li"><span class="ico"><i></i></span><div class="t"><b>Xiaomi Redmi Note 13</b><p>Camera app crashes as soon as it opens</p><small>Amila P. · DEMO-0011</small></div><div class="r"><span class="pill p-grey">Received</span><span class="late" style="font-size:12px">103 days</span></div></div>
+              <div class="li"><span class="ico"><i></i></span><div class="t"><b>OnePlus Nord 3</b><p>LKR 9,500 to collect</p><small>Nadeesha K. · DEMO-0014</small></div><div class="r"><span class="pill p-green">Ready</span><span class="muted" style="font-size:12px">12 days</span></div></div>
+              <div class="li"><span class="ico"><i></i></span><div class="t"><b>Apple iPhone 12</b><p>Paid</p><small>Chamara D. · DEMO-0015</small></div><div class="r"><span class="pill p-green">Ready</span><span class="muted" style="font-size:12px">5 days</span></div></div>
+            </div>
+            <div class="detail">
+              <div class="hero"><div><p>DEMO-0003 · Roshan W. · 071 555 0102</p><h3>Apple iPhone 11</h3><p>Battery replacement</p></div><span class="btn" style="background:#fff;color:var(--ink)">Mark ready</span></div>
+              <div class="steps"><span class="d"><i>✓</i>Received</span><em></em><span class="d"><i>✓</i>Diagnosing</span><em></em><span class="d"><i>✓</i>Parts</span><em></em><span class="n"><i>4</i>Repairing</span><em></em><span><i>5</i>Ready</span><em></em><span><i>6</i>Collected</span></div>
+              <div class="two">
+                <div class="box2"><h4>Customer</h4><b>Roshan Wijesinghe</b><span class="muted">071 555 0102</span><span style="color:var(--blue);font-weight:700">Message on WhatsApp</span></div>
+                <div class="box2"><h4>Money</h4><b class="money">LKR 12,000</b><span class="muted">Price agreed · nothing paid yet</span><span style="color:var(--blue);font-weight:700">Make bill</span></div>
+              </div>
+              <div class="box2"><h4>Latest note</h4><span>Original battery ordered from Pettah supplier. Arrived 18 Nov. Swap and run battery test before calling.</span><span class="muted" style="font-size:13px">Nuwan · 2 days ago</span></div>
+              <div style="display:flex;gap:8px"><span class="btn soft">Open full repair</span><span class="btn soft">Add note</span><span class="btn soft">Print label</span></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div>
+        <p class="cap">Phone</p>
+        <div class="shadow"><div class="phone">
+          <div class="ph-top"><span>Ceylon Device Care</span><span class="muted">⌕</span></div>
+          <div class="ph-body">
+            <h1>Repairs</h1>
+            <div class="hscroll"><span class="chip on">All <em>20</em></span><span class="chip">Ready <em>6</em></span><span class="chip">Bench <em>6</em></span></div>
+            <div>
+              <div class="prow"><span class="ico"><i></i></span><div class="t"><b>Dell Inspiron 15</b><small>Keyboard keys not responding</small></div><span class="pill p-amber">Parts</span></div>
+              <div class="prow" style="background:var(--blue-t)"><span class="ico"><i></i></span><div class="t"><b>Apple iPhone 11</b><small>Battery replacement</small></div><span class="pill p-blue">Repairing</span></div>
+            </div>
+          </div>
+          <div class="sheet">
+            <span class="grab"></span>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><b style="font-size:18px">Apple iPhone 11</b><div class="muted" style="font-size:13px">Roshan W. · DEMO-0003</div></div><span class="pill p-blue">Repairing</span></div>
+            <div class="box2"><span><b class="money">LKR 12,000</b> <span class="muted">· nothing paid yet</span></span><span class="muted" style="font-size:13px">Battery ordered, arrived 18 Nov</span></div>
+            <span class="btn" style="justify-content:center">Mark ready</span>
+            <div style="display:flex;gap:6px"><span class="btn soft sm" style="flex:1;justify-content:center">WhatsApp</span><span class="btn soft sm" style="flex:1;justify-content:center">Full repair</span></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="note">All names, numbers and devices are made up. The phone drawings are placeholders for photos.</p>
+</div>
+</body>
+</html>

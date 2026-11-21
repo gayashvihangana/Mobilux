@@ -307,7 +307,7 @@ export default async function AdminReportsPage({
             }
           />
           <Link
-            href="/admin/tickets?view=list"
+            href="/admin/tickets?scope=unpaid"
             className="flex flex-col justify-between gap-3 rounded-[1.75rem] bg-card p-5 transition-colors hover:bg-accent"
           >
             <span className="text-sm font-bold text-muted-foreground">Owed to you now</span>
@@ -435,7 +435,7 @@ function RankedCard({
               <li key={item.label}>
                 {linkable ? (
                   <Link
-                    href={`/admin/tickets?view=list&q=${encodeURIComponent(item.label)}`}
+                    href={`/admin/tickets?scope=all&q=${encodeURIComponent(item.label)}`}
                     title={`Show ${item.label} repairs`}
                     className="block rounded-xl px-2 py-2.5 transition-colors hover:bg-accent"
                   >

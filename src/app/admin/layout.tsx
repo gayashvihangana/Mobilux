@@ -102,7 +102,7 @@ export default async function AdminLayout({
   const canVerify = can(user, "payment:verify");
   const [shop, openRepairs, paymentsToCheck] = await Promise.all([
     getShopInfo(),
-    prisma.repairTicket.count({ where: { status: { in: [...OPEN_STATUSES] } } }),
+    prisma.repairTicket.count({ where: { status: { in: [...OPEN_STATUSES] }, archivedAt: null } }),
     canVerify
       ? prisma.payment.count({ where: { status: "PENDING_VERIFICATION" } })
       : Promise.resolve(0),

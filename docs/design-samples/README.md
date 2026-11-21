@@ -12,5 +12,7 @@ Static HTML copies of the samples the owner approved on the design canvas. Open 
 | `admin-nav.html` | Admin menu: navy sidebar on laptop, bottom bar and "More" panel on phone | Chosen. Built in step 5 |
 | `settings.html` | Settings page with section menu and unsaved-changes bar | Chosen for step 6 |
 | `bill.html` | Bill redesign: admin builder (laptop and phone), Record payment sheet, customer bill link (part paid and paid), printed A4 | Chosen. Built in step 7 |
+| `repairs-board-laptop-fix.html` | Repairs board on a 1366px laptop: A compact cards, B wider columns that slide | Not used: the board was replaced by the list and a By step view with wide cards |
+| `repairs-active-list.html` | Repairs page opening on all active repairs: 1 list like an orders page, 2 grouped by what needs doing, 3 list with the repair beside it. Laptop and phone | 1 chosen as the default list, 3 as the Side by side view. Built |
 
 All names, phone numbers, devices and prices in these samples are invented. The phone drawings are placeholders for photos.
