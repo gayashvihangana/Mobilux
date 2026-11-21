@@ -146,7 +146,35 @@ export default async function InvoicePage({
         )}
 
         {/* Warranty, once paid */}
-        {bill.isSettled && bill.warrantyEnd && ticket.warrantyPeriod ? (
+        {bill.isSettled && bill.warrantyItems.length > 0 ? (
+          <section className="rounded-[24px] bg-card p-5">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <ShieldCheck className="size-5" />
+              </span>
+              <div>
+                <p className="font-bold">Your warranty</p>
+                <p className="text-sm text-muted-foreground">Keep this link to claim it.</p>
+              </div>
+            </div>
+            <ul className="mt-3 divide-y divide-border">
+              {bill.warrantyItems.map((item, i) => (
+                <li key={`${item.label}-${i}`} className="py-2.5 text-sm">
+                  <p className="font-semibold">{item.label}</p>
+                  <p className="text-muted-foreground">
+                    {item.warranty}
+                    {item.cover ? `, ${item.cover.toLowerCase()}` : ""}
+                    {item.warrantyEnd ? ` · until ${formatDate(item.warrantyEnd)}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Not covered: water or liquid damage, drops, cracks and other physical damage,
+              or repairs by anyone else. Full terms are on the printed bill.
+            </p>
+          </section>
+        ) : bill.isSettled && bill.warrantyEnd && ticket.warrantyPeriod ? (
           <section className="flex items-center gap-3 rounded-[24px] bg-card p-5">
             <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <ShieldCheck className="size-5" />

@@ -1,4 +1,4 @@
-import { billQuote, warrantyTerms } from "@/lib/config";
+import { billQuote, WARRANTY_TERMS } from "@/lib/config";
 import {
   computeBill,
   invoiceNumber,
@@ -60,7 +60,9 @@ export function BillDocument({
   const showTechnician = show.technician && !!bill.technician;
   const showIssue = show.issue && !!ticket.issueTitle;
   const showSolution = show.solution && !!ticket.solution;
-  const showWarranty = show.warranty && !!ticket.warrantyPeriod;
+  // Bills from before per-item warranties carry one for the whole repair.
+  const showWarranty =
+    bill.warrantyItems.length === 0 && show.warranty && !!ticket.warrantyPeriod;
   // Only issues the customer was actually told about belong on the bill.
   const billIssues = ticket.issues.filter((i) => i.note.trim().length > 0);
   const showRepairIssue = show.repairIssue && billIssues.length > 0;
@@ -75,6 +77,9 @@ export function BillDocument({
           qty: 1,
           unitPrice: bill.subtotal,
           amount: bill.subtotal,
+          warranty: null as string | null,
+          cover: null as string | null,
+          warrantyEnd: null as Date | null,
         },
       ];
 
@@ -208,6 +213,13 @@ export function BillDocument({
                   {!bill.isItemized && ticket.partsUsed ? (
                     <span className="block text-xs text-neutral-500">
                       Parts: {ticket.partsUsed}
+                    </span>
+                  ) : null}
+                  {line.warranty ? (
+                    <span className="mt-0.5 block text-xs text-neutral-600">
+                      {line.warranty} warranty
+                      {line.cover ? ` · ${line.cover.toLowerCase()}` : ""}
+                      {line.warrantyEnd ? ` · until ${formatDate(line.warrantyEnd)}` : ""}
                     </span>
                   ) : null}
                 </td>
@@ -362,10 +374,14 @@ export function BillDocument({
           <p className="text-neutral-700">
             {shop.billMessage?.trim() || billQuote(shop.name)}
           </p>
-          <p className="mt-3 text-[11px] leading-relaxed">
-            <b className="text-neutral-600">Warranty terms: </b>
-            {warrantyTerms(shop.warrantyDays)}
-          </p>
+          <div className="mt-3 text-[11px] leading-relaxed">
+            <p className="font-bold text-neutral-600">Warranty terms</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+              {WARRANTY_TERMS.map((term) => (
+                <li key={term}>{term}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </div>

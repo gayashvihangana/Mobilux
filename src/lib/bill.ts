@@ -9,7 +9,38 @@ export type BillLineItem = {
   amount: number;
   qty?: number;
   unitPrice?: number;
+  /** This item's warranty, e.g. "3 months". Absent or empty: no warranty. */
+  warranty?: string | null;
+  /** What the warranty covers, e.g. "Touch only". Empty: full cover. */
+  cover?: string | null;
 };
+
+/** A line item as the bill shows it: every field filled in. */
+export type BillLine = {
+  label: string;
+  amount: number;
+  qty: number;
+  unitPrice: number;
+  warranty: string | null;
+  cover: string | null;
+  /** Last day the warranty covers (from the bill date), when it has one. */
+  warrantyEnd: Date | null;
+};
+
+// Warranty choices offered for each item on the bill page. Anything else can
+// be typed in; end dates are worked out from "N days / weeks / months / years".
+export const WARRANTY_OPTIONS = [
+  "7 days",
+  "14 days",
+  "30 days",
+  "2 months",
+  "3 months",
+  "6 months",
+] as const;
+
+// What an item's warranty covers. "Touch only" is the usual cover on a
+// replaced display: touch response is covered, the panel itself is not.
+export const WARRANTY_COVERS = ["Touch only", "Labour only"] as const;
 
 // A payment the shop recorded by hand on the bill page (cash at the counter,
 // a card, a transfer it checked itself). Stored oldest first in the ticket's
@@ -211,7 +242,9 @@ export type BillTotals = {
   // When true, render `items` as separate rows with a subtotal; otherwise
   // the single line made from the repair (solution + parts subtext).
   isItemized: boolean;
-  items: Required<BillLineItem>[];
+  items: BillLine[];
+  /** Items that carry a warranty, in bill order. */
+  warrantyItems: BillLine[];
   subtotal: number;
   discountLabel: string;
   discountAmount: number;
@@ -241,7 +274,9 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 // total. Old items without a quantity read as one of `amount`.
 export function normaliseItems(
   raw: BillTicket["billItems"],
-): Required<BillLineItem>[] {
+  /** The bill date, to work out each warranty's end. */
+  billDate?: Date,
+): BillLine[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter(
@@ -255,7 +290,19 @@ export function normaliseItems(
         i.unitPrice !== undefined && Number.isFinite(Number(i.unitPrice))
           ? Number(i.unitPrice)
           : round2(amount / qty);
-      return { label: i.label.trim(), qty, unitPrice, amount: round2(amount) };
+      const warranty =
+        typeof i.warranty === "string" && i.warranty.trim() ? i.warranty.trim() : null;
+      const cover =
+        warranty && typeof i.cover === "string" && i.cover.trim() ? i.cover.trim() : null;
+      return {
+        label: i.label.trim(),
+        qty,
+        unitPrice,
+        amount: round2(amount),
+        warranty,
+        cover,
+        warrantyEnd: warranty && billDate ? warrantyEndDate(billDate, warranty) : null,
+      };
     });
 }
 
@@ -334,15 +381,24 @@ export function computeBill(
   // falling back to completion/creation for bills made before this existed.
   const billDate =
     ticket.billGeneratedAt ?? ticket.completedAt ?? ticket.createdAt;
-  const warrantyEnd = warrantyEndDate(billDate, ticket.warrantyPeriod);
   const payTo = resolvePayTo(ticket.billPayTo, shopPayTo);
   const show = resolveBillShow(ticket.billShow);
 
   const payments = paymentRows(ticket);
   const paidTotal = round2(payments.reduce((sum, p) => sum + p.amount, 0));
 
-  const items = normaliseItems(ticket.billItems);
+  const items = normaliseItems(ticket.billItems, billDate);
   const isItemized = items.length > 0;
+  const warrantyItems = items.filter((i) => i.warranty);
+  // Bills from before per-item warranties carry one warranty for the repair.
+  const warrantyEnd =
+    warrantyItems.length > 0
+      ? warrantyItems.reduce<Date | null>(
+          (latest, i) =>
+            i.warrantyEnd && (!latest || i.warrantyEnd > latest) ? i.warrantyEnd : latest,
+          null,
+        )
+      : warrantyEndDate(billDate, ticket.warrantyPeriod);
 
   let subtotal: number;
   let discountAmount = 0;
@@ -398,6 +454,7 @@ export function computeBill(
     warrantyEnd,
     isItemized,
     items,
+    warrantyItems,
     subtotal,
     discountLabel,
     discountAmount,

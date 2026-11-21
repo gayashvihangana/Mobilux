@@ -545,15 +545,21 @@ const billItemSchema = z
     qty: z.coerce.number().int().min(1).max(999).optional(),
     unitPrice: z.coerce.number().min(0).max(100_000_000).optional(),
     amount: z.coerce.number().min(0).max(100_000_000).optional(),
+    warranty: z.string().trim().max(40).nullish(),
+    cover: z.string().trim().max(80).nullish(),
   })
   .transform((i) => {
     const qty = i.qty ?? 1;
     const unitPrice = i.unitPrice ?? (i.amount ?? 0) / qty;
+    const warranty = i.warranty || null;
     return {
       label: i.label,
       qty,
       unitPrice: Math.round(unitPrice * 100) / 100,
       amount: Math.round(qty * unitPrice * 100) / 100,
+      // Each item carries its own warranty; "what it covers" only with one.
+      warranty,
+      cover: (warranty && i.cover) || null,
     };
   });
 

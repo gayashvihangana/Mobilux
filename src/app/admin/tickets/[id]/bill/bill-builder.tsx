@@ -13,6 +13,7 @@ import {
   Loader2,
   Minus,
   Plus,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import type { RepairIssueStatus } from "@prisma/client";
@@ -35,6 +36,8 @@ import {
   invoiceNumber,
   normaliseItems,
   PAYMENT_METHODS,
+  WARRANTY_COVERS,
+  WARRANTY_OPTIONS,
   type BillShow,
   type BillTicket,
 } from "@/lib/bill";
@@ -52,7 +55,16 @@ import {
 // track at the top and one main button for whatever comes next. Payments can
 // come in parts, so the bill always shows what is still owed.
 
-type Row = { id: string; label: string; qty: string; price: string };
+type Row = {
+  id: string;
+  label: string;
+  qty: string;
+  price: string;
+  /** "" = no warranty. */
+  warranty: string;
+  /** "" = full cover. */
+  cover: string;
+};
 type PayTo = {
   bankName: string;
   branch: string;
@@ -76,18 +88,6 @@ const QUICK_ITEMS = [
   "Diagnosis",
 ];
 
-// Warranty choices. "No warranty" saves nothing, so no warranty prints.
-// Anything else (say "1 year") goes in Other; the end date is worked out from
-// any "N days / weeks / months / years".
-const WARRANTY_OPTIONS = [
-  "7 days",
-  "14 days",
-  "30 days",
-  "2 months",
-  "3 months",
-  "6 months",
-];
-
 // What prints on the bill: each can be switched off in More options.
 const PRINT_TOGGLES: { key: keyof BillShow; label: string }[] = [
   { key: "device", label: "Device name" },
@@ -95,7 +95,6 @@ const PRINT_TOGGLES: { key: keyof BillShow; label: string }[] = [
   { key: "issue", label: "Reported problem" },
   { key: "solution", label: "Work done" },
   { key: "technician", label: "Technician" },
-  { key: "warranty", label: "Warranty" },
   { key: "repairIssue", label: "Issue during the repair" },
   { key: "notes", label: "Bill notes" },
   { key: "payment", label: "How to pay (while unpaid)" },
@@ -103,12 +102,28 @@ const PRINT_TOGGLES: { key: keyof BillShow; label: string }[] = [
 ];
 
 let rowSeq = 0;
-const newRow = (label = "", price = "", qty = "1"): Row => ({
+const newRow = (
+  label = "",
+  price = "",
+  qty = "1",
+  warranty = "",
+  cover = "",
+): Row => ({
   id: `r${rowSeq++}`,
   label,
   qty,
   price,
+  warranty,
+  cover,
 });
+
+// Quick-add parts start on the shop's standard warranty (Settings); a new
+// screen starts on touch-only cover, the usual terms for a display.
+const PART_ITEMS = new Set(["Screen", "Battery", "Charging port", "Back cover"]);
+function quickRow(label: string, standard: string): Row {
+  if (!PART_ITEMS.has(label)) return newRow(label);
+  return newRow(label, "", "1", standard, label === "Screen" ? "Touch only" : "");
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -130,21 +145,38 @@ function toColomboLocalInput(date: Date | null): string {
 
 // A bill with no saved items starts from the repair: the price as labour,
 // plus one line per part the shop used (price to fill in).
-function seedRows(bill: BillTicket): Row[] {
+function seedRows(bill: BillTicket, standard: string): Row[] {
   const saved = normaliseItems(bill.billItems);
   if (saved.length > 0) {
-    return saved.map((i) => newRow(i.label, String(i.unitPrice), String(i.qty)));
+    // Bills saved before items had their own warranty: give the bill's one
+    // warranty to every item, to adjust.
+    const legacy =
+      bill.warrantyPeriod && !bill.billItems!.some((i) => "warranty" in i)
+        ? { warranty: bill.warrantyPeriod, cover: bill.warrantyParts ?? "" }
+        : null;
+    return saved.map((i) =>
+      newRow(
+        i.label,
+        String(i.unitPrice),
+        String(i.qty),
+        legacy?.warranty ?? i.warranty ?? "",
+        legacy?.cover ?? i.cover ?? "",
+      ),
+    );
   }
   const rows: Row[] = [];
   const parts = (bill.partsUsed ?? "")
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
-  for (const part of parts) rows.push(newRow(part, ""));
+  for (const part of parts) rows.push(newRow(part, "", "1", standard));
   rows.unshift(
     newRow(
       parts.length > 0 ? "Labour" : bill.solution?.trim() || bill.issueTitle || "Repair",
       bill.finalCost ?? bill.estimatedCost ?? "",
+      "1",
+      // With parts listed the warranty sits on them; otherwise on the repair.
+      parts.length > 0 ? "" : standard,
     ),
   );
   return rows;
@@ -157,8 +189,6 @@ type FormValues = {
   technician: string;
   issueTitle: string;
   solution: string;
-  warrantyPeriod: string;
-  warrantyParts: string;
   issueWarranty: string;
   show: BillShow;
   payTo: PayTo;
@@ -173,7 +203,7 @@ function initialValues(
   warrantyDays: number | undefined,
 ): FormValues {
   return {
-    rows: seedRows(bill),
+    rows: seedRows(bill, standardWarranty(warrantyDays)),
     discountMode: bill.billDiscountAmount
       ? "amount"
       : bill.billDiscountPercent
@@ -183,10 +213,6 @@ function initialValues(
     technician: bill.technician ?? "",
     issueTitle: bill.issueTitle ?? "",
     solution: bill.solution ?? "",
-    warrantyPeriod:
-      bill.warrantyPeriod ??
-      (bill.billItems === null && warrantyDays ? `${warrantyDays} days` : ""),
-    warrantyParts: bill.warrantyParts ?? "",
     issueWarranty: bill.issueWarranty ?? "",
     show: bill.billShow ?? defaultShow ?? DEFAULT_BILL_SHOW,
     payTo: {
@@ -200,12 +226,14 @@ function initialValues(
   };
 }
 
+const standardWarranty = (days: number | undefined) => (days ? `${days} days` : "");
+
 /** Comparable snapshot of the form (row ids left out). */
 function snapshot(v: FormValues) {
   return JSON.stringify({
     ...v,
     rows: v.rows
-      .map((r) => ({ l: r.label.trim(), q: r.qty, p: r.price }))
+      .map((r) => ({ l: r.label.trim(), q: r.qty, p: r.price, w: r.warranty, c: r.cover }))
       .filter((r) => r.l || r.p),
   });
 }
@@ -261,7 +289,10 @@ export function BillBuilder({
   const removeRow = (id: string) =>
     setValues((v) => ({ ...v, rows: v.rows.filter((r) => r.id !== id) }));
   const addRow = (label = "") =>
-    setValues((v) => ({ ...v, rows: [...v.rows, newRow(label)] }));
+    setValues((v) => ({
+      ...v,
+      rows: [...v.rows, quickRow(label, standardWarranty(shop.warrantyDays))],
+    }));
 
   // ── Unsaved draft, kept across reloads until the bill is saved ──
   const draftKey = `mbx-draft:bill-${ticketId}`;
@@ -278,7 +309,13 @@ export function BillBuilder({
         ...v,
         ...d,
         rows: d.rows!.map((r) =>
-          newRow(String(r.label ?? ""), String(r.price ?? ""), String(r.qty ?? "1")),
+          newRow(
+            String(r.label ?? ""),
+            String(r.price ?? ""),
+            String(r.qty ?? "1"),
+            String(r.warranty ?? ""),
+            String(r.cover ?? ""),
+          ),
         ),
       }));
     } catch {
@@ -304,11 +341,14 @@ export function BillBuilder({
         .map((r) => {
           const qty = Math.max(1, Math.round(Number(r.qty) || 1));
           const unitPrice = Math.max(0, Number(r.price) || 0);
+          const warranty = r.warranty.trim();
           return {
             label: r.label.trim(),
             qty,
             unitPrice,
             amount: round2(qty * unitPrice),
+            warranty: warranty || null,
+            cover: (warranty && r.cover.trim()) || null,
           };
         })
         .filter((i) => i.label.length > 0),
@@ -334,8 +374,9 @@ export function BillBuilder({
       values.customDate && values.billDateValue
         ? new Date(values.billDateValue)
         : (bill.billGeneratedAt ?? new Date()),
-    warrantyPeriod: values.warrantyPeriod.trim() || null,
-    warrantyParts: values.warrantyParts.trim() || null,
+    // Warranties now live on each item; saving clears the old bill-wide one.
+    warrantyPeriod: null,
+    warrantyParts: null,
     issueWarranty: values.issueWarranty.trim() || null,
     billShow: values.show,
   };
@@ -358,8 +399,8 @@ export function BillBuilder({
     fd.set("technician", values.technician);
     fd.set("issueTitle", values.issueTitle);
     fd.set("solution", values.solution);
-    fd.set("warrantyPeriod", values.warrantyPeriod);
-    fd.set("warrantyParts", values.warrantyParts);
+    fd.set("warrantyPeriod", "");
+    fd.set("warrantyParts", "");
     fd.set("issueWarranty", values.issueWarranty);
     fd.set("discountMode", values.discountMode);
     fd.set("discountValue", values.discountMode === "none" ? "" : values.discountValue);
@@ -508,10 +549,8 @@ export function BillBuilder({
                 const qty = Math.max(1, Math.round(Number(row.qty) || 1));
                 const lineTotal = round2(qty * (Number(row.price) || 0));
                 return (
-                  <li
-                    key={row.id}
-                    className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0 sm:flex-row sm:items-center sm:gap-3"
-                  >
+                  <li key={row.id} className="border-t border-border py-3 first:border-t-0">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                     <div className="flex min-w-0 flex-1 items-center gap-2">
                       <Input
                         aria-label="Item"
@@ -561,6 +600,13 @@ export function BillBuilder({
                       </span>
                       <RemoveRow label={row.label} onClick={() => removeRow(row.id)} className="hidden sm:inline-flex" />
                     </div>
+                  </div>
+                  <ItemWarranty
+                    item={row.label.trim() || "this item"}
+                    warranty={row.warranty}
+                    cover={row.cover}
+                    onChange={(patch) => setRow(row.id, patch)}
+                  />
                   </li>
                 );
               })}
@@ -650,9 +696,6 @@ export function BillBuilder({
             </button>
             {!moreOpen ? (
               <div className="mt-2 flex flex-wrap gap-2 text-sm font-semibold text-muted-foreground">
-                <span className="rounded-full bg-secondary px-3 py-1.5">
-                  Warranty: {values.warrantyPeriod.trim() || "none"}
-                </span>
                 {values.technician.trim() ? (
                   <span className="rounded-full bg-secondary px-3 py-1.5">
                     Technician: {values.technician.trim()}
@@ -694,13 +737,6 @@ export function BillBuilder({
                     />
                   </Field>
                 </div>
-
-                <WarrantyPicker
-                  period={values.warrantyPeriod}
-                  parts={values.warrantyParts}
-                  onPeriod={(v) => set("warrantyPeriod", v)}
-                  onParts={(v) => set("warrantyParts", v)}
-                />
 
                 {bill.issues.length > 0 ? (
                   <div className="space-y-2">
@@ -940,98 +976,120 @@ function RemoveRow({
   );
 }
 
-function WarrantyPicker({
-  period,
-  parts,
-  onPeriod,
-  onParts,
+const SELECT =
+  "h-10 min-w-0 rounded-xl border border-input bg-background px-3 pr-8 text-sm font-semibold";
+
+// One item's warranty, under its row: how long, and what it covers. Picking
+// "Other…" opens a box to type into (e.g. "1 year", "Display lines").
+function ItemWarranty({
+  item,
+  warranty,
+  cover,
+  onChange,
 }: {
-  period: string;
-  parts: string;
-  onPeriod: (value: string) => void;
-  onParts: (value: string) => void;
+  item: string;
+  warranty: string;
+  cover: string;
+  onChange: (patch: { warranty?: string; cover?: string }) => void;
 }) {
-  const trimmed = period.trim();
-  const preset = WARRANTY_OPTIONS.find((o) => o.toLowerCase() === trimmed.toLowerCase());
-  // Other stays open while its box is being typed in, even when empty.
-  const [other, setOther] = useState(!!trimmed && !preset);
-  // Follow outside changes (Discard, a restored draft) unless typing in Other.
+  const presetPeriod = (WARRANTY_OPTIONS as readonly string[]).find(
+    (o) => o.toLowerCase() === warranty.trim().toLowerCase(),
+  );
+  const presetCover = (WARRANTY_COVERS as readonly string[]).find(
+    (o) => o.toLowerCase() === cover.trim().toLowerCase(),
+  );
+  // "Other…" stays open while its box is empty and being typed in.
+  const [periodOther, setPeriodOther] = useState(!!warranty.trim() && !presetPeriod);
+  const [coverOther, setCoverOther] = useState(!!cover.trim() && !presetCover);
   useEffect(() => {
-    if (document.activeElement?.id === "b-warranty") return;
-    if (preset) setOther(false);
-    else if (trimmed) setOther(true);
-  }, [trimmed, preset]);
-  const selected = other ? "other" : trimmed ? preset : "none";
-  const chip = (on: boolean) =>
-    cn(
-      "inline-flex h-11 items-center rounded-full px-4 text-sm font-bold transition-colors",
-      on ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-accent",
-    );
+    if (presetPeriod) setPeriodOther(false);
+    else if (warranty.trim()) setPeriodOther(true);
+  }, [warranty, presetPeriod]);
+  useEffect(() => {
+    if (presetCover) setCoverOther(false);
+    else if (cover.trim()) setCoverOther(true);
+  }, [cover, presetCover]);
+
+  const periodValue = periodOther ? "other" : (presetPeriod ?? "");
+  const coverValue = coverOther ? "other" : (presetCover ?? "");
+  const has = !!warranty.trim() || periodOther;
 
   return (
-    <div className="space-y-2">
-      <Label id="b-warranty-label">Warranty</Label>
-      <div role="radiogroup" aria-labelledby="b-warranty-label" className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={selected === "none"}
-          className={chip(selected === "none")}
-          onClick={() => {
-            setOther(false);
-            onPeriod("");
-          }}
-        >
-          No warranty
-        </button>
-        {WARRANTY_OPTIONS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            role="radio"
-            aria-checked={selected === option}
-            className={chip(selected === option)}
-            onClick={() => {
-              setOther(false);
-              onPeriod(option);
-            }}
-          >
-            {option}
-          </button>
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <ShieldCheck
+        aria-hidden="true"
+        className={cn("size-4 shrink-0", has ? "text-success" : "text-muted-foreground")}
+      />
+      <select
+        aria-label={`Warranty for ${item}`}
+        value={periodValue}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === "other") {
+            setPeriodOther(true);
+            onChange({ warranty: "" });
+          } else {
+            setPeriodOther(false);
+            onChange(v ? { warranty: v } : { warranty: "", cover: "" });
+          }
+        }}
+        className={SELECT}
+      >
+        <option value="">No warranty</option>
+        {WARRANTY_OPTIONS.map((o) => (
+          <option key={o} value={o}>
+            {o} warranty
+          </option>
         ))}
-        <button
-          type="button"
-          role="radio"
-          aria-checked={selected === "other"}
-          className={chip(selected === "other")}
-          onClick={() => {
-            setOther(true);
-            if (preset) onPeriod("");
-            requestAnimationFrame(() => document.getElementById("b-warranty")?.focus());
-          }}
-        >
-          Other
-        </button>
-      </div>
-      <div className={cn("grid gap-2", other && "sm:grid-cols-2")}>
-        {other ? (
-          <Input
-            id="b-warranty"
-            aria-label="Warranty period"
-            value={period}
-            onChange={(e) => onPeriod(e.target.value)}
-            placeholder="e.g. 1 year or 45 days"
-          />
-        ) : null}
-        {selected !== "none" ? (
-          <Input
-            aria-label="Warranty covers"
-            value={parts}
-            onChange={(e) => onParts(e.target.value)}
-            placeholder="Covers (optional), e.g. screen"
-          />
-        ) : null}
-      </div>
+        <option value="other">Other…</option>
+      </select>
+      {periodOther ? (
+        <Input
+          aria-label={`Warranty period for ${item}`}
+          value={warranty}
+          onChange={(e) => onChange({ warranty: e.target.value })}
+          placeholder="e.g. 1 year"
+          className="h-10 w-32"
+          autoFocus={!warranty}
+        />
+      ) : null}
+      {has ? (
+        <>
+          <select
+            aria-label={`What the warranty covers for ${item}`}
+            value={coverValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "other") {
+                setCoverOther(true);
+                onChange({ cover: "" });
+              } else {
+                setCoverOther(false);
+                onChange({ cover: v });
+              }
+            }}
+            className={SELECT}
+          >
+            <option value="">Full cover</option>
+            {WARRANTY_COVERS.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+            <option value="other">Other…</option>
+          </select>
+          {coverOther ? (
+            <Input
+              aria-label={`What the warranty covers for ${item}`}
+              value={cover}
+              onChange={(e) => onChange({ cover: e.target.value })}
+              placeholder="e.g. Parts only"
+              className="h-10 min-w-0 flex-1 basis-40"
+              autoFocus={!cover}
+            />
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }

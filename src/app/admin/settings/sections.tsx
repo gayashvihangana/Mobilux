@@ -272,7 +272,7 @@ export function RepairsFields({
           inputMode="numeric"
           min={0}
           max={3650}
-          hint="Shown on the homepage and in the bill's warranty terms."
+          hint="Shown on the homepage. New bills give parts this warranty to start with."
         />
         <TextField
           name="ticketPrefix"
