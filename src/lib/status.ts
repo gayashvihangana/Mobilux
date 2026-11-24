@@ -145,6 +145,11 @@ const MILESTONE_DESCRIPTIONS: Record<TicketStatus, string> = {
   CANCELLED: "This repair was cancelled.",
 };
 
+/** The plain timeline text a step gets when nobody writes a comment. */
+export function defaultStepNote(status: TicketStatus): string {
+  return MILESTONE_DESCRIPTIONS[status];
+}
+
 // A natural phrase for a headline like "Your iPhone 13 is <phrase>" — used in
 // the notification title and email heading so they read like a sentence.
 const STATUS_HEADLINE: Record<TicketStatus, string> = {
