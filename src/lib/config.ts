@@ -57,12 +57,10 @@ export function billQuote(shopName: string): string {
 // only items listed on the bill with a warranty period are covered, each
 // until the date shown beside it.
 export const WARRANTY_TERMS = [
-  "Only items listed with a warranty on this bill are covered, until the date shown beside each. Items with no warranty shown are not covered.",
-  "“Touch only” on a display covers touch response only. Lines, spots, colour or brightness faults and cracks are not covered.",
-  "The warranty does not cover water or liquid damage, drops, cracks, bends, pressure or any other physical damage.",
-  "It ends if the device is opened or repaired by anyone else, or our warranty seal is broken or removed.",
-  "It does not cover software, viruses, lost data or faults not related to the part we fitted. Please back up your data before a repair.",
-  "To claim, bring the device and this bill (or its link) before the end date. We will check it, then repair or replace the covered part.",
+  "Only items with a warranty shown are covered, until the date beside them.",
+  "Not covered: water or physical damage, or repair by anyone else.",
+  "“Touch only” covers touch, not the display itself.",
+  "To claim, bring the device and this bill.",
 ];
 
 // Canonical site URL (no trailing slash) for links in emails, QR codes,
