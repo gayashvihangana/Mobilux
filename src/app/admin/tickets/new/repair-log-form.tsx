@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { Loader2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,12 +20,10 @@ import { PartsEditor } from "@/components/forms/parts-editor";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { DEVICE_TYPES, statusLabel, STATUS_PIPELINE } from "@/lib/status";
 import { DeviceFields } from "@/components/forms/device-fields";
+import { CustomerFields } from "@/components/forms/customer-fields";
 
-export type CustomerOption = { id: string; name: string; email: string };
-
-export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
+export function RepairLogForm() {
   const [state, formAction, pending] = useActionState(adminCreateTicket, null);
-  const [customerId, setCustomerId] = useState("none");
 
   return (
     <form action={formAction} className="space-y-6">
@@ -38,59 +36,35 @@ export function RepairLogForm({ customers }: { customers: CustomerOption[] }) {
       ) : null}
 
       {/* Customer */}
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="customerId">Customer account</Label>
-          <Select
-            name="customerId"
-            value={customerId}
-            onValueChange={setCustomerId}
-          >
-            <SelectTrigger id="customerId" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No account (walk-in)</SelectItem>
-              {customers.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name} — {c.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="customerName">
-            Customer name{" "}
-            {customerId === "none" ? (
-              ""
-            ) : (
-              <span className="text-muted-foreground">(optional)</span>
-            )}
-          </Label>
-          <Input
-            id="customerName"
-            name="customerName"
-            placeholder="e.g. Priyantha Bappa"
-          />
-          <FieldError errors={state?.fieldErrors?.customerName} />
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="customerPhone">
-            Phone number{" "}
-            <span className="text-muted-foreground">(optional)</span>
-          </Label>
-          <Input
-            id="customerPhone"
-            name="customerPhone"
-            type="tel"
-            inputMode="tel"
-            autoComplete="off"
-            placeholder="07X XXX XXXX"
-          />
-          <FieldError errors={state?.fieldErrors?.customerPhone} />
-        </div>
-      </div>
+      <CustomerFields
+        name={{
+          id: "customerName",
+          placeholder: "Type a name or pick a customer",
+          invalid: !!state?.fieldErrors?.customerName,
+        }}
+        phone={{
+          id: "customerPhone",
+          placeholder: "07X XXX XXXX",
+          invalid: !!state?.fieldErrors?.customerPhone,
+        }}
+      >
+        {(fields) => (
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor="customerName">Customer</Label>
+              {fields.customer}
+              <FieldError errors={state?.fieldErrors?.customerName} />
+            </div>
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor="customerPhone">
+                Phone number <span className="text-muted-foreground">(optional)</span>
+              </Label>
+              {fields.phone}
+              <FieldError errors={state?.fieldErrors?.customerPhone} />
+            </div>
+          </div>
+        )}
+      </CustomerFields>
 
       <Separator />
 
