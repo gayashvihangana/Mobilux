@@ -57,6 +57,7 @@ export const SHOP_INFO_KEYS = {
   // rest so they share one cached query.
   weekHours: "shop_hours_week",
   warrantyDays: "repair_warranty_days",
+  markupPercent: "repair_markup_percent",
   ticketPrefix: "repair_ticket_prefix",
   commonProblems: "repair_common_problems",
   billMessage: "bill_message",
@@ -87,6 +88,8 @@ export type ShopInfo = {
   weekHours: DayHours[];
   /** Standard warranty on repairs, in days. */
   warrantyDays: number;
+  /** Usual markup on a part's cost, used to start the Mark ready price. */
+  markupPercent: number;
   /** New repairs are numbered PREFIX-001, PREFIX-002… */
   ticketPrefix: string;
   /** One-tap problems on the new-repair form. */
@@ -144,6 +147,10 @@ const readShopInfo = unstable_cache(
       warrantyDays:
         Number.parseInt(map.get(SHOP_INFO_KEYS.warrantyDays) ?? "", 10) ||
         WARRANTY_DAYS,
+      markupPercent: (() => {
+        const n = Number.parseFloat(map.get(SHOP_INFO_KEYS.markupPercent) ?? "");
+        return Number.isFinite(n) && n >= 0 ? n : 50;
+      })(),
       ticketPrefix: map.get(SHOP_INFO_KEYS.ticketPrefix) || "REP",
       commonProblems: (() => {
         const list = (map.get(SHOP_INFO_KEYS.commonProblems) ?? "")

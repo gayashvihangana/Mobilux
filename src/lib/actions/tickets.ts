@@ -1225,6 +1225,9 @@ export async function updateTicketStatus(
       model: true,
       issueTitle: true,
       customer: { select: { name: true, email: true } },
+      finalCost: true,
+      paidAmount: true,
+      payments: { where: { status: "PAID" }, select: { amount: true } },
     },
   });
   if (!ticket) return { error: "Ticket not found." };
@@ -1290,9 +1293,20 @@ export async function updateTicketStatus(
   // full "come and collect" message even though the timeline entry itself
   // keeps a plain "repair done" note.
   const headline = statusHeadline(status as TicketStatus);
+  // Ready: say what is left to pay, so the customer brings the right amount.
+  const toCollect = ticket.finalCost
+    ? Math.round(
+        Number(ticket.finalCost) -
+          Number(ticket.paidAmount ?? 0) -
+          ticket.payments.reduce((sum, p) => sum + Number(p.amount), 0),
+      )
+    : 0;
   const defaultMessage =
     status === "COMPLETED"
-      ? pickupNote(milestoneCtx)
+      ? toCollect > 0
+        ? // The amount goes before the closing "Thank you for choosing…".
+          `${pickupNote({ ...milestoneCtx, shopName: undefined })} Amount to collect: LKR ${toCollect.toLocaleString("en-LK")}.${milestoneCtx.shopName?.trim() ? ` Thank you for choosing ${milestoneCtx.shopName.trim()}!` : ""}`
+        : pickupNote(milestoneCtx)
       : milestoneDescription(status as TicketStatus, milestoneCtx);
   const message = note || itemsNote || defaultMessage;
   const notifTitle = `Your ${deviceName} (${ticket.ticketNumber}) is ${headline}`;
@@ -1378,12 +1392,59 @@ export type MoveResult =
  * notification and email). Returns the status it came from so the button can
  * offer Undo. "Send price" also saves the quoted price.
  */
+const stepPartsSchema = z.array(partEntrySchema).max(40);
+const stepBillItemsSchema = z
+  .array(
+    z.object({
+      label: z.string().trim().min(1).max(100),
+      qty: z.coerce.number().int().min(1).max(999),
+      unitPrice: z.coerce.number().min(0).max(100_000_000),
+    }),
+  )
+  .max(40);
+
+/** What the step windows need to show: the repair's parts, prices and the usual markup. */
+export type StepContext = {
+  parts: PartEntry[];
+  quoted: number | null;
+  finalCost: number | null;
+  markupPercent: number;
+  hasBill: boolean;
+};
+
+export async function stepContext(ticketId: string): Promise<StepContext | null> {
+  if (!(await actionPermission("repair:write"))) return null;
+  const [ticket, shop] = await Promise.all([
+    prisma.repairTicket.findUnique({
+      where: { id: ticketId },
+      select: { parts: true, estimatedCost: true, finalCost: true, billItems: true },
+    }),
+    getShopInfo(),
+  ]);
+  if (!ticket) return null;
+  return {
+    parts: parseParts(ticket.parts),
+    quoted: ticket.estimatedCost ? Number(ticket.estimatedCost) : null,
+    finalCost: ticket.finalCost ? Number(ticket.finalCost) : null,
+    markupPercent: shop.markupPercent,
+    hasBill: Array.isArray(ticket.billItems) && ticket.billItems.length > 0,
+  };
+}
+
 export async function moveTicket(input: {
   ticketId: string;
   status: TicketStatus;
   estimatedCost?: number;
   /** Comment for the timeline and the customer; empty keeps the usual message. */
   note?: string;
+  /** Replaces the repair's own parts list (names, costs, suppliers). */
+  parts?: PartEntry[];
+  /** The price worked out at Mark ready. */
+  finalCost?: number;
+  /** Bill lines from Mark ready; saved as the repair's bill. */
+  billItems?: { label: string; qty: number; unitPrice: number }[];
+  /** Diagnosed: what was found, written on the Diagnosing step. */
+  diagnosis?: string;
 }): Promise<MoveResult> {
   if (!(await actionPermission("repair:write"))) {
     return { ok: false, error: "Not authorized." };
@@ -1408,6 +1469,52 @@ export async function moveTicket(input: {
     });
   }
 
+  if (input.parts !== undefined) {
+    const parts = stepPartsSchema.safeParse(input.parts);
+    if (!parts.success) return { ok: false, error: "Check the parts: each needs a name, and costs must be 0 or more." };
+    const existing = await prisma.repairTicket.findUnique({
+      where: { id: input.ticketId },
+      select: { partsCost: true, issues: { select: { parts: true } } },
+    });
+    await prisma.repairTicket.update({
+      where: { id: input.ticketId },
+      data: partsColumns(
+        parts.data.map((p) => ({
+          part: p.part,
+          ...(p.supplier ? { supplier: p.supplier } : {}),
+          ...(p.cost !== undefined ? { cost: p.cost } : {}),
+        })),
+        {
+          issuePartsCost: issuePartsCostOf(existing?.issues ?? []),
+          existingPartsCost: null,
+        },
+      ),
+    });
+  }
+
+  if (input.finalCost !== undefined) {
+    const finalCost = Number(input.finalCost);
+    if (!Number.isFinite(finalCost) || finalCost < 0) return { ok: false, error: "Enter a price of 0 or more." };
+    const items = stepBillItemsSchema.safeParse(input.billItems ?? []);
+    if (!items.success) return { ok: false, error: "Check the price lines." };
+    await prisma.repairTicket.update({
+      where: { id: input.ticketId },
+      data: {
+        finalCost: Math.round(finalCost * 100) / 100,
+        ...(items.data.length > 0
+          ? {
+              billItems: items.data.map((i) => ({
+                label: i.label,
+                qty: i.qty,
+                unitPrice: Math.round(i.unitPrice * 100) / 100,
+                amount: Math.round(i.qty * i.unitPrice * 100) / 100,
+              })),
+            }
+          : {}),
+      },
+    });
+  }
+
   const form = new FormData();
   form.set("ticketId", input.ticketId);
   form.set("status", input.status);
@@ -1415,6 +1522,18 @@ export async function moveTicket(input: {
   const result = await updateTicketStatus(null, form);
   if (!result?.success) {
     return { ok: false, error: result?.error ?? "Could not update the repair." };
+  }
+  // Diagnosed: the Diagnosing step on the timeline now says what was found.
+  const diagnosis = input.diagnosis?.trim().slice(0, 500);
+  if (diagnosis && ticket.status === "DIAGNOSING") {
+    const entry = await prisma.statusUpdate.findFirst({
+      where: { ticketId: input.ticketId, status: "DIAGNOSING" },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    if (entry) {
+      await prisma.statusUpdate.update({ where: { id: entry.id }, data: { note: diagnosis } });
+    }
   }
   return { ok: true, from: ticket.status, to: input.status };
 }

@@ -117,13 +117,13 @@ export function repairStepIndex(status: TicketStatus): number {
   return REPAIR_STEPS.indexOf(status === "READY_FOR_PICKUP" ? "COMPLETED" : status);
 }
 
-// The button that moves a repair on from each status. "Send price" is a
+// The button that moves a repair on from each status. "Diagnosed" is a
 // small form (price, and whether a part is needed); the rest are one tap.
 export const NEXT_STEP_ACTION: Partial<Record<TicketStatus, string>> = {
   SUBMITTED: "Accept request",
   CONFIRMED: "Mark received",
   RECEIVED: "Start diagnosing",
-  DIAGNOSING: "Send price",
+  DIAGNOSING: "Diagnosed",
   AWAITING_PARTS: "Part arrived",
   IN_PROGRESS: "Mark ready",
   COMPLETED: "Picked up",
