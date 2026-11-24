@@ -254,10 +254,12 @@ export function HoursFields({ week: saved }: { week: DayHours[] }) {
 
 export function RepairsFields({
   warrantyDays,
+  markupPercent,
   ticketPrefix,
   commonProblems,
 }: {
   warrantyDays: number;
+  markupPercent: number;
   ticketPrefix: string;
   commonProblems: string[];
 }) {
@@ -273,6 +275,16 @@ export function RepairsFields({
           min={0}
           max={3650}
           hint="Shown on the homepage. Bills set a warranty per item."
+        />
+        <TextField
+          name="markupPercent"
+          label="Usual markup on parts (%)"
+          defaultValue={markupPercent}
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={1000}
+          hint="Mark ready starts each part at its cost plus this. Never shown to customers."
         />
         <TextField
           name="ticketPrefix"

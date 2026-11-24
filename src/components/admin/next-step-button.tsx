@@ -14,12 +14,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { moveTicket, undoTicketMove } from "@/lib/actions/tickets";
 import { defaultStepNote, NEXT_STEP_ACTION, nextStatus, statusLabel } from "@/lib/status";
 import { cn } from "@/lib/utils";
+import type { PartEntry } from "@/lib/parts";
+import {
+  DIAGNOSED_DEFAULT,
+  DiagnosedDialog,
+  MarkReadyDialog,
+  PartArrivedDialog,
+} from "@/components/admin/step-dialogs";
 
 type Tone = "primary" | "secondary" | "ink" | "onPrimary";
 
@@ -38,9 +44,11 @@ const TONE: Record<Tone, { variant: "default" | "secondary" | "ink"; className?:
 // comment, filled in with the step's usual message: keep it, or write what
 // was found or done. Confirming moves the repair on, followed by a message
 // with Undo (status changes reach the customer, so a slip has to be easy to
-// take back). "Send price" also asks for the price and whether a part is
-// needed. Online requests (Submitted, Confirmed) need more than a tap, so
-// they link to the repair page instead.
+// take back). Three steps ask for more (see step-dialogs.tsx): Diagnosed
+// (what was found, parts needed, an optional price), Part arrived (what each
+// part cost) and Mark ready (the final price, worked out from the costs).
+// Online requests (Submitted, Confirmed) need more than a tap, so they link
+// to the repair page instead.
 export function NextStepButton({
   ticketId,
   status,
@@ -54,7 +62,7 @@ export function NextStepButton({
   status: TicketStatus;
   /** Names the repair in the confirmation message. */
   deviceName: string;
-  /** Prefills "Send price". */
+  /** Kept for callers; the Diagnosed window reads the quote itself. */
   estimatedCost?: number | null;
   tone?: Tone;
   size?: "default" | "lg";
@@ -78,13 +86,23 @@ export function NextStepButton({
     );
   }
 
-  const move = (to: TicketStatus, price?: number, comment?: string) =>
+  const move = (
+    to: TicketStatus,
+    price?: number,
+    comment?: string,
+    extra: {
+      parts?: PartEntry[];
+      finalCost?: number;
+      billItems?: { label: string; qty: number; unitPrice: number }[];
+      diagnosis?: string;
+    } = {},
+  ) =>
     startTransition(async () => {
       // Left as the ready-made message: send nothing, so the customer gets
       // the same message as always (for "ready", that includes where and
-      // when to collect).
+      // when to collect, and the amount).
       const note = comment?.trim() && comment.trim() !== defaultStepNote(to) ? comment : undefined;
-      const result = await moveTicket({ ticketId, status: to, estimatedCost: price, note });
+      const result = await moveTicket({ ticketId, status: to, estimatedCost: price, note, ...extra });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -117,14 +135,17 @@ export function NextStepButton({
         >
           {label}
         </Button>
-        <SendPriceDialog
+        <DiagnosedDialog
           open={priceOpen}
           onOpenChange={setPriceOpen}
+          ticketId={ticketId}
           deviceName={deviceName}
-          estimatedCost={estimatedCost}
           pending={pending}
-          onSend={(price, needsPart, comment) =>
-            move(needsPart ? "AWAITING_PARTS" : "IN_PROGRESS", price, comment)
+          onSave={(r) =>
+            move(r.needsParts ? "AWAITING_PARTS" : "IN_PROGRESS", r.price, undefined, {
+              diagnosis: r.comment.trim() || DIAGNOSED_DEFAULT,
+              ...(r.parts ? { parts: r.parts } : {}),
+            })
           }
         />
       </>
@@ -144,15 +165,41 @@ export function NextStepButton({
         {pending ? <Loader2 className="animate-spin" /> : null}
         {label}
       </Button>
-      <StepDialog
-        open={stepOpen}
-        onOpenChange={setStepOpen}
-        deviceName={deviceName}
-        action={label}
-        to={next}
-        pending={pending}
-        onConfirm={(comment) => move(next, undefined, comment)}
-      />
+      {status === "AWAITING_PARTS" ? (
+        <PartArrivedDialog
+          open={stepOpen}
+          onOpenChange={setStepOpen}
+          ticketId={ticketId}
+          deviceName={deviceName}
+          pending={pending}
+          defaultComment={defaultStepNote(next)}
+          onSave={(r) => move(next, undefined, r.comment, { parts: r.parts })}
+        />
+      ) : status === "IN_PROGRESS" ? (
+        <MarkReadyDialog
+          open={stepOpen}
+          onOpenChange={setStepOpen}
+          ticketId={ticketId}
+          deviceName={deviceName}
+          pending={pending}
+          defaultComment={defaultStepNote(next)}
+          onSave={(r) =>
+            move(next, undefined, r.comment, {
+              ...(r.finalCost !== undefined ? { finalCost: r.finalCost, billItems: r.billItems } : {}),
+            })
+          }
+        />
+      ) : (
+        <StepDialog
+          open={stepOpen}
+          onOpenChange={setStepOpen}
+          deviceName={deviceName}
+          action={label}
+          to={next}
+          pending={pending}
+          onConfirm={(comment) => move(next, undefined, comment)}
+        />
+      )}
     </>
   );
 }
@@ -237,95 +284,6 @@ function StepDialog({
             <Button type="submit" size="lg" disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
               {action}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function SendPriceDialog({
-  open,
-  onOpenChange,
-  deviceName,
-  estimatedCost,
-  pending,
-  onSend,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  deviceName: string;
-  estimatedCost?: number | null;
-  pending: boolean;
-  onSend: (price: number, needsPart: boolean, comment: string) => void;
-}) {
-  const [comment, setComment] = useState("");
-  const [price, setPrice] = useState(
-    estimatedCost != null ? String(Math.round(estimatedCost)) : "",
-  );
-  const value = Number(price);
-  const valid = price.trim() !== "" && Number.isFinite(value) && value >= 0;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form
-          className="space-y-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            // Enter in the price box means the common case: no part needed.
-            if (valid) onSend(value, false, comment);
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Price for the {deviceName}</DialogTitle>
-            <DialogDescription>
-              Saved as the price quoted to the customer. Then pick what
-              happens next.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor={`price-${deviceName}`}>Price (LKR)</Label>
-            <Input
-              id={`price-${deviceName}`}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step="1"
-              autoFocus
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-              placeholder="e.g. 6500"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor={`price-note-${deviceName}`}>
-              Comment <span className="font-normal text-muted-foreground">(optional)</span>
-            </Label>
-            <Textarea
-              id={`price-note-${deviceName}`}
-              rows={2}
-              maxLength={500}
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-              placeholder="What you found, e.g. the charging port is worn and needs replacing"
-              className="resize-none"
-            />
-          </div>
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="lg"
-              disabled={!valid || pending}
-              onClick={() => onSend(value, true, comment)}
-            >
-              Needs a part
-            </Button>
-            <Button type="submit" size="lg" disabled={!valid || pending}>
-              {pending ? <Loader2 className="animate-spin" /> : null}
-              No part, start repair
             </Button>
           </DialogFooter>
         </form>

@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 
 const SECTIONS = [
   { key: "profile", title: "Shop profile", note: "Name, logo, contact, hours" },
-  { key: "repairs", title: "Repairs", note: "Warranty, repair numbers, common problems" },
+  { key: "repairs", title: "Repairs", note: "Warranty, markup, repair numbers, common problems" },
   { key: "bills", title: "Bills and payments", note: "Bank accounts, bill text" },
   { key: "messages", title: "Customer messages", note: "WhatsApp texts you send" },
   { key: "appearance", title: "Appearance", note: "Light or dark, accent colour" },
@@ -98,6 +98,7 @@ export default async function AdminSettingsPage({
           <SettingsForm>
             <RepairsFields
               warrantyDays={info.warrantyDays}
+              markupPercent={info.markupPercent}
               ticketPrefix={info.ticketPrefix}
               commonProblems={info.commonProblems}
             />

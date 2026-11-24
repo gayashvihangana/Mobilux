@@ -207,6 +207,10 @@ const FIELD_SCHEMAS = {
     .int("Whole days only")
     .min(0, "0 or more")
     .max(3650, "That is more than ten years"),
+  markupPercent: z.coerce
+    .number()
+    .min(0, "0 or more")
+    .max(1000, "That is more than 1000%"),
   ticketPrefix: z
     .string()
     .trim()
