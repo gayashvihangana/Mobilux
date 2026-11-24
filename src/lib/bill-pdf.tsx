@@ -252,13 +252,28 @@ function BillPdf({
             <Text style={[s.bold, { fontSize: 11 }]}>{money(bill.total)}</Text>
           </View>
           {bill.payments.map((p) => (
-            <View key={p.id} style={[s.between, { marginBottom: 3 }]}>
-              <Text style={s.text}>
-                Paid {formatDate(p.at)} · {p.method}
-              </Text>
-              <Text style={s.text}>- {money(p.amount)}</Text>
+            <View key={p.id}>
+              <View style={[s.between, { marginBottom: 3 }]}>
+                <Text style={s.text}>
+                  {p.change > 0 && p.method === "Cash" ? "Cash received" : "Paid"} {formatDate(p.at)}
+                  {p.change > 0 && p.method === "Cash" ? "" : ` · ${p.method}`}
+                </Text>
+                <Text style={s.text}>{money(p.amount)}</Text>
+              </View>
+              {p.change > 0 ? (
+                <View style={[s.between, { marginBottom: 3 }]}>
+                  <Text style={s.text}>Change given</Text>
+                  <Text style={s.text}>{money(p.change)}</Text>
+                </View>
+              ) : null}
             </View>
           ))}
+          {bill.extraReceived > 0 ? (
+            <View style={[s.between, { marginBottom: 3 }]}>
+              <Text style={s.text}>Extra received</Text>
+              <Text style={s.text}>{money(bill.extraReceived)}</Text>
+            </View>
+          ) : null}
           {bill.isSettled ? (
             <View style={[s.between, { borderTopWidth: 0.75, borderTopColor: C.line, paddingTop: 5, marginTop: 2 }]}>
               <Text style={[s.bold, { fontSize: 11, color: C.green }]}>Balance</Text>

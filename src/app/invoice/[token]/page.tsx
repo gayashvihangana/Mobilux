@@ -230,7 +230,7 @@ export default async function InvoicePage({
                       <dt>
                         Paid {formatDate(p.at)} · {p.method.toLowerCase()}
                       </dt>
-                      <dd className="tabular-nums">− {formatLKR(p.amount)}</dd>
+                      <dd className="tabular-nums">{formatLKR(p.amount)}</dd>
                     </div>
                   ))
                 : null}

@@ -740,11 +740,14 @@ const recordPaymentSchema = z.object({
   amount: z.coerce.number().positive().max(100_000_000),
   method: z.enum(PAYMENT_METHODS),
   date: optionalText(40),
+  /** Cash handed back when they paid more than was owed. */
+  change: z.coerce.number().min(0).max(100_000_000).optional(),
 });
 
 function paymentRollup(entries: BillPaymentEntry[], total: number, online: number) {
+  // What the shop kept: each payment less any change handed back.
   const sum =
-    Math.round(entries.reduce((s, e) => s + e.amount, 0) * 100) / 100;
+    Math.round(entries.reduce((s, e) => s + e.amount - (e.change ?? 0), 0) * 100) / 100;
   const methods = [...new Set(entries.map((e) => e.method))];
   const settled = entries.length > 0 && sum + online >= total - 0.005;
   const last = entries[entries.length - 1];
@@ -770,6 +773,7 @@ export async function recordBillPayment(input: {
   amount: string | number;
   method: string;
   date?: string;
+  change?: number;
 }): Promise<TicketFormState> {
   const actor = await actionPermission("bill:write");
   if (!actor) return { error: "Not authorized." };
@@ -779,6 +783,8 @@ export async function recordBillPayment(input: {
     return { error: "Enter an amount above zero and pick how they paid." };
   }
   const { ticketId, amount, method, date } = parsed.data;
+  const change = Math.round((parsed.data.change ?? 0) * 100) / 100;
+  if (change >= amount) return { error: "The change can't be as much as what they paid." };
   const at = date ? parseColomboLocal(date) : new Date();
   if (!at) return { error: "That date couldn't be read." };
 
@@ -801,6 +807,7 @@ export async function recordBillPayment(input: {
   entries.push({
     id: crypto.randomUUID(),
     amount: Math.round(amount * 100) / 100,
+    ...(change > 0 ? { change } : {}),
     method,
     at: at.toISOString(),
     by: actor.name,
@@ -819,6 +826,7 @@ export async function recordBillPayment(input: {
     await logAudit(tx, actor, "bill.payment", "RepairTicket", ticketId, {
       ticketNumber: result.bill.ticketNumber,
       amount,
+      change,
       method,
     });
   });

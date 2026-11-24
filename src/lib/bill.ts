@@ -54,6 +54,8 @@ export type BillPaymentEntry = {
   at: string;
   /** Who recorded it (staff name), for the admin list only. */
   by?: string | null;
+  /** Cash given back when the customer handed over more than was owed. */
+  change?: number | null;
 };
 
 export const PAYMENT_METHODS = ["Cash", "Card", "Bank transfer", "Other"] as const;
@@ -66,10 +68,12 @@ export function parseBillPayments(raw: unknown): BillPaymentEntry[] {
     const e = r as Record<string, unknown>;
     const amount = Number(e.amount);
     if (typeof e.id !== "string" || !(amount > 0)) return [];
+    const change = Number(e.change);
     return [
       {
         id: e.id,
         amount: Math.round(amount * 100) / 100,
+        change: change > 0 && change < amount ? Math.round(change * 100) / 100 : null,
         method: typeof e.method === "string" ? e.method : "Other",
         at: typeof e.at === "string" ? e.at : new Date(0).toISOString(),
         by: typeof e.by === "string" ? e.by : null,
@@ -225,7 +229,10 @@ export type BillState = "draft" | "issued" | "partial" | "paid";
 /** One row in the bill's payment list, whichever way the money came in. */
 export type BillPaymentRow = {
   id: string;
+  /** What the customer handed over. */
   amount: number;
+  /** Given back as change (0 when none). The shop keeps amount − change. */
+  change: number;
   method: string;
   at: Date;
   by: string | null;
@@ -254,6 +261,8 @@ export type BillTotals = {
   paidTotal: number;
   /** What is still owed (never below zero). */
   balance: number;
+  /** Paid beyond the total and kept by the shop (no change given). */
+  extraReceived: number;
   state: BillState;
   /** Paid in full: the bill reads as a receipt. */
   isSettled: boolean;
@@ -335,6 +344,7 @@ function paymentRows(ticket: BillTicket): BillPaymentRow[] {
   const rows: BillPaymentRow[] = ticket.billPayments.map((p) => ({
     id: p.id,
     amount: p.amount,
+    change: p.change ?? 0,
     method: p.method,
     at: new Date(p.at),
     by: p.by ?? null,
@@ -348,6 +358,7 @@ function paymentRows(ticket: BillTicket): BillPaymentRow[] {
     rows.push({
       id: "legacy",
       amount: Number(ticket.paidAmount),
+      change: 0,
       method: ticket.paidMethod ?? "Cash",
       at: ticket.paidAt ?? ticket.completedAt ?? ticket.createdAt,
       by: null,
@@ -358,6 +369,7 @@ function paymentRows(ticket: BillTicket): BillPaymentRow[] {
     rows.push({
       id: `online-${i}`,
       amount: Number(p.amount),
+      change: 0,
       method: "Bank transfer",
       at: p.createdAt,
       by: null,
@@ -385,7 +397,8 @@ export function computeBill(
   const show = resolveBillShow(ticket.billShow);
 
   const payments = paymentRows(ticket);
-  const paidTotal = round2(payments.reduce((sum, p) => sum + p.amount, 0));
+  // What the shop kept: each payment less any change handed back.
+  const paidTotal = round2(payments.reduce((sum, p) => sum + p.amount - p.change, 0));
 
   const items = normaliseItems(ticket.billItems, billDate);
   const isItemized = items.length > 0;
@@ -434,6 +447,7 @@ export function computeBill(
 
   const total = round2(Math.max(0, subtotal - discountAmount));
   const balance = round2(Math.max(0, total - paidTotal));
+  const extraReceived = round2(Math.max(0, paidTotal - total));
   const isSettled = paidTotal > 0 && balance === 0;
   const state: BillState = isSettled
     ? "paid"
@@ -462,6 +476,7 @@ export function computeBill(
     payments,
     paidTotal,
     balance,
+    extraReceived,
     state,
     isSettled,
     paidDate: isSettled ? (last?.at ?? null) : null,
