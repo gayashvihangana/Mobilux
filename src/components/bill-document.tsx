@@ -252,13 +252,28 @@ export function BillDocument({
             <span className="tabular-nums">{money(bill.total)}</span>
           </div>
           {bill.payments.map((p) => (
-            <div key={p.id} className="flex justify-between text-neutral-600">
-              <span>
-                Paid {formatDate(p.at)} · {p.method}
-              </span>
-              <span className="tabular-nums">− {money(p.amount)}</span>
+            <div key={p.id} className="flex flex-col gap-1.5 text-neutral-600">
+              <div className="flex justify-between">
+                <span>
+                  {p.change > 0 && p.method === "Cash" ? "Cash received" : "Paid"} {formatDate(p.at)}
+                  {p.change > 0 && p.method === "Cash" ? "" : ` · ${p.method}`}
+                </span>
+                <span className="tabular-nums">{money(p.amount)}</span>
+              </div>
+              {p.change > 0 ? (
+                <div className="flex justify-between">
+                  <span>Change given</span>
+                  <span className="tabular-nums">{money(p.change)}</span>
+                </div>
+              ) : null}
             </div>
           ))}
+          {bill.extraReceived > 0 ? (
+            <div className="flex justify-between text-neutral-600">
+              <span>Extra received</span>
+              <span className="tabular-nums">{money(bill.extraReceived)}</span>
+            </div>
+          ) : null}
           {bill.isSettled ? (
             <div className="mt-1 flex justify-between border-t border-neutral-200 pt-2 text-[15px] font-extrabold text-green-800">
               <span>Balance</span>

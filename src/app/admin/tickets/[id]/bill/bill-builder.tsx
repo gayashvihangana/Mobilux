@@ -492,6 +492,7 @@ export function BillBuilder({
             <>
               {/* Saves the PDF file straight away: no new page, no print box.
                   It is the saved bill, so unsaved changes ask for a save first. */}
+              {main.href ? null : (
               <Button asChild variant="secondary">
                 <a
                   href={`/bill/${ticketId}/pdf`}
@@ -505,6 +506,7 @@ export function BillBuilder({
                   <Download /> PDF
                 </a>
               </Button>
+              )}
               <Button asChild variant="secondary">
                 <a href={`/bill/${ticketId}`} target="_blank" rel="noreferrer">
                   <Eye /> Preview
@@ -865,7 +867,10 @@ export function BillBuilder({
                 <SumRow label="Total" value={formatLKR(live.total)} className="text-xl font-extrabold" />
               </div>
               {live.paidTotal > 0 ? (
-                <SumRow label="Paid" value={`− ${formatLKR(live.paidTotal)}`} muted />
+                <SumRow label="Paid" value={formatLKR(live.paidTotal - live.extraReceived)} muted />
+              ) : null}
+              {live.extraReceived > 0 ? (
+                <SumRow label="Extra received" value={formatLKR(live.extraReceived)} muted />
               ) : null}
               <div
                 className={cn(
@@ -1249,6 +1254,7 @@ function PaymentsCard({
                   <p className="font-bold">{p.online ? "Online · bank transfer" : p.method}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatDate(p.at)}
+                    {p.change > 0 ? ` · ${formatLKR(p.change)} change given` : ""}
                     {p.by ? ` · by ${p.by}` : ""}
                     {p.online ? " · verified under Payments" : ""}
                   </p>
@@ -1290,6 +1296,8 @@ function RecordPaymentDialog({
   const [full, setFull] = useState(true);
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]>("Cash");
+  // Paid more than owed: give the difference back (usual) or keep it.
+  const [giveChange, setGiveChange] = useState(true);
   const [saving, startSaving] = useTransition();
 
   useEffect(() => {
@@ -1297,11 +1305,13 @@ function RecordPaymentDialog({
       setFull(true);
       setAmount(String(balance));
       setMethod("Cash");
+      setGiveChange(true);
     }
   }, [open, balance]);
 
   const value = full ? balance : Number(amount) || 0;
   const settles = value >= balance - 0.005;
+  const over = balance > 0 ? Math.round((value - balance) * 100) / 100 : 0;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1310,9 +1320,16 @@ function RecordPaymentDialog({
       return;
     }
     startSaving(async () => {
-      const res = await recordBillPayment({ ticketId, amount: value, method });
+      const change = over > 0 && giveChange ? over : 0;
+      const res = await recordBillPayment({ ticketId, amount: value, method, change });
       if (res?.success) {
-        toast.success(settles ? "Paid in full. The bill is now a receipt." : `${formatLKR(value)} recorded.`);
+        toast.success(
+          settles
+            ? change > 0
+              ? `Paid in full. Give ${formatLKR(change)} change.`
+              : "Paid in full. The bill is now a receipt."
+            : `${formatLKR(value)} recorded.`,
+        );
         onOpenChange(false);
         router.refresh();
       } else toast.error(res?.error ?? "Couldn't record the payment.");
@@ -1374,6 +1391,35 @@ function RecordPaymentDialog({
               </button>
             </div>
           </div>
+          {over > 0 ? (
+            <fieldset className="space-y-2 rounded-2xl bg-warning-soft p-3">
+              <legend className="sr-only">Extra paid</legend>
+              <p className="text-sm font-bold">
+                That&apos;s {formatLKR(over)} more than the balance.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    [true, `Give ${formatLKR(over)} change`],
+                    [false, "They left it as extra"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={String(v)}
+                    type="button"
+                    aria-pressed={giveChange === v}
+                    onClick={() => setGiveChange(v)}
+                    className={cn(
+                      "min-h-11 rounded-xl px-3 text-sm font-bold",
+                      giveChange === v ? "bg-card text-foreground ring-2 ring-primary" : "bg-card/60 text-muted-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
           <fieldset className="space-y-2">
             <legend className="mb-2 text-sm font-semibold">How they paid</legend>
             <div className="grid grid-cols-2 gap-2">
