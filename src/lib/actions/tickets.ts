@@ -192,6 +192,8 @@ const adminTicketSchema = z.object({
   solution: optionalText(2000),
   status: z.enum(TICKET_STATUSES),
   completedAt: optionalText(20),
+  /** The day the device came in (YYYY-MM-DD); empty means now. */
+  receivedAt: optionalText(20),
   estimatedCost: optionalMoney(),
   finalCost: optionalMoney(),
   paidAmount: optionalMoney(),
@@ -273,6 +275,7 @@ function parseAdminTicketForm(formData: FormData) {
     solution: formData.get("solution"),
     status: formData.get("status"),
     completedAt: formData.get("completedAt"),
+    receivedAt: formData.get("receivedAt"),
     estimatedCost: formData.get("estimatedCost") ?? "",
     finalCost: formData.get("finalCost") ?? "",
     paidAmount: formData.get("paidAmount") ?? "",
@@ -301,6 +304,7 @@ function parseTicketDetailsForm(formData: FormData) {
     solution: formData.get("solution"),
     status: formData.get("status"),
     completedAt: formData.get("completedAt"),
+    receivedAt: formData.get("receivedAt"),
     estimatedCost: formData.get("estimatedCost") ?? "",
     finalCost: formData.get("finalCost") ?? "",
     paidAmount: formData.get("paidAmount") ?? "",
@@ -326,6 +330,30 @@ function parseColomboLocal(input: string): Date | null {
     COLOMBO_OFFSET_MS;
   const date = new Date(utcMs);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+// The day a device came in, from a YYYY-MM-DD picked on the form. A repair
+// entered late ("it came in yesterday") keeps the time it is entered, moved
+// to that day, so repairs from the same day stay in order. Today or empty
+// means right now. Returns an error message for a future or nonsense date.
+function resolveReceivedAt(input: string | undefined): Date | { error: string } {
+  const now = new Date();
+  if (!input) return now;
+  const m = input.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return { error: "Pick the day the device came in." };
+  const clock = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Colombo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(now);
+  const at = parseColomboLocal(`${m[1]}-${m[2]}-${m[3]}T${clock}`);
+  if (!at) return { error: "Pick the day the device came in." };
+  if (at.getTime() > now.getTime() + 60_000) {
+    return { error: "The received date can't be in the future." };
+  }
+  if (at.getUTCFullYear() < 2000) return { error: "Pick the day the device came in." };
+  return at;
 }
 
 function resolveCompletedAt(
@@ -361,7 +389,11 @@ export async function adminCreateTicket(
   const badPhone = phoneError(data.customerPhone);
   if (badPhone) return { fieldErrors: { customerPhone: [badPhone] } };
 
-  const completedAt = resolveCompletedAt(data.status, data.completedAt);
+  const receivedAt = resolveReceivedAt(data.receivedAt);
+  if (!(receivedAt instanceof Date)) return { fieldErrors: { receivedAt: [receivedAt.error] } };
+  let completedAt = resolveCompletedAt(data.status, data.completedAt);
+  // Finished before it came in can't be right: the same day at the earliest.
+  if (completedAt && completedAt < receivedAt) completedAt = receivedAt;
 
   const ticket = await prisma.$transaction(async (tx) => {
     const ticketNumber = await nextTicketNumber(tx);
@@ -386,16 +418,24 @@ export async function adminCreateTicket(
         adminNotes: data.adminNotes ?? null,
         forgottenParts: data.forgottenParts ?? null,
         completedAt,
+        createdAt: receivedAt,
       },
     });
+    // The timeline starts on the day it came in. A repair entered at a later
+    // step (or already finished) gets a second entry for where it is now.
     await tx.statusUpdate.create({
-      data: {
-        ticketId: created.id,
-        status: data.status,
-        note: "Repair log added by shop.",
-        createdAt: completedAt ?? new Date(),
-      },
+      data: { ticketId: created.id, status: "RECEIVED", createdAt: receivedAt },
     });
+    if (data.status !== "RECEIVED") {
+      await tx.statusUpdate.create({
+        data: {
+          ticketId: created.id,
+          status: data.status,
+          note: "Added by the shop.",
+          createdAt: completedAt ?? new Date(),
+        },
+      });
+    }
     if (customerId) {
       await syncCompletedRepairs(tx, customerId);
     }
