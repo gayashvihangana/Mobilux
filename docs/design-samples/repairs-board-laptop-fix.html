@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repairs board laptop fix</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+:root{--ink:#083262;--text:#0B1B33;--muted:#55637A;--bg:#F5F7FB;--card:#FFFFFF;--field:#F0F3F9;--line:#E3E8F1;--blue:#0B57F0;--blue-t:#E6EDFF;--blue-col:#E1E9FB;--green:#0B7A3E;--green-t:#DDF0E5;--amber:#7A4B00;--amber-t:#FFF1C7;--amber-col:#FFF3D6;--red:#C2261C;--grey-col:#EBEFF6}
+*{box-sizing:border-box}
+body{margin:0;background:#DCE2EC;color:var(--text);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:15px;line-height:1.4}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.wrap{max-width:1420px;margin:0 auto;padding:32px 16px 80px;display:flex;flex-direction:column;gap:56px}
+.label{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;max-width:860px}
+.label b{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.label h2{font-size:26px;font-weight:800;letter-spacing:-.02em}
+.label p{color:var(--muted)}
+.label ul{margin:4px 0 0;padding-left:20px;color:var(--muted)}
+.scroll{overflow-x:auto;border-radius:20px;box-shadow:0 20px 50px -20px rgba(8,50,98,.35)}
+
+/* laptop frame: 1366 x 768 */
+.laptop{width:1366px;height:768px;display:flex;background:var(--bg);overflow:hidden}
+.side{width:256px;flex:none;background:var(--ink);color:#fff;padding:22px 14px;display:flex;flex-direction:column;gap:6px}
+.side .brand{font-weight:800;font-size:19px;padding:6px 10px 14px}
+.side .new{height:46px;border-radius:14px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;margin-bottom:8px}
+.side a{height:42px;border-radius:12px;padding:0 12px;display:flex;align-items:center;font-weight:700;color:#fff;text-decoration:none;opacity:.9}
+.side a.on{background:#fff;color:var(--ink);opacity:1}
+.main{flex:1;min-width:0;padding:30px 32px 0;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.top h1{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.top p{color:var(--muted);font-size:14px;margin-top:2px}
+.seg{display:flex;gap:4px;background:var(--card);border-radius:16px;padding:4px}
+.seg span{height:40px;padding:0 16px;border-radius:12px;display:flex;align-items:center;font-weight:700;font-size:14px;color:var(--muted)}
+.seg span.on{background:var(--ink);color:#fff}
+.req{background:var(--amber-t);border-radius:20px;padding:10px 14px;display:flex;align-items:center;gap:12px;font-size:14px}
+.req b{color:var(--amber);font-weight:800;white-space:nowrap}
+.req .r{background:#fff;border-radius:12px;padding:6px 12px;display:flex;gap:8px;align-items:center;white-space:nowrap;font-weight:700}
+.req .r em{font-style:normal;color:var(--muted);font-weight:500}
+
+/* columns */
+.cols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;align-items:start}
+.col{border-radius:22px;padding:10px}
+.col header{display:flex;justify-content:space-between;align-items:center;padding:4px 6px 10px}
+.col h3{font-size:15px;font-weight:800}
+.col .n{min-width:24px;height:24px;border-radius:99px;background:#fff;font-size:12px;font-weight:800;display:grid;place-items:center;padding:0 7px}
+.c-grey{background:var(--grey-col)} .c-amber{background:var(--amber-col)} .c-amber h3{color:var(--amber)}
+.c-blue{background:var(--blue-col)} .c-blue h3{color:var(--blue)} .c-green{background:var(--green-t)} .c-green h3{color:var(--green)}
+.stack{display:flex;flex-direction:column;gap:10px}
+
+/* Option A card */
+.ca{background:#fff;border-radius:18px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ca .dev{display:flex;gap:10px;align-items:flex-start}
+.ico{width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;background:var(--blue-t)}
+.ico i{width:12px;height:20px;border-radius:3px;border:2px solid var(--ink);background:var(--blue)}
+.ico.amber{background:var(--amber-t)} .ico.amber i{background:#F2B705}
+.ico.green{background:var(--green-t)} .ico.green i{background:#fff}
+.ca h4{margin:0;font-size:15px;font-weight:800;line-height:1.25}
+.ca .rep{font-size:12px;color:var(--muted);font-weight:600}
+.ca .prob{font-size:14px;color:#3F4D63;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ca .meta{display:flex;justify-content:space-between;gap:6px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.ca .late{color:var(--red);font-weight:700}
+.ca .money{font-weight:800;color:var(--text);font-size:14px}
+.act{height:42px;border-radius:12px;font-weight:700;font-size:14px;background:var(--field);display:flex;align-items:center;justify-content:center;width:100%}
+.act.blue{background:var(--blue);color:#fff} .act.ink{background:var(--ink);color:#fff}
+.pair{display:flex;gap:6px}
+.pair .icon{width:42px;flex:none;height:42px;border-radius:12px;background:var(--field);display:grid;place-items:center}
+.more{text-align:center;font-size:13px;font-weight:700;color:var(--blue);padding:4px}
+
+/* Option B: wide columns that scroll sideways */
+.bwrap{position:relative}
+.bcols{display:flex;gap:14px;overflow:hidden}
+.bcols .col{width:300px;flex:none}
+.cb{background:#fff;border-radius:18px;padding:14px;display:grid;grid-template-columns:64px 1fr;gap:12px}
+.pic{width:64px;height:76px;border-radius:14px;display:grid;place-items:center;background:var(--blue-t)}
+.pic i{width:22px;height:38px;border-radius:5px;border:2.5px solid var(--ink);background:var(--blue)}
+.pic.amber{background:var(--amber-t)} .pic.amber i{background:#F2B705}
+.pic.green{background:var(--green-t)} .pic.green i{background:#fff}
+.cb h4{margin:0;font-size:15px;font-weight:800}
+.cb p{font-size:14px;color:#3F4D63}
+.cb .meta{font-size:13px;color:var(--muted);margin-top:2px}
+.cb .act{grid-column:1/-1}
+.arrow{position:absolute;top:120px;width:48px;height:48px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:22px;font-weight:800;box-shadow:0 8px 20px -6px rgba(0,0,0,.4)}
+.steps{display:flex;gap:6px;align-items:center}
+.steps span{height:36px;padding:0 12px;border-radius:99px;background:#fff;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700}
+.steps span.on{background:var(--ink);color:#fff}
+.steps em{font-style:normal;font-size:12px;opacity:.7}
+.fade{position:absolute;right:0;top:0;bottom:0;width:80px;background:linear-gradient(90deg,transparent,var(--bg))}
+.note{font-size:13px;color:var(--muted);margin-top:10px}
+.tag{display:inline-block;background:var(--green);color:#fff;font-size:12px;font-weight:800;border-radius:99px;padding:3px 10px;margin-left:8px;vertical-align:middle;letter-spacing:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div>
+    <div class="label">
+      <b>The problem</b>
+      <h2>On a laptop the five columns are about 190px wide</h2>
+      <p>Half of every card is a big phone picture, so the device name wraps, the problem is cut after about 15 letters ("Keyboard keys not r…"), and "Remind / Picked up" are squashed side by side. Both options below are drawn at the real size of a 1366 × 768 laptop screen. Phones stay as they are now (one column, swipe between steps).</p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── OPTION A ───────────────────────── -->
+  <div>
+    <div class="label">
+      <b>Option A <span class="tag">Recommended</span></b>
+      <h2>Compact cards: all five steps still on one screen</h2>
+      <ul>
+        <li>The big picture becomes a small device icon beside the name, so the text gets the whole card width.</li>
+        <li>The problem shows on two full lines instead of one cut-off line.</li>
+        <li>Name, repair number, customer and days waiting each get their own line; late ones in red.</li>
+        <li>Two buttons become one main button plus a small Remind icon, so nothing is squashed.</li>
+        <li>About three cards per column fit on the screen without scrolling (now it is under two).</li>
+        <li>Online requests become a slim strip, giving the board more height.</li>
+      </ul>
+    </div>
+    <div class="scroll"><div class="laptop">
+      <aside class="side">
+        <div class="brand">Ceylon Device Care</div>
+        <div class="new">+ New repair</div>
+        <a>Today</a><a class="on">Repairs</a><a>Customers</a><a>Payments</a><a>Orders</a><a>Products</a><a>Reports</a>
+      </aside>
+      <div class="main">
+        <div class="top">
+          <div><h1>Repairs</h1><p>18 open repairs · 16 waiting more than 3 days</p></div>
+          <div class="seg"><span class="on">Board 18</span><span>Finished</span><span>Unpaid 3</span></div>
+        </div>
+        <div class="req">
+          <b>Online requests · 2</b>
+          <span class="r">Samsung Galaxy S24 <em>Sanduni R. · waiting for device</em></span>
+          <span class="r">Apple iPhone 15 <em>Dilshan W. · waiting to confirm</em></span>
+        </div>
+        <div class="cols">
+          <section class="col c-grey">
+            <header><h3>Received</h3><span class="n">3</span></header>
+            <div class="stack">
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Xiaomi Redmi Note 13</h4><span class="rep">DEMO-0011</span></div></div>
+                <p class="prob">Camera app crashes as soon as it opens</p>
+                <div class="meta"><span>Amila P.</span><span class="late">103 days</span></div>
+                <button class="act">Start diagnosing</button>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Apple iPhone 13</h4><span class="rep">DEMO-0012</span></div></div>
+                <p class="prob">Won't hold a charge past midday</p>
+                <div class="meta"><span>Kasun F.</span><span class="late">98 days</span></div>
+                <button class="act">Start diagnosing</button>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Huawei Nova 11</h4><span class="rep">DEMO-0013</span></div></div>
+                <p class="prob">Phone restarts on its own</p>
+                <div class="meta"><span>Nimali S.</span><span>2 days</span></div>
+                <button class="act">Start diagnosing</button>
+              </div>
+            </div>
+          </section>
+          <section class="col c-grey">
+            <header><h3>Diagnosing</h3><span class="n">3</span></header>
+            <div class="stack">
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Samsung Galaxy A54</h4><span class="rep">DEMO-0008</span></div></div>
+                <p class="prob">No sound from earpiece during calls</p>
+                <div class="meta"><span>Chamara D.</span><span class="late">104 days</span></div>
+                <button class="act">Send price</button>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Huawei Nova 11</h4><span class="rep">DEMO-0009</span></div></div>
+                <p class="prob">Phone gets hot and the battery drains fast</p>
+                <div class="meta"><span>Ruwan K.</span><span class="late">96 days</span></div>
+                <button class="act">Send price</button>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Oppo A78</h4><span class="rep">DEMO-0010</span></div></div>
+                <p class="prob">Touch not working at the top of the screen</p>
+                <div class="meta"><span>Dinithi P.</span><span>1 day</span></div>
+                <button class="act">Send price</button>
+              </div>
+            </div>
+          </section>
+          <section class="col c-amber">
+            <header><h3>Waiting for parts</h3><span class="n">3</span></header>
+            <div class="stack">
+              <div class="ca">
+                <div class="dev"><span class="ico amber"><i></i></span><div><h4>Dell Inspiron 15</h4><span class="rep">DEMO-0005</span></div></div>
+                <p class="prob">Keyboard keys not responding (E, R, T)</p>
+                <div class="meta"><span>Sanduni R.</span><span class="late">107 days</span></div>
+                <button class="act">Part arrived</button>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico amber"><i></i></span><div><h4>Samsung Galaxy Watch 5</h4><span class="rep">DEMO-0006</span></div></div>
+                <p class="prob">Screen cracked after a fall</p>
+                <div class="meta"><span>Tharindu J.</span><span class="late">99 days</span></div>
+                <button class="act">Part arrived</button>
+              </div>
+              <div class="more">+ 1 more</div>
+            </div>
+          </section>
+          <section class="col c-blue">
+            <header><h3>Repairing</h3><span class="n">3</span></header>
+            <div class="stack">
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Apple iPhone 11</h4><span class="rep">DEMO-0003</span></div></div>
+                <p class="prob">Battery replacement</p>
+                <div class="meta"><span>Roshan W.</span><span class="late">106 days</span></div>
+                <button class="act blue">Mark ready</button>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico"><i></i></span><div><h4>Samsung Galaxy S23 Ultra</h4><span class="rep">DEMO-0004</span></div></div>
+                <p class="prob">S Pen not detected by the phone</p>
+                <div class="meta"><span>Ishara M.</span><span class="late">101 days</span></div>
+                <button class="act blue">Mark ready</button>
+              </div>
+              <div class="more">+ 1 more</div>
+            </div>
+          </section>
+          <section class="col c-green">
+            <header><h3>Ready for pickup</h3><span class="n">6</span></header>
+            <div class="stack">
+              <div class="ca">
+                <div class="dev"><span class="ico green"><i></i></span><div><h4>OnePlus Nord 3</h4><span class="rep">DEMO-0014</span></div></div>
+                <p class="prob">Speaker crackling at high volume</p>
+                <div class="meta"><span class="money">LKR 9,500 to collect</span></div>
+                <div class="pair"><button class="act ink">Picked up</button><span class="icon" title="Remind on WhatsApp">🔔</span></div>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico green"><i></i></span><div><h4>Apple iPhone 12</h4><span class="rep">DEMO-0015</span></div></div>
+                <p class="prob">Charging port loose</p>
+                <div class="meta"><span class="money" style="color:var(--green)">Paid</span></div>
+                <div class="pair"><button class="act ink">Picked up</button><span class="icon" title="Remind on WhatsApp">🔔</span></div>
+              </div>
+              <div class="ca">
+                <div class="dev"><span class="ico green"><i></i></span><div><h4>Samsung Galaxy A34</h4><span class="rep">DEMO-0016</span></div></div>
+                <p class="prob">Water damage, would not turn on</p>
+                <div class="meta"><span class="money">LKR 14,000 to collect</span></div>
+                <div class="pair"><button class="act ink">Picked up</button><span class="icon" title="Remind on WhatsApp">🔔</span></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div></div>
+    <p class="note">"+ 1 more" only appears in this drawing because the frame is cut at 768px; on the real page the columns keep going and the page scrolls down.</p>
+  </div>
+
+  <!-- ───────────────────────── OPTION B ───────────────────────── -->
+  <div>
+    <div class="label">
+      <b>Option B</b>
+      <h2>Wider columns that slide sideways</h2>
+      <ul>
+        <li>Each column is a fixed 300px, so cards keep a picture and the text never cuts off.</li>
+        <li>About three and a half steps fit on screen; arrow buttons (or the step chips above) slide to the rest.</li>
+        <li>Downside: you can't see every step at once, and "Ready for pickup" (the busiest column) starts off screen.</li>
+      </ul>
+    </div>
+    <div class="scroll"><div class="laptop">
+      <aside class="side">
+        <div class="brand">Ceylon Device Care</div>
+        <div class="new">+ New repair</div>
+        <a>Today</a><a class="on">Repairs</a><a>Customers</a><a>Payments</a><a>Orders</a><a>Products</a><a>Reports</a>
+      </aside>
+      <div class="main">
+        <div class="top">
+          <div><h1>Repairs</h1><p>18 open repairs · 16 waiting more than 3 days</p></div>
+          <div class="seg"><span class="on">Board 18</span><span>Finished</span><span>Unpaid 3</span></div>
+        </div>
+        <div class="steps">
+          <span class="on">Received <em>3</em></span><span>Diagnosing <em>3</em></span><span>Waiting for parts <em>3</em></span><span>Repairing <em>3</em></span><span>Ready for pickup <em>6</em></span>
+        </div>
+        <div class="bwrap">
+          <div class="bcols">
+            <section class="col c-grey">
+              <header><h3>Received</h3><span class="n">3</span></header>
+              <div class="stack">
+                <div class="cb"><span class="pic"><i></i></span><div><h4>Xiaomi Redmi Note 13</h4><p>Camera app crashes as soon as it opens</p><p class="meta">Amila P. · <span style="color:var(--red);font-weight:700">103 days</span></p></div><button class="act">Start diagnosing</button></div>
+                <div class="cb"><span class="pic"><i></i></span><div><h4>Apple iPhone 13</h4><p>Won't hold a charge past midday</p><p class="meta">Kasun F. · <span style="color:var(--red);font-weight:700">98 days</span></p></div><button class="act">Start diagnosing</button></div>
+              </div>
+            </section>
+            <section class="col c-grey">
+              <header><h3>Diagnosing</h3><span class="n">3</span></header>
+              <div class="stack">
+                <div class="cb"><span class="pic"><i></i></span><div><h4>Samsung Galaxy A54</h4><p>No sound from earpiece during calls</p><p class="meta">Chamara D. · <span style="color:var(--red);font-weight:700">104 days</span></p></div><button class="act">Send price</button></div>
+                <div class="cb"><span class="pic"><i></i></span><div><h4>Huawei Nova 11</h4><p>Phone gets hot and the battery drains fast</p><p class="meta">Ruwan K. · <span style="color:var(--red);font-weight:700">96 days</span></p></div><button class="act">Send price</button></div>
+              </div>
+            </section>
+            <section class="col c-amber">
+              <header><h3>Waiting for parts</h3><span class="n">3</span></header>
+              <div class="stack">
+                <div class="cb"><span class="pic amber"><i></i></span><div><h4>Dell Inspiron 15</h4><p>Keyboard keys not responding (E, R, T)</p><p class="meta">Sanduni R. · <span style="color:var(--red);font-weight:700">107 days</span></p></div><button class="act">Part arrived</button></div>
+                <div class="cb"><span class="pic amber"><i></i></span><div><h4>Samsung Galaxy Watch 5</h4><p>Screen cracked after a fall</p><p class="meta">Tharindu J. · <span style="color:var(--red);font-weight:700">99 days</span></p></div><button class="act">Part arrived</button></div>
+              </div>
+            </section>
+            <section class="col c-blue">
+              <header><h3>Repairing</h3><span class="n">3</span></header>
+              <div class="stack">
+                <div class="cb"><span class="pic"><i></i></span><div><h4>Apple iPhone 11</h4><p>Battery replacement</p><p class="meta">Roshan W. · <span style="color:var(--red);font-weight:700">106 days</span></p></div><button class="act blue">Mark ready</button></div>
+              </div>
+            </section>
+          </div>
+          <div class="fade"></div>
+          <span class="arrow" style="right:12px">›</span>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+</body>
+</html>

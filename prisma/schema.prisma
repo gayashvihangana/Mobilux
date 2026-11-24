@@ -160,6 +160,7 @@ model RepairTicket {
   // Payments the shop recorded by hand (cash, card, transfer), oldest first:
   // [{ id, amount, method, at, by }]. paidAmount is kept as their sum.
   billPayments        Json?
+  archivedAt          DateTime? // set when the shop hides a repair from the active list (e.g. never collected); null = shown
   warrantyPeriod      String? // e.g. "3 months" — only shown when the warranty field is enabled
   warrantyParts       String? // e.g. "Display, Battery" — what the warranty covers
   issueWarranty       String? // warranty offered on a free fix after an issue during the repair

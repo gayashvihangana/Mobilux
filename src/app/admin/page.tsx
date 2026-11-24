@@ -85,7 +85,7 @@ export default async function TodayPage() {
   const [active, ready, readyCount, unpaid, monthTickets, paidByTicket] =
     await Promise.all([
       prisma.repairTicket.findMany({
-        where: { status: { in: [...ACTIVE_STATUSES] } },
+        where: { status: { in: [...ACTIVE_STATUSES] }, archivedAt: null },
         orderBy: { createdAt: "asc" },
         select: {
           id: true,
@@ -103,7 +103,7 @@ export default async function TodayPage() {
       }),
       // Fixed and still on the shelf — longest wait first.
       prisma.repairTicket.findMany({
-        where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
+        where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] }, archivedAt: null },
         orderBy: { completedAt: { sort: "asc", nulls: "last" } },
         take: 4,
         select: {
@@ -115,7 +115,7 @@ export default async function TodayPage() {
         },
       }),
       prisma.repairTicket.count({
-        where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] } },
+        where: { status: { in: ["COMPLETED", "READY_FOR_PICKUP"] }, archivedAt: null },
       }),
       prisma.repairTicket.aggregate({
         where: UNPAID_WHERE,

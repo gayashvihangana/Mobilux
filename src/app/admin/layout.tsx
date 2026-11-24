@@ -1,5 +1,7 @@
 import type { Role } from "@prisma/client";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { SIDEBAR_COOKIE } from "@/lib/ui-prefs";
 import { Search } from "lucide-react";
 import { requireStaff } from "@/lib/auth-guard";
 import { can, type Permission } from "@/lib/permissions";
@@ -13,7 +15,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   AdminBottomBar,
-  AdminSidebar,
+  AdminFrame,
   type ShellGroup,
   type ShellLink,
 } from "@/components/admin-shell";
@@ -102,7 +104,7 @@ export default async function AdminLayout({
   const canVerify = can(user, "payment:verify");
   const [shop, openRepairs, paymentsToCheck] = await Promise.all([
     getShopInfo(),
-    prisma.repairTicket.count({ where: { status: { in: [...OPEN_STATUSES] } } }),
+    prisma.repairTicket.count({ where: { status: { in: [...OPEN_STATUSES] }, archivedAt: null } }),
     canVerify
       ? prisma.payment.count({ where: { status: "PENDING_VERIFICATION" } })
       : Promise.resolve(0),
@@ -133,54 +135,55 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-dvh">
-      <AdminSidebar
-        brand={<Logo brand={brand} href="/admin" />}
-        primary={sidebarPrimary}
-        groups={groups}
-        account={
-          <>
+      <AdminFrame
+        initialCollapsed={(await cookies()).get(SIDEBAR_COOKIE)?.value === "collapsed"}
+        sidebar={{
+          brand: <Logo brand={brand} href="/admin" />,
+          primary: sidebarPrimary,
+          groups,
+          account: (
+            <>
+              <UserMenu
+                name={user.name}
+                email={user.email}
+                image={user.image ?? undefined}
+                isAdmin
+              />
+              <span className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">
+                {user.name}
+              </span>
+              <ThemeToggle />
+              <Notifications userId={user.id} />
+            </>
+          ),
+        }}
+      >
+        {/* Phone and tablet: a slim top bar; the menu is at the bottom. */}
+        <header className="sticky top-0 z-30 border-b border-border bg-card lg:hidden">
+          <div className="mx-auto flex h-16 max-w-6xl items-center gap-1 px-3 sm:px-4">
+            <div className="min-w-0 flex-1">
+              <Logo brand={brand} href="/admin" />
+            </div>
+            <Button asChild variant="ghost" size="icon" aria-label="Search repairs">
+              <Link href="/admin/tickets#search">
+                <Search />
+              </Link>
+            </Button>
+            <ThemeToggle />
+            <Notifications userId={user.id} />
             <UserMenu
               name={user.name}
               email={user.email}
               image={user.image ?? undefined}
               isAdmin
             />
-            <span className="min-w-0 flex-1 truncate px-1 text-sm font-semibold">
-              {user.name}
-            </span>
-            <ThemeToggle />
-            <Notifications userId={user.id} />
-          </>
-        }
-      />
-
-      {/* Phone and tablet: a slim top bar; the menu is at the bottom. */}
-      <header className="sticky top-0 z-30 border-b border-border bg-card lg:hidden">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-1 px-3 sm:px-4">
-          <div className="min-w-0 flex-1">
-            <Logo brand={brand} href="/admin" />
           </div>
-          <Button asChild variant="ghost" size="icon" aria-label="Search repairs">
-            <Link href="/admin/tickets#search">
-              <Search />
-            </Link>
-          </Button>
-          <ThemeToggle />
-          <Notifications userId={user.id} />
-          <UserMenu
-            name={user.name}
-            email={user.email}
-            image={user.image ?? undefined}
-            isAdmin
-          />
-        </div>
-      </header>
+        </header>
 
-      <div className="lg:pl-64">
         <main className="mx-auto max-w-6xl px-4 pt-6 pb-28 sm:pt-8 lg:px-8 lg:pt-10 lg:pb-12">
           {children}
         </main>
-      </div>
+      </AdminFrame>
 
       <AdminBottomBar bar={bar} groups={moreGroups} />
     </div>
