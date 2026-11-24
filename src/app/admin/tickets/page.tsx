@@ -271,7 +271,7 @@ export default async function RepairsPage({
   const emptyText = p.q
     ? "No repairs match your search."
     : p.scope === "archived"
-      ? "Nothing archived. Tick repairs in a list and press Archive to hide them here."
+      ? "Nothing archived. Use the ⋯ menu on a repair and pick Archive to hide it here."
       : p.scope === "unpaid"
         ? "Every bill is paid."
         : step

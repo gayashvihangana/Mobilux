@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, ArrowDown, ArrowUp, Loader2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowDown, ArrowUp, ExternalLink, MoreHorizontal } from "lucide-react";
 import type { TicketStatus } from "@prisma/client";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { PhoneGlyph } from "@/components/admin/phone-glyph";
 import { NextStepButton } from "@/components/admin/next-step-button";
 import { setTicketsArchived } from "@/lib/actions/tickets";
 import { cn } from "@/lib/utils";
@@ -33,9 +39,32 @@ export type RepairRowData = {
 
 export type SortKey = "date" | "customer" | "step" | "money";
 
-// The repairs list, like an online shop's orders page: one row per repair
-// with its step, how long it has waited, the money and the next button.
-// Tick rows to archive (hide) or bring back several at once.
+// Picture tile colour per step, as on the old board cards.
+function tile(status: TicketStatus): { bg: string; screen: string } {
+  switch (status) {
+    case "AWAITING_PARTS":
+    case "SUBMITTED":
+    case "CONFIRMED":
+      return { bg: "bg-warning-tint", screen: "fill-amber" };
+    case "IN_PROGRESS":
+      return { bg: "bg-primary", screen: "fill-primary-foreground" };
+    case "COMPLETED":
+    case "READY_FOR_PICKUP":
+      return { bg: "bg-success/15", screen: "fill-card" };
+    case "DIAGNOSING":
+      return { bg: "bg-primary/10", screen: "fill-primary" };
+    default:
+      return { bg: "bg-secondary", screen: "fill-primary/45" };
+  }
+}
+
+// Same columns on the heading row and on every card.
+const GRID =
+  "md:grid md:grid-cols-[3rem_minmax(0,1.4fr)_minmax(0,1fr)_8.5rem_5.5rem_7rem_8.5rem_2.5rem] md:items-center md:gap-3";
+
+// The repairs list: one rounded card per repair with its picture, the
+// problem, the customer, the step, how long it has waited, the money and the
+// next button. The "⋯" menu on each card archives (hides) it or brings it back.
 export function RepairsTable({
   rows,
   sort,
@@ -53,213 +82,156 @@ export function RepairsTable({
   /** Next-step buttons, only on lists of open repairs. */
   showNext: boolean;
 }) {
+  const Heading = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
+    <Link
+      href={sortHref[k]}
+      scroll={false}
+      aria-sort={sort === k ? (dir === "asc" ? "ascending" : "descending") : undefined}
+      className={cn("inline-flex min-h-8 items-center gap-1 hover:text-foreground", sort === k && "text-foreground")}
+    >
+      {children}
+      {sort === k ? dir === "asc" ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" /> : null}
+    </Link>
+  );
+
+  return (
+    <div className="space-y-2">
+      {/* Headings (laptop): click to sort */}
+      <div className={cn("hidden px-3 text-xs font-bold tracking-[0.06em] text-muted-foreground uppercase", GRID)}>
+        <span />
+        <span>Repair</span>
+        <Heading k="customer">Customer</Heading>
+        <Heading k="step">Step</Heading>
+        <Heading k="date">{whenLabel}</Heading>
+        <Heading k="money">Money</Heading>
+        <span />
+        <span />
+      </div>
+
+      <ul className="space-y-2">
+        {rows.map((r) => (
+          <RepairCard key={r.id} r={r} showNext={showNext} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function RepairCard({ r, showNext }: { r: RepairRowData; showNext: boolean }) {
+  const t = tile(r.status);
+  return (
+    <li className={cn("relative rounded-[1.25rem] bg-card p-3 transition-colors hover:bg-accent/50", GRID)}>
+      {/* Picture */}
+      <span className={cn("hidden size-12 place-items-center rounded-xl md:grid", t.bg)}>
+        <PhoneGlyph className="h-8" screen={t.screen} />
+      </span>
+
+      {/* Repair: device, problem, number. The name opens the repair; the
+          link covers the card, buttons sit above it. */}
+      <div className="min-w-0 pr-10 md:pr-0">
+        <h3 className="text-[15px] leading-snug font-extrabold">
+          <Link
+            href={`/admin/tickets/${r.id}`}
+            className="after:absolute after:inset-0 after:rounded-[1.25rem] focus-visible:outline-none focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+          >
+            {r.device}
+          </Link>
+        </h3>
+        <p className="line-clamp-2 text-sm text-foreground/75">{r.problem}</p>
+        <p className="text-xs font-semibold text-muted-foreground">
+          {r.number}
+          {r.archived ? " · Archived" : ""}
+          {/* Phone: customer here, the rest below */}
+          <span className="md:hidden"> · {r.customer}</span>
+        </p>
+      </div>
+
+      {/* Customer */}
+      <div className="hidden min-w-0 md:block">
+        <p className="truncate text-sm font-bold">{r.customer}</p>
+        {r.phone ? <p className="truncate text-xs text-muted-foreground">{r.phone}</p> : null}
+      </div>
+
+      {/* Step, waiting and money: one line on a phone */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 md:contents">
+        <span className={cn("inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap", r.stepClass)}>
+          {r.stepLabel}
+        </span>
+        <span className={cn("text-sm whitespace-nowrap tabular-nums", r.late ? "font-bold text-destructive" : "text-muted-foreground")}>
+          {r.when}
+        </span>
+        <span className={cn("text-sm font-bold whitespace-nowrap tabular-nums", r.moneyClass)}>{r.money}</span>
+      </div>
+
+      {/* Next step */}
+      <div className="relative z-10 mt-3 md:mt-0">
+        {showNext ? (
+          <NextStepButton
+            ticketId={r.id}
+            status={r.status}
+            deviceName={r.device}
+            estimatedCost={r.estimatedCost}
+            tone={r.status === "IN_PROGRESS" ? "primary" : r.status === "COMPLETED" || r.status === "READY_FOR_PICKUP" ? "ink" : "secondary"}
+            className="h-10 w-full px-3 text-[13px]"
+          />
+        ) : null}
+      </div>
+
+      {/* ⋯ menu */}
+      <div className="absolute top-2 right-2 z-10 md:static">
+        <RowMenu r={r} />
+      </div>
+    </li>
+  );
+}
+
+function RowMenu({ r }: { r: RepairRowData }) {
   const router = useRouter();
-  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [pending, start] = useTransition();
-  const allPicked = rows.length > 0 && rows.every((r) => picked.has(r.id));
-  const pickedRows = rows.filter((r) => picked.has(r.id));
-  const restoring = pickedRows.length > 0 && pickedRows.every((r) => r.archived);
-
-  const toggle = (id: string) =>
-    setPicked((p) => {
-      const next = new Set(p);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
-  const archive = (archived: boolean) =>
+  const toggle = (archived: boolean) =>
     start(async () => {
-      const ids = pickedRows.map((r) => r.id);
-      const res = await setTicketsArchived({ ticketIds: ids, archived });
+      const res = await setTicketsArchived({ ticketIds: [r.id], archived });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      setPicked(new Set());
-      toast.success(
-        archived
-          ? `${res.count} repair${res.count === 1 ? "" : "s"} archived. Find them under Archived.`
-          : `${res.count} repair${res.count === 1 ? "" : "s"} back in the list.`,
-        {
-          action: {
-            label: "Undo",
-            onClick: async () => {
-              await setTicketsArchived({ ticketIds: ids, archived: !archived });
-              router.refresh();
-            },
+      toast.success(archived ? `${r.device} archived. Find it under Archived.` : `${r.device} is back in the list.`, {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            await setTicketsArchived({ ticketIds: [r.id], archived: !archived });
+            router.refresh();
           },
         },
-      );
+      });
       router.refresh();
     });
 
-  const Heading = ({ k, children, className }: { k: SortKey; children: React.ReactNode; className?: string }) => (
-    <th className={cn("py-3 pr-3 text-left font-bold", className)} aria-sort={sort === k ? (dir === "asc" ? "ascending" : "descending") : undefined}>
-      <Link
-        href={sortHref[k]}
-        scroll={false}
-        className={cn(
-          "inline-flex min-h-8 items-center gap-1 rounded-md hover:text-foreground",
-          sort === k && "text-foreground",
-        )}
-      >
-        {children}
-        {sort === k ? (dir === "asc" ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />) : null}
-      </Link>
-    </th>
-  );
-
   return (
-    <div className="relative">
-      {/* Bar for ticked rows */}
-      {pickedRows.length > 0 ? (
-        <div className="sticky top-2 z-20 mb-3 flex flex-wrap items-center gap-3 rounded-2xl bg-ink p-2 pl-4 text-ink-foreground shadow-lg">
-          <span className="text-sm font-bold">{pickedRows.length} picked</span>
-          <Button
-            size="sm"
-            className="bg-ink-foreground text-ink hover:bg-ink-foreground/90"
-            onClick={() => archive(!restoring)}
-            disabled={pending}
-          >
-            {pending ? <Loader2 className="animate-spin" /> : restoring ? <ArchiveRestore /> : <Archive />}
-            {restoring ? "Bring back" : "Archive"}
-          </Button>
-          <button
-            type="button"
-            onClick={() => setPicked(new Set())}
-            className="ml-auto inline-flex size-9 items-center justify-center rounded-xl hover:bg-ink-foreground/15"
-            aria-label="Clear ticks"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      ) : null}
-
-      {/* Laptop: table */}
-      <div className="hidden overflow-hidden rounded-[1.5rem] bg-card md:block">
-        <table className="w-full table-fixed text-sm">
-          <colgroup>
-            <col className="w-12" />
-            <col />
-            <col className="w-[17%]" />
-            <col className="w-[10.5rem]" />
-            <col className="w-[6.5rem]" />
-            <col className="w-[8rem]" />
-            {showNext ? <col className="w-[9.5rem]" /> : null}
-          </colgroup>
-          <thead className="bg-secondary/50 text-xs tracking-[0.06em] text-muted-foreground uppercase">
-            <tr>
-              <th className="py-3 pl-4 text-left">
-                <input
-                  type="checkbox"
-                  aria-label="Tick all"
-                  checked={allPicked}
-                  onChange={() => setPicked(allPicked ? new Set() : new Set(rows.map((r) => r.id)))}
-                  className="size-4 accent-primary"
-                />
-              </th>
-              <th className="py-3 pr-3 text-left font-bold">Repair</th>
-              <Heading k="customer">Customer</Heading>
-              <Heading k="step">Step</Heading>
-              <Heading k="date">{whenLabel}</Heading>
-              <Heading k="money">Money</Heading>
-              {showNext ? <th /> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.id}
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("a,button,input,[role=dialog]")) return;
-                  router.push(`/admin/tickets/${r.id}`);
-                }}
-                className={cn(
-                  "cursor-pointer border-t border-border align-middle transition-colors hover:bg-accent/60",
-                  picked.has(r.id) && "bg-primary/5",
-                )}
-              >
-                <td className="py-3 pl-4">
-                  <input
-                    type="checkbox"
-                    aria-label={`Tick ${r.device} ${r.number}`}
-                    checked={picked.has(r.id)}
-                    onChange={() => toggle(r.id)}
-                    className="size-4 accent-primary"
-                  />
-                </td>
-                <td className="py-3 pr-3">
-                  <Link href={`/admin/tickets/${r.id}`} className="block font-extrabold leading-snug hover:underline">
-                    {r.device}
-                  </Link>
-                  <span className="line-clamp-2 text-foreground/80">{r.problem}</span>
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    {r.number}
-                    {r.archived ? " · Archived" : ""}
-                  </span>
-                </td>
-                <td className="py-3 pr-3">
-                  <span className="block truncate font-bold">{r.customer}</span>
-                  {r.phone ? <span className="block truncate text-xs text-muted-foreground">{r.phone}</span> : null}
-                </td>
-                <td className="py-3 pr-3">
-                  <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap", r.stepClass)}>
-                    {r.stepLabel}
-                  </span>
-                </td>
-                <td className={cn("py-3 pr-3 whitespace-nowrap tabular-nums", r.late ? "font-bold text-destructive" : "text-muted-foreground")}>
-                  {r.when}
-                </td>
-                <td className={cn("py-3 pr-3 font-bold whitespace-nowrap tabular-nums", r.moneyClass)}>{r.money}</td>
-                {showNext ? (
-                  <td className="py-2 pr-4">
-                    <NextStepButton
-                      ticketId={r.id}
-                      status={r.status}
-                      deviceName={r.device}
-                      estimatedCost={r.estimatedCost}
-                      tone={r.status === "IN_PROGRESS" ? "primary" : r.status === "COMPLETED" || r.status === "READY_FOR_PICKUP" ? "ink" : "secondary"}
-                      className="h-10 w-full px-3 text-[13px]"
-                    />
-                  </td>
-                ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Phone: one row per repair */}
-      <ul className="overflow-hidden rounded-[1.5rem] bg-card md:hidden">
-        {rows.map((r) => (
-          <li key={r.id} className="flex items-center gap-3 border-t border-border p-3 first:border-t-0">
-            <input
-              type="checkbox"
-              aria-label={`Tick ${r.device} ${r.number}`}
-              checked={picked.has(r.id)}
-              onChange={() => toggle(r.id)}
-              className="size-5 shrink-0 accent-primary"
-            />
-            <Link href={`/admin/tickets/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="min-w-0 flex-1">
-                <span className="block font-extrabold leading-snug">{r.device}</span>
-                <span className="block truncate text-sm text-muted-foreground">
-                  {r.problem} · {r.customer}
-                </span>
-              </span>
-              <span className="flex shrink-0 flex-col items-end gap-1">
-                <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap", r.stepClass)}>
-                  {r.stepLabel}
-                </span>
-                <span className={cn("text-xs tabular-nums", r.late ? "font-bold text-destructive" : "text-muted-foreground")}>
-                  {r.when}
-                </span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={`More for ${r.device} ${r.number}`}
+        disabled={pending}
+        className="grid size-10 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+      >
+        <MoreHorizontal className="size-5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/tickets/${r.id}`}>
+            <ExternalLink /> Open repair
+          </Link>
+        </DropdownMenuItem>
+        {r.archived ? (
+          <DropdownMenuItem onSelect={() => toggle(false)}>
+            <ArchiveRestore /> Bring back
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem onSelect={() => toggle(true)}>
+            <Archive /> Archive
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
