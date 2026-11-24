@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { prisma } from "@/lib/prisma";
 import { getShopInfo } from "@/lib/settings";
 import {
   Card,
@@ -30,13 +29,6 @@ export default async function NewRepairPage({
   const past = mode === "past";
 
   const shop = await getShopInfo();
-  const customers = past
-    ? await prisma.user.findMany({
-        where: { role: "CUSTOMER" },
-        select: { id: true, name: true, email: true },
-        orderBy: { name: "asc" },
-      })
-    : [];
 
   return (
     <div className={past ? "mx-auto max-w-3xl space-y-6" : "mx-auto max-w-2xl space-y-6"}>
@@ -60,7 +52,7 @@ export default async function NewRepairPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {past ? <RepairLogForm customers={customers} /> : <QuickRepairForm problems={shop.commonProblems} />}
+          {past ? <RepairLogForm /> : <QuickRepairForm problems={shop.commonProblems} />}
         </CardContent>
       </Card>
       <p className="text-sm text-muted-foreground">

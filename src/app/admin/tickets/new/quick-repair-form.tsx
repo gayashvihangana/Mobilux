@@ -10,6 +10,7 @@ import { FormAutosave } from "@/components/forms/form-autosave";
 import { adminCreateTicket } from "@/lib/actions/tickets";
 import { cn } from "@/lib/utils";
 import { DeviceFields } from "@/components/forms/device-fields";
+import { CustomerFields } from "@/components/forms/customer-fields";
 
 // Fields that render their own error message below.
 const SHOWN_FIELDS = new Set([
@@ -52,7 +53,6 @@ export function QuickRepairForm({
         storageKey={compact ? "quick-repair" : "new-repair-admin"}
         signal={state}
       />
-      <input type="hidden" name="customerId" value="none" />
       <input type="hidden" name="deviceType" value="PHONE" />
       <input type="hidden" name="status" value="RECEIVED" />
 
@@ -66,36 +66,37 @@ export function QuickRepairForm({
         </div>
       ) : null}
 
-      <div className={cn("grid gap-3", !compact && "gap-5 sm:grid-cols-2")}>
-        <div className="space-y-1.5">
-          <Label htmlFor={id("customerName")} className={cn(compact && "sr-only")}>
-            Customer name
-          </Label>
-          <Input
-            id={id("customerName")}
-            name="customerName"
-            required
-            autoComplete="off"
-            placeholder={compact ? "Customer name" : "e.g. Nimal Perera"}
-          />
-          <FieldError errors={state?.fieldErrors?.customerName} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={id("customerPhone")} className={cn(compact && "sr-only")}>
-            Phone number
-          </Label>
-          <Input
-            id={id("customerPhone")}
-            name="customerPhone"
-            type="tel"
-            inputMode="tel"
-            required
-            autoComplete="off"
-            placeholder={compact ? "Phone number" : "07X XXX XXXX"}
-          />
-          <FieldError errors={state?.fieldErrors?.customerPhone} />
-        </div>
-      </div>
+      <CustomerFields
+        name={{
+          id: id("customerName"),
+          placeholder: compact ? "Customer name" : "Type a name or pick a customer",
+          invalid: !!state?.fieldErrors?.customerName,
+        }}
+        phone={{
+          id: id("customerPhone"),
+          placeholder: compact ? "Phone (optional)" : "07X XXX XXXX",
+          invalid: !!state?.fieldErrors?.customerPhone,
+        }}
+      >
+        {(fields) => (
+          <div className={cn("grid gap-3", !compact && "gap-5 sm:grid-cols-2")}>
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor={id("customerName")} className={cn(compact && "sr-only")}>
+                Customer
+              </Label>
+              {fields.customer}
+              <FieldError errors={state?.fieldErrors?.customerName} />
+            </div>
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor={id("customerPhone")} className={cn(compact && "sr-only")}>
+                Phone number <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              {fields.phone}
+              <FieldError errors={state?.fieldErrors?.customerPhone} />
+            </div>
+          </div>
+        )}
+      </CustomerFields>
 
       <DeviceFields
         brand={{ id: id("brand"), placeholder: compact ? "Brand" : "Type or pick, e.g. Samsung" }}
