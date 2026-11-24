@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 
 // The Repairs page, as in docs/design-samples/repairs-active-list.html.
 // It opens on every active repair as a list (like an online shop's orders
-// page), oldest first. Tabs switch to all repairs, unpaid bills or archived
+// page), newest first. Tabs switch to all repairs, unpaid bills or archived
 // ones; step chips narrow the list; the views show the same repairs as a
 // list, a list with the repair beside it, or wide cards grouped by step.
 
@@ -155,7 +155,7 @@ function href(p: Params, patch: Partial<Params> = {}) {
   if (v.step) s.set("step", v.step);
   if (v.q) s.set("q", v.q);
   if (v.sort !== "date") s.set("sort", v.sort);
-  if (v.dir !== "asc") s.set("dir", v.dir);
+  if (v.dir !== "desc") s.set("dir", v.dir);
   if (v.page && v.page > 1) s.set("page", String(v.page));
   if (v.open) s.set("open", v.open);
   const q = s.toString();
@@ -180,7 +180,7 @@ export default async function RepairsPage({
     step: STEPS.some((s) => s.key === raw.step) ? raw.step : legacyStep,
     q: raw.q?.trim().slice(0, 80) || undefined,
     sort: raw.sort === "customer" || raw.sort === "step" || raw.sort === "money" ? raw.sort : "date",
-    dir: raw.dir === "desc" ? "desc" : "asc",
+    dir: raw.dir === "asc" ? "asc" : "desc",
     page: Math.max(1, Number.parseInt(raw.page ?? "1", 10) || 1),
     open: raw.open,
   };
@@ -206,7 +206,7 @@ export default async function RepairsPage({
   const step = STEPS.find((s) => s.key === p.step);
   const filtered = step ? searched.filter((t) => step.statuses.includes(t.status)) : searched;
 
-  // Sort. Default: oldest first.
+  // Sort. Default: newest first.
   const sign = p.dir === "asc" ? 1 : -1;
   const sorted = [...filtered].sort((a, b) => {
     let d = 0;
@@ -250,7 +250,11 @@ export default async function RepairsPage({
   const sortHref = Object.fromEntries(
     (["date", "customer", "step", "money"] as SortKey[]).map((k) => [
       k,
-      href(p, { sort: k, dir: p.sort === k && p.dir === "asc" ? "desc" : "asc", page: 1 }),
+      href(p, {
+        sort: k,
+        dir: p.sort === k ? (p.dir === "asc" ? "desc" : "asc") : k === "date" || k === "money" ? "desc" : "asc",
+        page: 1,
+      }),
     ]),
   ) as Record<SortKey, string>;
 

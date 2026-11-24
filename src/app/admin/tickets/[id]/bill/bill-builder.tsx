@@ -118,12 +118,9 @@ const newRow = (
   cover,
 });
 
-// Quick-add parts start on the shop's standard warranty (Settings); a new
-// screen starts on touch-only cover, the usual terms for a display.
-const PART_ITEMS = new Set(["Screen", "Battery", "Charging port", "Back cover"]);
-function quickRow(label: string, standard: string): Row {
-  if (!PART_ITEMS.has(label)) return newRow(label);
-  return newRow(label, "", "1", standard, label === "Screen" ? "Touch only" : "");
+// Every item starts with no warranty; pick one per item when it applies.
+function quickRow(label: string): Row {
+  return newRow(label);
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -146,7 +143,7 @@ function toColomboLocalInput(date: Date | null): string {
 
 // A bill with no saved items starts from the repair: the price as labour,
 // plus one line per part the shop used (price to fill in).
-function seedRows(bill: BillTicket, standard: string): Row[] {
+function seedRows(bill: BillTicket): Row[] {
   const saved = normaliseItems(bill.billItems);
   if (saved.length > 0) {
     // Bills saved before items had their own warranty: give the bill's one
@@ -170,14 +167,11 @@ function seedRows(bill: BillTicket, standard: string): Row[] {
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
-  for (const part of parts) rows.push(newRow(part, "", "1", standard));
+  for (const part of parts) rows.push(newRow(part, ""));
   rows.unshift(
     newRow(
       parts.length > 0 ? "Labour" : bill.solution?.trim() || bill.issueTitle || "Repair",
       bill.finalCost ?? bill.estimatedCost ?? "",
-      "1",
-      // With parts listed the warranty sits on them; otherwise on the repair.
-      parts.length > 0 ? "" : standard,
     ),
   );
   return rows;
@@ -204,7 +198,7 @@ function initialValues(
   warrantyDays: number | undefined,
 ): FormValues {
   return {
-    rows: seedRows(bill, standardWarranty(warrantyDays)),
+    rows: seedRows(bill),
     discountMode: bill.billDiscountAmount
       ? "amount"
       : bill.billDiscountPercent
@@ -227,7 +221,6 @@ function initialValues(
   };
 }
 
-const standardWarranty = (days: number | undefined) => (days ? `${days} days` : "");
 
 /** Comparable snapshot of the form (row ids left out). */
 function snapshot(v: FormValues) {
@@ -292,7 +285,7 @@ export function BillBuilder({
   const addRow = (label = "") =>
     setValues((v) => ({
       ...v,
-      rows: [...v.rows, quickRow(label, standardWarranty(shop.warrantyDays))],
+      rows: [...v.rows, quickRow(label)],
     }));
 
   // ── Unsaved draft, kept across reloads until the bill is saved ──

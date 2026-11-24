@@ -171,8 +171,7 @@ export default async function InvoicePage({
               ))}
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
-              Not covered: water or liquid damage, drops, cracks and other physical damage,
-              or repairs by anyone else. Full terms are on the printed bill.
+              Not covered: water or physical damage, or repair by anyone else.
             </p>
           </section>
         ) : bill.isSettled && bill.warrantyEnd && ticket.warrantyPeriod ? (

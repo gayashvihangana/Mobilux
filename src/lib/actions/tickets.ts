@@ -1334,6 +1334,8 @@ export async function moveTicket(input: {
   ticketId: string;
   status: TicketStatus;
   estimatedCost?: number;
+  /** Comment for the timeline and the customer; empty keeps the usual message. */
+  note?: string;
 }): Promise<MoveResult> {
   if (!(await actionPermission("repair:write"))) {
     return { ok: false, error: "Not authorized." };
@@ -1361,6 +1363,7 @@ export async function moveTicket(input: {
   const form = new FormData();
   form.set("ticketId", input.ticketId);
   form.set("status", input.status);
+  if (input.note?.trim()) form.set("note", input.note.trim().slice(0, 500));
   const result = await updateTicketStatus(null, form);
   if (!result?.success) {
     return { ok: false, error: result?.error ?? "Could not update the repair." };
